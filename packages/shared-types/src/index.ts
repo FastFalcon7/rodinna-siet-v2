@@ -3,3 +3,4 @@
 // pribudnú v príslušných týždňoch a budú importované oboma stranami.
 
 export * from './health';
+export * from './auth';

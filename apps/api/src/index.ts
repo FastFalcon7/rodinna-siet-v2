@@ -1,5 +1,9 @@
 import { app, modules } from './core/rpc/app';
 import { env, isDev } from './config/env';
+import { runMigrations } from './core/db/migrate';
+
+// Pred štartom servera aplikuj čakajúce migrácie (idempotentné).
+await runMigrations();
 
 const server = Bun.serve({
   port: env.API_PORT,

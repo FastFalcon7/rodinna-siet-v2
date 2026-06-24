@@ -1,9 +1,10 @@
 import { Hono } from 'hono';
 import { HealthResponseSchema, type HealthResponse } from '@rodinna/shared-types';
 import type { AppModule } from '../../core/module';
+import type { AppEnv } from '../../core/types';
 import { version } from '../../version';
 
-const router = new Hono();
+const router = new Hono<AppEnv>();
 
 /**
  * GET /api/health — liveness check.
