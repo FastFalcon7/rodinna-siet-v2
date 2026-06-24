@@ -1,0 +1,15 @@
+node_modules
+**/node_modules
+dist
+**/dist
+.git
+.env
+.env.local
+*.log
+coverage
+.docker-data
+caddy/data
+caddy/config
+media
+@eaDir
+ARCHITECTURE_V2.md
