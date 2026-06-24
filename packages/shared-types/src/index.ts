@@ -4,3 +4,5 @@
 
 export * from './health';
 export * from './auth';
+export * from './media';
+export * from './users';

@@ -3,7 +3,8 @@
 # závislosti (vrátane dev). Zdroják sa nekopíruje — pripája sa bind-mountom
 # z docker-compose.dev.yml, takže `bun --watch` / Vite HMR reaguje na zmeny.
 
-FROM oven/bun:1.2-alpine
+# glibc (Debian slim), nie Alpine/musl — `sharp` (libvips) je na glibc spoľahlivejší.
+FROM oven/bun:1.2
 WORKDIR /app
 COPY package.json bun.lock* ./
 COPY apps/api/package.json ./apps/api/

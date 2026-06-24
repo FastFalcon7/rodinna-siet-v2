@@ -6,9 +6,10 @@ Synology DS925+. Architektonický návrh: [`ARCHITECTURE_V2.md`](./ARCHITECTURE_
 **Stack:** Bun + Hono + PostgreSQL/pgvector (backend) · Vite 7 + React 19 PWA
 (frontend) · Caddy (TLS) · Docker Compose. Monorepo cez **Bun workspaces**.
 
-> **Stav:** T2a — Auth (email + heslo). Monorepo skeleton, `/api/health`, Docker
-> setup (T1) + DB (Drizzle/Postgres), session auth, invite-only registrácia,
-> login/register UI. Passkey (T2b), Feed, Chat prichádzajú ďalej (`ARCHITECTURE_V2.md §13`).
+> **Stav:** T3 — Users + Media. Monorepo, `/api/health`, Docker (T1), DB + session
+> auth + invite-only registrácia (T2a), a teraz **profily, avatary a upload obrázkov**
+> (sharp re-encode + EXIF/GPS strip + blurhash). Passkey (T2b), Feed, Chat ďalej
+> (`ARCHITECTURE_V2.md §13`).
 
 ## Auth (T2a)
 
@@ -28,8 +29,19 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml exec api \
 ```
 
 Vypíše registračný link `…/register?token=…&email=…`. Otvor ho v prehliadači,
-dokonči registráciu → si admin. Ďalších členov pozývaš rovnako (alebo neskôr
-z UI). Migrácie sa aplikujú automaticky pri štarte api.
+dokonči registráciu → si admin. **Ďalších členov už pozývaš priamo z UI**
+(po prihlásení ako admin → „Pozvať člena" → skopíruj vygenerovaný link).
+Migrácie sa aplikujú automaticky pri štarte api.
+
+## Users + Media (T3)
+
+- **Profil**: úprava zobrazovaného mena, nahranie **avatara** (štvorcový 512×512).
+- **Upload obrázkov**: `sharp` re-encode do WebP, **EXIF/GPS strip** (§9), `blurhash`
+  placeholder, magic-byte kontrola (`file-type`), limit `MAX_IMAGE_MB` (default 50).
+- **Úložisko**: lokálny FS pod `MEDIA_HOST_PATH` (na NAS napr. `/volume1/rodinna/media`),
+  v DB len metadáta. Serve cez `GET /api/media/:id` (auth-gated, privátna sieť).
+- Endpointy: `GET /api/users`, `GET /api/users/:id`, `PATCH /api/users/me`,
+  `POST /api/users/me/avatar`, `POST /api/media`, `GET /api/media/:id`.
 
 ---
 
@@ -101,4 +113,4 @@ docker compose --profile edge up -d --build
 
 ## Roadmap
 
-Pozri `ARCHITECTURE_V2.md §13`. Aktuálne: **T1 hotové.**
+Pozri `ARCHITECTURE_V2.md §13`. Hotové: **T1, T2a, T3.** Ďalej: Feed (T4–5).

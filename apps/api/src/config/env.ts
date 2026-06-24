@@ -13,6 +13,10 @@ const EnvSchema = z.object({
   DATABASE_URL: z.string().min(1, 'DATABASE_URL je povinná'),
   // Životnosť session (dni). Sliding expiration sa predĺži pri aktivite.
   SESSION_TTL_DAYS: z.coerce.number().int().positive().default(30),
+  // Koreňový adresár pre nahrané súbory (na NAS bind-mount /volume1/rodinna/media).
+  MEDIA_PATH: z.string().default('./media'),
+  // Max veľkosť nahrávaného obrázka v MB (§9: 50 MB foto).
+  MAX_IMAGE_MB: z.coerce.number().int().positive().default(50),
 });
 
 export const env = EnvSchema.parse(process.env);

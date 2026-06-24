@@ -1,4 +1,4 @@
-import { pgTable, text, uuid, timestamp, jsonb, index } from 'drizzle-orm/pg-core';
+import { pgTable, text, uuid, timestamp, jsonb, index, integer } from 'drizzle-orm/pg-core';
 
 /**
  * Dátový model (ARCHITECTURE_V2.md §7). T2a zavádza auth tabuľky.
@@ -54,6 +54,36 @@ export const inviteTokens = pgTable('invite_tokens', {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
+/**
+ * Media (§7): nahrané obrázky/videá. Súbor žije na disku (MEDIA_PATH),
+ * v DB len metadáta + relatívna `storage_path`. `blurhash` slúži ako
+ * placeholder pred načítaním (bez CLS). `sha256` na kontrolu integrity.
+ * T3 spracúva obrázky (sharp re-encode + EXIF strip); video pribudne s chatom.
+ */
+export const mediaKindValues = ['image', 'video'] as const;
+
+export const media = pgTable(
+  'media',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    ownerId: uuid('owner_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    kind: text('kind', { enum: mediaKindValues }).notNull(),
+    mime: text('mime').notNull(),
+    bytes: integer('bytes').notNull(),
+    width: integer('width'),
+    height: integer('height'),
+    durationMs: integer('duration_ms'),
+    storagePath: text('storage_path').notNull(),
+    blurhash: text('blurhash'),
+    sha256: text('sha256').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index('media_owner_id_idx').on(t.ownerId)],
+);
+
 export type UserRow = typeof users.$inferSelect;
 export type SessionRow = typeof sessions.$inferSelect;
 export type InviteTokenRow = typeof inviteTokens.$inferSelect;
+export type MediaRow = typeof media.$inferSelect;
