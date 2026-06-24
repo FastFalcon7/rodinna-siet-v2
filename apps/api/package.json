@@ -8,14 +8,21 @@
     "start": "bun src/index.ts",
     "build": "bun build src/index.ts --target bun --outdir dist",
     "typecheck": "tsc --noEmit",
-    "lint": "echo 'lint: api (noop)'"
+    "lint": "echo 'lint: api (noop)'",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "bun src/core/db/migrate.ts",
+    "invite": "bun scripts/create-invite.ts"
   },
   "dependencies": {
+    "@hono/zod-validator": "^0.4.2",
     "@rodinna/shared-types": "workspace:*",
+    "drizzle-orm": "^0.38.3",
     "hono": "^4.6.15",
+    "postgres": "^3.4.5",
     "zod": "^3.24.1"
   },
   "devDependencies": {
-    "@types/bun": "^1.1.14"
+    "@types/bun": "^1.1.14",
+    "drizzle-kit": "^0.30.1"
   }
 }

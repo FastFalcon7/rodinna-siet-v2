@@ -1,4 +1,5 @@
 import type { Hono } from 'hono';
+import type { AppEnv } from './types';
 
 /**
  * Plugin kontrakt (backend) — ARCHITECTURE_V2.md §5.
@@ -11,8 +12,8 @@ import type { Hono } from 'hono';
 export interface AppModule {
   /** Unikátny názov modulu, napr. 'health', 'auth', 'feed'. */
   name: string;
-  /** Hono sub-app, mountovaná na `basePath`. */
-  router: Hono;
+  /** Hono sub-app, mountovaná na `basePath`. Zdieľa AppEnv (user/session vars). */
+  router: Hono<AppEnv>;
   /** Cesta pod /api, kam sa router mountuje, napr. '/health'. */
   basePath: string;
   /** Drizzle migrácie modulu (T2+). */

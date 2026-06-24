@@ -6,8 +6,30 @@ Synology DS925+. Architektonický návrh: [`ARCHITECTURE_V2.md`](./ARCHITECTURE_
 **Stack:** Bun + Hono + PostgreSQL/pgvector (backend) · Vite 7 + React 19 PWA
 (frontend) · Caddy (TLS) · Docker Compose. Monorepo cez **Bun workspaces**.
 
-> **Stav:** T1 — monorepo skeleton + `/api/health` + Docker setup. (Login, Feed,
-> Chat prichádzajú v ďalších týždňoch podľa roadmapy v `ARCHITECTURE_V2.md §13`.)
+> **Stav:** T2a — Auth (email + heslo). Monorepo skeleton, `/api/health`, Docker
+> setup (T1) + DB (Drizzle/Postgres), session auth, invite-only registrácia,
+> login/register UI. Passkey (T2b), Feed, Chat prichádzajú ďalej (`ARCHITECTURE_V2.md §13`).
+
+## Auth (T2a)
+
+- **Email + heslo** (argon2id, natívne v Bune), **invite-only** registrácia.
+- **Session** = opaque token v HttpOnly cookie, hash v DB, sliding expirácia (bez JWT).
+- **RBAC**: prvý registrovaný užívateľ = `admin`, ďalší = `member`.
+- Endpointy: `POST /api/auth/{register,login,logout,invite}`, `GET /api/auth/me`.
+
+### Prvé prihlásenie (bootstrap admina)
+
+Registrovať sa dá len cez pozývací link. Prvú pozvánku vygeneruje admin z CLI
+(v bežiacom api kontajneri, aby použil jeho `DATABASE_URL`):
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.dev.yml exec api \
+  bun apps/api/scripts/create-invite.ts ty@email.sk
+```
+
+Vypíše registračný link `…/register?token=…&email=…`. Otvor ho v prehliadači,
+dokonči registráciu → si admin. Ďalších členov pozývaš rovnako (alebo neskôr
+z UI). Migrácie sa aplikujú automaticky pri štarte api.
 
 ---
 
