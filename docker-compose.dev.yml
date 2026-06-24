@@ -28,7 +28,7 @@ services:
       # zachovaj node_modules z image (nech ich bind-mount neprekryje)
       - /app/node_modules
     ports:
-      - '3000:3000'
+      - '${API_HOST_PORT:-3000}:3000'
 
   web:
     build:
@@ -44,6 +44,6 @@ services:
       - ./tsconfig.base.json:/app/tsconfig.base.json
       - /app/node_modules
     ports:
-      - '5173:5173'
+      - '${WEB_HOST_PORT:-5173}:5173'
     depends_on:
       - api
