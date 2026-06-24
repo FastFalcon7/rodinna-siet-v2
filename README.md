@@ -24,7 +24,7 @@ Registrovať sa dá len cez pozývací link. Prvú pozvánku vygeneruje admin z 
 
 ```bash
 docker compose -f docker-compose.yml -f docker-compose.dev.yml exec api \
-  bun scripts/create-invite.ts ty@email.sk
+  bun apps/api/scripts/create-invite.ts ty@email.sk
 ```
 
 Vypíše registračný link `…/register?token=…&email=…`. Otvor ho v prehliadači,
