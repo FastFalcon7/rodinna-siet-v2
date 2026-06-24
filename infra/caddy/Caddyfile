@@ -1,0 +1,25 @@
+# ── Rodinná Sieť v2 — Caddy ──────────────────────────────────────────────────
+# DOMAIN je env premenná: lokálne "localhost" (Caddy spraví self-signed),
+# v produkcii napr. "rodinna.tvojmeno.synology.me" → auto Let's Encrypt.
+# Zmena domény = úprava DOMAIN v .env, žiadny refactor (ARCHITECTURE_V2.md §2).
+
+{$DOMAIN:localhost} {
+	encode zstd gzip
+
+	# API + WebSocket → api kontajner
+	@api path /api/* /ws
+	reverse_proxy @api api:3000
+
+	# SPA statika
+	root * /srv/web
+	try_files {path} /index.html
+	file_server
+
+	# Bezpečnostné hlavičky (ARCHITECTURE_V2.md §9)
+	header {
+		-Server
+		Referrer-Policy strict-origin-when-cross-origin
+		X-Content-Type-Options nosniff
+		X-Frame-Options DENY
+	}
+}

@@ -1,0 +1,48 @@
+# ── Rodinná Sieť v2 — dev override ───────────────────────────────────────────
+# Použitie: docker compose -f docker-compose.yml -f docker-compose.dev.yml up
+#
+# Rozdiely oproti base:
+#  - postgres vystavený na host (DB nástroje)
+#  - api: dev image + bind-mount zdroja + `bun --watch` hot-reload
+#  - web: nová služba Vite dev server (HMR) na :5173, proxuje /api → api:3000
+#  - caddy sa nespúšťa (je v profile 'edge') → v dev ideme priamo na :5173
+
+services:
+  postgres:
+    ports:
+      - '5432:5432'
+
+  api:
+    build:
+      context: .
+      dockerfile: infra/docker/dev.Dockerfile
+    environment:
+      NODE_ENV: development
+    command: ['bun', '--watch', 'apps/api/src/index.ts']
+    volumes:
+      - ./apps/api:/app/apps/api
+      - ./packages:/app/packages
+      - ./package.json:/app/package.json
+      - ./tsconfig.base.json:/app/tsconfig.base.json
+      # zachovaj node_modules z image (nech ich bind-mount neprekryje)
+      - /app/node_modules
+    ports:
+      - '3000:3000'
+
+  web:
+    build:
+      context: .
+      dockerfile: infra/docker/dev.Dockerfile
+    command: ['bun', 'run', '--filter', '@rodinna/web', 'dev']
+    environment:
+      API_PROXY_TARGET: http://api:3000
+    volumes:
+      - ./apps/web:/app/apps/web
+      - ./packages:/app/packages
+      - ./package.json:/app/package.json
+      - ./tsconfig.base.json:/app/tsconfig.base.json
+      - /app/node_modules
+    ports:
+      - '5173:5173'
+    depends_on:
+      - api

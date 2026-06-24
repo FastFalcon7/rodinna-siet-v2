@@ -1,0 +1,54 @@
+/*
+ * Rodinná Sieť v2 — design tokens (ARCHITECTURE_V2.md §10)
+ * OKLCH paleta: warm coral + deep teal, neutrálny grey 50–950.
+ * Theming cez data-theme="light|dark" + prefers-color-scheme.
+ */
+
+:root {
+  /* Akcenty (nezávislé od témy) */
+  --color-accent: oklch(0.68 0.17 25); /* warm coral */
+  --color-accent-teal: oklch(0.55 0.09 195); /* deep teal */
+
+  /* Typografia */
+  --font-sans: 'Inter Variable', Inter, system-ui, -apple-system, sans-serif;
+  --font-mono: 'Geist Mono', ui-monospace, 'SF Mono', monospace;
+  --leading-feed: 1.55;
+
+  /* Rádiusy / tiene */
+  --radius-sm: 0.5rem;
+  --radius-md: 0.75rem;
+  --radius-lg: 1rem;
+}
+
+/* Svetlá téma (default) */
+:root,
+[data-theme='light'] {
+  color-scheme: light;
+  --color-bg: oklch(0.99 0.005 95);
+  --color-surface: oklch(1 0 0);
+  --color-text: oklch(0.22 0.01 260);
+  --color-text-muted: oklch(0.52 0.01 260);
+  --color-border: oklch(0.92 0.005 260);
+}
+
+/* Tmavá téma */
+[data-theme='dark'] {
+  color-scheme: dark;
+  --color-bg: oklch(0.18 0.01 260);
+  --color-surface: oklch(0.22 0.01 260);
+  --color-text: oklch(0.96 0.005 260);
+  --color-text-muted: oklch(0.68 0.01 260);
+  --color-border: oklch(0.30 0.01 260);
+}
+
+/* Auto podľa systému, ak nie je manuálny override */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) {
+    color-scheme: dark;
+    --color-bg: oklch(0.18 0.01 260);
+    --color-surface: oklch(0.22 0.01 260);
+    --color-text: oklch(0.96 0.005 260);
+    --color-text-muted: oklch(0.68 0.01 260);
+    --color-border: oklch(0.30 0.01 260);
+  }
+}

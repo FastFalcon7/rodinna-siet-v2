@@ -1,0 +1,21 @@
+{
+  "name": "@rodinna/api",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "bun --watch src/index.ts",
+    "start": "bun src/index.ts",
+    "build": "bun build src/index.ts --target bun --outdir dist",
+    "typecheck": "tsc --noEmit",
+    "lint": "echo 'lint: api (noop)'"
+  },
+  "dependencies": {
+    "@rodinna/shared-types": "workspace:*",
+    "hono": "^4.6.15",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.1.14"
+  }
+}

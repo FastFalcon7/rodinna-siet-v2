@@ -1,0 +1,27 @@
+{
+  "name": "rodinna-siet-v2",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "bun run --filter '*' dev",
+    "dev:api": "bun run --filter '@rodinna/api' dev",
+    "dev:web": "bun run --filter '@rodinna/web' dev",
+    "build": "bun run --filter '*' build",
+    "typecheck": "bun run --filter '*' typecheck",
+    "lint": "bun run --filter '*' lint",
+    "compose:dev": "docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build",
+    "compose:up": "docker compose up -d --build",
+    "compose:down": "docker compose down"
+  },
+  "engines": {
+    "bun": ">=1.2.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.3"
+  }
+}

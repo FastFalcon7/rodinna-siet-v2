@@ -1,0 +1,45 @@
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-sans);
+  background: var(--color-bg);
+  color: var(--color-text);
+  line-height: var(--leading-feed);
+  -webkit-font-smoothing: antialiased;
+}
+
+.shell {
+  max-width: 32rem;
+  margin: 0 auto;
+  padding: 4rem 1.5rem;
+}
+
+h1 {
+  font-size: 1.75rem;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+  margin: 0 0 0.25rem;
+}
+
+.muted {
+  color: var(--color-text-muted);
+  margin: 0 0 2rem;
+}
+
+.card {
+  padding: 1rem 1.25rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+}
+
+.ok strong {
+  color: var(--color-accent-teal);
+}
+
+.err {
+  color: var(--color-accent);
+}
