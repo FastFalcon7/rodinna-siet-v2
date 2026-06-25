@@ -14,7 +14,7 @@ export const ALLOWED_REACTION_EMOJIS = ['👍', '❤️', '😂', '😮', '😢'
 export const ReactionEmojiSchema = z.enum(ALLOWED_REACTION_EMOJIS);
 export type ReactionEmoji = z.infer<typeof ReactionEmojiSchema>;
 
-export const ReactionTargetTypeSchema = z.enum(['post', 'comment']);
+export const ReactionTargetTypeSchema = z.enum(['post', 'comment', 'message']);
 export type ReactionTargetType = z.infer<typeof ReactionTargetTypeSchema>;
 
 /** Agregovaný súhrn reakcií na jednom targete (zoskupené podľa emoji). */

@@ -7,3 +7,4 @@ export * from './auth';
 export * from './media';
 export * from './users';
 export * from './feed';
+export * from './chat';

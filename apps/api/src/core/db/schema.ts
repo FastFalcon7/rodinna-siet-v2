@@ -1,4 +1,14 @@
-import { pgTable, text, uuid, timestamp, jsonb, index, integer, unique } from 'drizzle-orm/pg-core';
+import {
+  pgTable,
+  text,
+  uuid,
+  timestamp,
+  jsonb,
+  index,
+  integer,
+  unique,
+  primaryKey,
+} from 'drizzle-orm/pg-core';
 
 /**
  * Dátový model (ARCHITECTURE_V2.md §7). T2a zavádza auth tabuľky.
@@ -149,10 +159,12 @@ export const comments = pgTable(
 );
 
 /**
- * Reakcie — spoločná tabuľka pre posty aj komentáre (a neskôr správy v chate).
+ * Reakcie — spoločná tabuľka pre posty, komentáre aj správy v chate (T6).
  * Jedna reakcia na (target, user): nová emoji prepíše starú, rovnaká emoji = unreact.
+ * `target_type` je obyčajný text (bez DB CHECK), takže pridanie 'message' nevyžaduje
+ * migráciu existujúceho stĺpca.
  */
-export const reactionTargetValues = ['post', 'comment'] as const;
+export const reactionTargetValues = ['post', 'comment', 'message'] as const;
 
 export const reactions = pgTable(
   'reactions',
@@ -171,6 +183,95 @@ export const reactions = pgTable(
     unique('reactions_target_user_unique').on(t.targetType, t.targetId, t.userId),
   ],
 );
+/**
+ * Chat (§7, T6) — miestnosti. `dm` = 1:1 (priama správa), `group` = ľubovoľná
+ * skupina, `family` = jediná spoločná miestnosť všetkých (založí sa lazy).
+ * `dmKey` je kanonický kľúč páru (zoradené user-id spojené `:`) s unique
+ * indexom → garantuje práve jednu DM miestnosť na dvojicu (race-safe cez DB).
+ */
+export const roomKindValues = ['dm', 'group', 'family'] as const;
+
+export const chatRooms = pgTable(
+  'chat_rooms',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    kind: text('kind', { enum: roomKindValues }).notNull(),
+    // null pre DM (názov sa odvodí z druhého člena); povinný len pre skupiny.
+    title: text('title'),
+    avatarUrl: text('avatar_url'),
+    createdBy: uuid('created_by').references(() => users.id, { onDelete: 'set null' }),
+    // Kanonický kľúč DM ("uuidA:uuidB", zoradené). null pre group/family.
+    dmKey: text('dm_key').unique(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index('chat_rooms_kind_idx').on(t.kind)],
+);
+
+/**
+ * Členstvo v miestnosti. `lastReadAt` je zdroj pravdy pre neprečítané aj
+ * potvrdenia o prečítaní (správa je „videná" členom, ak `created_at <= lastReadAt`).
+ * `lastReadMessageId` je len referenčné (kam doskrolovať). PK = (room, user).
+ */
+export const roomMemberRoleValues = ['owner', 'member'] as const;
+
+export const roomMembers = pgTable(
+  'room_members',
+  {
+    roomId: uuid('room_id')
+      .notNull()
+      .references(() => chatRooms.id, { onDelete: 'cascade' }),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    role: text('role', { enum: roomMemberRoleValues }).notNull().default('member'),
+    joinedAt: timestamp('joined_at', { withTimezone: true }).notNull().defaultNow(),
+    lastReadAt: timestamp('last_read_at', { withTimezone: true }),
+    lastReadMessageId: uuid('last_read_message_id'),
+    mutedUntil: timestamp('muted_until', { withTimezone: true }),
+  },
+  (t) => [primaryKey({ columns: [t.roomId, t.userId] }), index('room_members_user_idx').on(t.userId)],
+);
+
+/**
+ * Správy. `replyToId` je self-referencia bez FK constraintu — odpovedať sa dá
+ * aj na neskôr zmazanú správu (zobrazí sa „správa bola zmazaná"). Soft delete
+ * (`deletedAt`) nech reakcie/odpovede neosirie. `bodyMd` môže byť prázdny, ak
+ * správa nesie len prílohy.
+ */
+export const messages = pgTable(
+  'messages',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    roomId: uuid('room_id')
+      .notNull()
+      .references(() => chatRooms.id, { onDelete: 'cascade' }),
+    authorId: uuid('author_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    bodyMd: text('body_md').notNull().default(''),
+    replyToId: uuid('reply_to_id'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    editedAt: timestamp('edited_at', { withTimezone: true }),
+    deletedAt: timestamp('deleted_at', { withTimezone: true }),
+  },
+  (t) => [index('messages_room_created_idx').on(t.roomId, t.createdAt)],
+);
+
+/** Médiá pripojené k správe (poradie v galérii). */
+export const messageMedia = pgTable(
+  'message_media',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    messageId: uuid('message_id')
+      .notNull()
+      .references(() => messages.id, { onDelete: 'cascade' }),
+    mediaId: uuid('media_id')
+      .notNull()
+      .references(() => media.id, { onDelete: 'cascade' }),
+    order: integer('order').notNull().default(0),
+  },
+  (t) => [index('message_media_message_idx').on(t.messageId)],
+);
 
 export type UserRow = typeof users.$inferSelect;
 export type SessionRow = typeof sessions.$inferSelect;
@@ -180,3 +281,7 @@ export type PostRow = typeof posts.$inferSelect;
 export type PostMediaRow = typeof postMedia.$inferSelect;
 export type CommentRow = typeof comments.$inferSelect;
 export type ReactionRow = typeof reactions.$inferSelect;
+export type ChatRoomRow = typeof chatRooms.$inferSelect;
+export type RoomMemberRow = typeof roomMembers.$inferSelect;
+export type MessageRow = typeof messages.$inferSelect;
+export type MessageMediaRow = typeof messageMedia.$inferSelect;
