@@ -203,10 +203,12 @@ users         (id, email, display_name, avatar_url, role, created_at, last_seen_
 sessions      (id, user_id, refresh_token_hash, user_agent, ip, expires_at)
 push_subs     (id, user_id, endpoint, p256dh, auth, device_label, created_at)
 
-posts         (id, author_id, body_md, visibility, created_at, edited_at)
+posts         (id, author_id, body_md, visibility, created_at, edited_at, deleted_at)   -- [T4] deleted_at = soft delete
 post_media    (id, post_id, media_id, order)
-comments      (id, post_id, parent_comment_id, author_id, body_md, created_at)
+comments      (id, post_id, parent_comment_id, author_id, body_md, depth, created_at, edited_at, deleted_at)
+              -- [T4] depth (0-2) = server-side vynútenie max hĺbky 3; deleted_at = soft delete (deti neosirotia)
 reactions     (id, target_type ENUM('post','comment','message'), target_id, user_id, emoji, created_at)
+              -- [T4] UNIQUE(target_type, target_id, user_id): 1 reakcia/užívateľ/cieľ, toggle sémantika
 
 chat_rooms    (id, kind ENUM('dm','group','family'), title, avatar_url, created_at)
 room_members  (room_id, user_id, role, joined_at, last_read_message_id, muted_until)
@@ -326,14 +328,25 @@ rodinna.tvojadomena.synology.me {
 
 | Týždeň | Cieľ |
 |---|---|
-| **T1** | monorepo skeleton (pnpm workspaces), Caddy + Postgres + Bun "hello", deploy na NAS, HTTPS funguje |
-| **T2** | Auth modul (Lucia + invite + Passkey), prvé prihlásenie cez verejnú URL |
-| **T3** | Users + Media (upload, sharp, blurhash), avatary |
-| **T4–5** | Feed (posty, reakcie, komentáre, infinite scroll) |
-| **T6–7** | Chat (WS, typing, push notifikácie, attachments) |
+| **T1** ✅ | monorepo skeleton (Bun workspaces), Caddy + Postgres + Bun "hello", deploy na NAS, HTTPS funguje |
+| **T2a** ✅ | Auth modul (email+heslo argon2id + invite-only), prvé prihlásenie cez verejnú URL. *(T2b Passkey odložené)* |
+| **T3** ✅ | Users + Media (upload, sharp, blurhash, EXIF strip), avatary |
+| **T4–5** | Feed (posty, reakcie, komentáre, ~~infinite scroll~~). **Jadro ✅ overené na NAS-e.** Zostáva: virtualizácia (react-virtuoso + TanStack `useInfiniteQuery`) — viď Odchýlky nižšie a §14.5 |
+| **T6–7** | Chat (WS, typing, push notifikácie, attachments) ← **ďalší krok** |
 | **T8** | PWA polish, install prompts, offline shell, command palette |
 | **T9** | Security audit, rate limiting, **restore drill** |
 | **T10+** | Phase 2 moduly + LLM integrácia |
+
+### Odchýlky implementácie oproti návrhu (živý zoznam)
+
+| Oblasť | Návrh | Realita | Dôvod |
+|---|---|---|---|
+| Feed scroll | react-virtuoso + TanStack `useInfiniteQuery` | tlačidlo „Načítať staršie" + `useState`, cursor (keyset) pagination na BE | max 10 užívateľov, nízky objem; minimum závislostí. **Dlh:** §14.5 (500 postov) zatiaľ nesplnené |
+| Routing | TanStack Router | tab state v `Home.tsx` (Feed ↔ Profil) | netreba file-based routing pri 2 obrazovkách |
+| Server state (web) | TanStack Query | natívny `fetch` + lokálny `useState` | zatiaľ bez cache vrstvy; pridá sa keď začne byť potrebná |
+| Komentáre | `(…, body_md, created_at)` | + `depth`, `edited_at`, `deleted_at` | vynútenie hĺbky a soft delete |
+| Reakcie | bez constraintu | `UNIQUE(target_type,target_id,user_id)` + toggle | 1 reakcia/užívateľ/cieľ |
+| Email pozvánok | — | linky **neposiela** žiadny SMTP; admin ich kopíruje ručne z UI | zámerne (§8), žiadna SMTP závislosť |
 
 ---
 
