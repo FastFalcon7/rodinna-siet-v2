@@ -1,10 +1,18 @@
 import type {
   AuthUserResponse,
+  CommentsResponse,
+  CreateCommentInput,
+  CreatePostInput,
+  FeedPage,
   InviteInput,
   InviteResponse,
   LoginInput,
   MediaPublic,
+  PostPublic,
   RegisterInput,
+  ReactionSummary,
+  SetReactionInput,
+  UpdatePostInput,
   UpdateProfileInput,
   UsersListResponse,
 } from '@rodinna/shared-types';
@@ -69,4 +77,29 @@ export const usersApi = {
 
 export const mediaApi = {
   upload: (file: File) => upload<MediaPublic>('/media', file),
+};
+
+export const feedApi = {
+  list: (cursor?: string | null, limit = 20) => {
+    const params = new URLSearchParams({ limit: String(limit) });
+    if (cursor) params.set('cursor', cursor);
+    return request<FeedPage>(`/feed?${params}`);
+  },
+  createPost: (input: CreatePostInput) =>
+    request<PostPublic>('/feed', { method: 'POST', body: JSON.stringify(input) }),
+  updatePost: (id: string, input: UpdatePostInput) =>
+    request<PostPublic>(`/feed/${id}`, { method: 'PATCH', body: JSON.stringify(input) }),
+  deletePost: (id: string) => request<void>(`/feed/${id}`, { method: 'DELETE' }),
+  listComments: (postId: string) => request<CommentsResponse>(`/feed/${postId}/comments`),
+  createComment: (postId: string, input: CreateCommentInput) =>
+    request<CommentsResponse['comments'][number]>(`/feed/${postId}/comments`, {
+      method: 'POST',
+      body: JSON.stringify(input),
+    }),
+  deleteComment: (id: string) => request<void>(`/feed/comments/${id}`, { method: 'DELETE' }),
+  setReaction: (input: SetReactionInput) =>
+    request<{ reactions: ReactionSummary[] }>('/feed/reactions', {
+      method: 'PUT',
+      body: JSON.stringify(input),
+    }),
 };

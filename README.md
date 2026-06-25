@@ -6,10 +6,10 @@ Synology DS925+. Architektonický návrh: [`ARCHITECTURE_V2.md`](./ARCHITECTURE_
 **Stack:** Bun + Hono + PostgreSQL/pgvector (backend) · Vite 7 + React 19 PWA
 (frontend) · Caddy (TLS) · Docker Compose. Monorepo cez **Bun workspaces**.
 
-> **Stav:** T3 — Users + Media. Monorepo, `/api/health`, Docker (T1), DB + session
-> auth + invite-only registrácia (T2a), a teraz **profily, avatary a upload obrázkov**
-> (sharp re-encode + EXIF/GPS strip + blurhash). Passkey (T2b), Feed, Chat ďalej
-> (`ARCHITECTURE_V2.md §13`).
+> **Stav:** T4 — Feed. Monorepo, `/api/health`, Docker (T1), DB + session auth +
+> invite-only registrácia (T2a), profily/avatary/upload obrázkov (T3), a teraz
+> **rodinný feed**: príspevky s fotkami, vnorené komentáre (max hĺbka 3), reakcie
+> (emoji toggle), cursor pagination. Passkey (T2b), Chat ďalej (`ARCHITECTURE_V2.md §13`).
 
 ## Auth (T2a)
 
@@ -42,6 +42,18 @@ Migrácie sa aplikujú automaticky pri štarte api.
   v DB len metadáta. Serve cez `GET /api/media/:id` (auth-gated, privátna sieť).
 - Endpointy: `GET /api/users`, `GET /api/users/:id`, `PATCH /api/users/me`,
   `POST /api/users/me/avatar`, `POST /api/media`, `GET /api/media/:id`.
+
+## Feed (T4)
+
+- **Príspevky**: text (Markdown-ready) + až 10 fotiek, úprava/zmazanie (autor alebo admin).
+- **Komentáre**: vnorené odpovede max do hĺbky 3 (depth 0–2), mazanie autor/admin.
+- **Reakcie**: 6 emoji (👍❤️😂😮😢🙏), jedna reakcia na užívateľa/cieľ — klik na inú
+  emoji ju nahradí, klik na rovnakú ju zruší (toggle).
+- **Stránkovanie**: keyset (cursor) pagination, najnovšie prvé, tlačidlo „Načítať staršie".
+- Rate limit: 20 príspevkov / 30 komentárov za minútu na užívateľa.
+- Endpointy: `GET/POST /api/feed`, `PATCH/DELETE /api/feed/:id`,
+  `GET/POST /api/feed/:id/comments`, `DELETE /api/feed/comments/:id`,
+  `PUT /api/feed/reactions`.
 
 ---
 
@@ -113,4 +125,4 @@ docker compose --profile edge up -d --build
 
 ## Roadmap
 
-Pozri `ARCHITECTURE_V2.md §13`. Hotové: **T1, T2a, T3.** Ďalej: Feed (T4–5).
+Pozri `ARCHITECTURE_V2.md §13`. Hotové: **T1, T2a, T3, T4.** Ďalej: Chat (T6–7).
