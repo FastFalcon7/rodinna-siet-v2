@@ -5,18 +5,21 @@ import { ProfileCard } from './users/ProfileCard';
 import { MembersList } from './users/MembersList';
 import { InvitePanel } from './users/InvitePanel';
 import { Feed } from './feed/Feed';
+import { ChatProvider, useChat } from './chat/ChatProvider';
+import { Chat } from './chat/Chat';
 
-type Tab = 'feed' | 'profil';
+type Tab = 'feed' | 'chat' | 'profil';
 
-/** Domovská obrazovka: jednoduchá tab navigácia Feed ↔ Profil (bez routera, max 10 užívateľov). */
-export function Home() {
+/** Domovská obrazovka: tab navigácia Feed ↔ Chat ↔ Profil (bez routera, max 10 užívateľov). */
+function HomeInner() {
   const { user, logout } = useAuth();
+  const { totalUnread } = useChat();
   const [tab, setTab] = useState<Tab>('feed');
   if (!user) return null;
 
   return (
     <main className="min-h-dvh px-4 py-10">
-      <div className="mx-auto max-w-2xl space-y-6">
+      <div className={`mx-auto space-y-6 ${tab === 'chat' ? 'max-w-5xl' : 'max-w-2xl'}`}>
         <header className="flex items-center gap-3">
           <Avatar user={user} size={48} />
           <div className="min-w-0">
@@ -39,23 +42,37 @@ export function Home() {
           {(
             [
               ['feed', 'Feed'],
+              ['chat', 'Chat'],
               ['profil', 'Profil a rodina'],
             ] as const
           ).map(([value, label]) => (
             <button
               key={value}
               onClick={() => setTab(value)}
-              className={`flex-1 rounded-lg px-3 py-1.5 text-sm font-medium transition ${
+              className={`relative flex-1 rounded-lg px-3 py-1.5 text-sm font-medium transition ${
                 tab === value
                   ? 'bg-accent text-white'
                   : 'text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800'
               }`}
             >
               {label}
+              {value === 'chat' && totalUnread > 0 && (
+                <span
+                  className={`ml-1.5 inline-grid min-w-5 place-items-center rounded-full px-1.5 text-xs font-semibold ${
+                    tab === 'chat' ? 'bg-white/25 text-white' : 'bg-accent text-white'
+                  }`}
+                >
+                  {totalUnread}
+                </span>
+              )}
             </button>
           ))}
         </nav>
 
+        {/* ChatProvider (socket + unread badge) žije nad všetkými tabmi, takže
+            badge sa aktualizuje stále. Samotný Chat mountujeme len keď je aktívny
+            — inak by sa otvorená konverzácia označovala ako prečítaná na pozadí. */}
+        {tab === 'chat' && <Chat />}
         {tab === 'feed' && <Feed />}
         {tab === 'profil' && (
           <>
@@ -64,11 +81,15 @@ export function Home() {
             <MembersList />
           </>
         )}
-
-        <p className="text-center text-xs text-neutral-400">
-          Ďalej príde <strong>Chat</strong> (T6–7).
-        </p>
       </div>
     </main>
+  );
+}
+
+export function Home() {
+  return (
+    <ChatProvider>
+      <HomeInner />
+    </ChatProvider>
   );
 }

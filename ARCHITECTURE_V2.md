@@ -332,7 +332,8 @@ rodinna.tvojadomena.synology.me {
 | **T2a** ✅ | Auth modul (email+heslo argon2id + invite-only), prvé prihlásenie cez verejnú URL. *(T2b Passkey odložené)* |
 | **T3** ✅ | Users + Media (upload, sharp, blurhash, EXIF strip), avatary |
 | **T4–5** | Feed (posty, reakcie, komentáre, ~~infinite scroll~~). **Jadro ✅ overené na NAS-e.** Zostáva: virtualizácia (react-virtuoso + TanStack `useInfiniteQuery`) — viď Odchýlky nižšie a §14.5 |
-| **T6–7** | Chat (WS, typing, push notifikácie, attachments) ← **ďalší krok** |
+| **T6** ✅ | Chat — **real-time jadro**: natívne Bun WebSockets (pub/sub), DM + skupiny + „Rodina", typing, online presence, read receipts, reakcie + odpovede na správach, foto prílohy, cursor pagination. **Overené E2E (36/36) + browser smoke (2 prehliadače, real-time).** |
+| **T7** | Chat — push notifikácie (web-push/VAPID + worker), video prílohy, hlasovky ← **ďalší krok** |
 | **T8** | PWA polish, install prompts, offline shell, command palette |
 | **T9** | Security audit, rate limiting, **restore drill** |
 | **T10+** | Phase 2 moduly + LLM integrácia |
@@ -347,6 +348,10 @@ rodinna.tvojadomena.synology.me {
 | Komentáre | `(…, body_md, created_at)` | + `depth`, `edited_at`, `deleted_at` | vynútenie hĺbky a soft delete |
 | Reakcie | bez constraintu | `UNIQUE(target_type,target_id,user_id)` + toggle | 1 reakcia/užívateľ/cieľ |
 | Email pozvánok | — | linky **neposiela** žiadny SMTP; admin ich kopíruje ručne z UI | zámerne (§8), žiadna SMTP závislosť |
+| Real-time klient (web) | `partysocket` | vlastná `ChatSocket` trieda (reconnect + exp. backoff + heartbeat) | ~80 riadkov, žiadna závislosť navyše |
+| Chat prílohy | foto **aj video** | zatiaľ **len foto** (cez existujúci `media` pipeline) | video = samostatný slice (T7): upload path + HTTP range serving + prehrávač/poster |
+| Chat push | web-push/VAPID v T6 | **odložené na T7** | push na lock screen sa reálne overí až s PWA (T8); WS protokol je forward-compatible |
+| Read receipts | — | `room_members.last_read_at` nastavený priamo v SQL z `messages.created_at` | round-trip cez JS `Date` orezáva µs → vlastná správa by vyšla ako neprečítaná |
 
 ---
 

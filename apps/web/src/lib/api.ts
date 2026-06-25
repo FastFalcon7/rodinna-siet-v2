@@ -1,16 +1,22 @@
 import type {
   AuthUserResponse,
+  ChatRoomPublic,
   CommentsResponse,
   CreateCommentInput,
   CreatePostInput,
+  CreateRoomInput,
   FeedPage,
   InviteInput,
   InviteResponse,
   LoginInput,
   MediaPublic,
+  MessagePublic,
+  MessagesPage,
   PostPublic,
   RegisterInput,
   ReactionSummary,
+  RoomsListResponse,
+  SendMessageInput,
   SetReactionInput,
   UpdatePostInput,
   UpdateProfileInput,
@@ -101,5 +107,38 @@ export const feedApi = {
     request<{ reactions: ReactionSummary[] }>('/feed/reactions', {
       method: 'PUT',
       body: JSON.stringify(input),
+    }),
+};
+
+export const chatApi = {
+  listRooms: () => request<RoomsListResponse>('/chat/rooms'),
+  getRoom: (id: string) => request<ChatRoomPublic>(`/chat/rooms/${id}`),
+  createRoom: (input: CreateRoomInput) =>
+    request<ChatRoomPublic>('/chat/rooms', { method: 'POST', body: JSON.stringify(input) }),
+  listMessages: (roomId: string, cursor?: string | null, limit = 30) => {
+    const params = new URLSearchParams({ limit: String(limit) });
+    if (cursor) params.set('cursor', cursor);
+    return request<MessagesPage>(`/chat/rooms/${roomId}/messages?${params}`);
+  },
+  sendMessage: (roomId: string, input: SendMessageInput) =>
+    request<MessagePublic>(`/chat/rooms/${roomId}/messages`, {
+      method: 'POST',
+      body: JSON.stringify(input),
+    }),
+  editMessage: (id: string, bodyMd: string) =>
+    request<MessagePublic>(`/chat/messages/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ bodyMd }),
+    }),
+  deleteMessage: (id: string) => request<void>(`/chat/messages/${id}`, { method: 'DELETE' }),
+  markRead: (roomId: string, messageId: string) =>
+    request<{ read: { lastReadAt: string; lastReadMessageId: string } | null }>(
+      `/chat/rooms/${roomId}/read`,
+      { method: 'POST', body: JSON.stringify({ messageId }) },
+    ),
+  setReaction: (messageId: string, emoji: string) =>
+    request<{ reactions: ReactionSummary[] }>('/chat/reactions', {
+      method: 'PUT',
+      body: JSON.stringify({ messageId, emoji }),
     }),
 };

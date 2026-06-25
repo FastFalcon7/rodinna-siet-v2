@@ -6,10 +6,11 @@ Synology DS925+. Architektonický návrh: [`ARCHITECTURE_V2.md`](./ARCHITECTURE_
 **Stack:** Bun + Hono + PostgreSQL/pgvector (backend) · Vite 7 + React 19 PWA
 (frontend) · Caddy (TLS) · Docker Compose. Monorepo cez **Bun workspaces**.
 
-> **Stav:** T4 — Feed. Monorepo, `/api/health`, Docker (T1), DB + session auth +
-> invite-only registrácia (T2a), profily/avatary/upload obrázkov (T3), a teraz
-> **rodinný feed**: príspevky s fotkami, vnorené komentáre (max hĺbka 3), reakcie
-> (emoji toggle), cursor pagination. Passkey (T2b), Chat ďalej (`ARCHITECTURE_V2.md §13`).
+> **Stav:** T6 — Chat (real-time jadro). Monorepo, `/api/health`, Docker (T1), DB +
+> session auth + invite-only registrácia (T2a), profily/avatary/upload obrázkov (T3),
+> rodinný feed (T4), a teraz **real-time chat**: WebSocket správy naživo, DM + skupiny +
+> „Rodina", typing, online presence, read receipts, reakcie a odpovede, foto prílohy.
+> Push notifikácie + video (T7), Passkey (T2b) ďalej (`ARCHITECTURE_V2.md §13`).
 
 ## Auth (T2a)
 
@@ -54,6 +55,23 @@ Migrácie sa aplikujú automaticky pri štarte api.
 - Endpointy: `GET/POST /api/feed`, `PATCH/DELETE /api/feed/:id`,
   `GET/POST /api/feed/:id/comments`, `DELETE /api/feed/comments/:id`,
   `PUT /api/feed/reactions`.
+
+## Chat (T6 — real-time jadro)
+
+- **Real-time** cez natívne **Bun WebSockets** (pub/sub) na `/ws`, autentifikácia
+  cez tú istú session cookie. Auto-reconnect klient (exp. backoff + heartbeat).
+- **Miestnosti**: priame správy (DM, idempotentné — 1 na pár), skupiny a jedna
+  spoločná „Rodina" (všetci členovia, zakladá sa automaticky).
+- **Správy**: text + foto prílohy, **odpovede (reply)**, úprava/zmazanie (autor/admin,
+  soft delete), **reakcie** (zdieľané so feedom), cursor pagination histórie.
+- **Live signály**: typing indikátor, **online presence**, **read receipts** (✓✓ videné),
+  neprečítané (badge), to všetko cez WS eventy.
+- Rate limit: 60 správ / 20 miestností za minútu na užívateľa.
+- Endpointy: `GET/POST /api/chat/rooms`, `GET /api/chat/rooms/:id`,
+  `GET/POST /api/chat/rooms/:id/messages`, `POST /api/chat/rooms/:id/read`,
+  `PATCH/DELETE /api/chat/messages/:id`, `PUT /api/chat/reactions`, WS `/ws`.
+- E2E test (REST + WebSocket): `cd apps/api && bun scripts/test-chat.ts` (potrebuje
+  bežiaci Postgres v `DATABASE_URL`).
 
 ---
 
@@ -125,4 +143,5 @@ docker compose --profile edge up -d --build
 
 ## Roadmap
 
-Pozri `ARCHITECTURE_V2.md §13`. Hotové: **T1, T2a, T3, T4.** Ďalej: Chat (T6–7).
+Pozri `ARCHITECTURE_V2.md §13`. Hotové: **T1, T2a, T3, T4, T6 (chat jadro).**
+Ďalej: T7 (chat push + video), T8 (PWA polish), T2b (Passkey), feed virtualizácia.

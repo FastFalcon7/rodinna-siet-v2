@@ -18,6 +18,12 @@ export default defineConfig({
         target: API_TARGET,
         changeOrigin: true,
       },
+      // WebSocket chatu — proxy s ws:true (prod rieši Caddy: @api path /ws).
+      '/ws': {
+        target: API_TARGET,
+        changeOrigin: true,
+        ws: true,
+      },
     },
   },
 });
