@@ -1,22 +1,6 @@
-import net from 'node:net';
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
-
-// Bun (na NAS aj lokálne `bun run dev`) ešte nemá `Socket#destroySoon` v node:net
-// polyfille — Vite-ov bundlovaný http-proxy ho volá pri ukončení proxovanej
-// odpovede a bez tohto patchu to zhodí celý dev server (SIGILL/segfault) pri
-// prvom requeste cez /api alebo /ws. Vite Node.js implementácia: end() + destroy
-// po dopísaní streamu. Týka sa len dev servera, produkcia ide cez Caddy bez proxy.
-type SocketWithDestroySoon = net.Socket & { destroySoon?: () => void };
-const socketProto = net.Socket.prototype as SocketWithDestroySoon;
-if (typeof socketProto.destroySoon !== 'function') {
-  socketProto.destroySoon = function destroySoon(this: net.Socket) {
-    if (this.writable) this.end();
-    if (this.writableFinished) this.destroy();
-    else this.once('finish', () => this.destroy());
-  };
-}
 
 // Pri dev volá web API cez /api → proxy na api kontajner (alebo localhost:3000).
 // V produkcii ten istý origin obsluhuje Caddy, takže /api ostáva relatívne.

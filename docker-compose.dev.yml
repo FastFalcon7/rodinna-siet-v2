@@ -34,7 +34,9 @@ services:
     build:
       context: .
       dockerfile: infra/docker/dev.Dockerfile
-    command: ['bun', 'run', '--filter', '@rodinna/web', 'dev']
+    # Node (nie bun) — pozri komentár v dev.Dockerfile: Vite-ov proxy potrebuje
+    # reálny node:net (Bunov polyfill chýba Socket#destroySoon).
+    command: ['sh', '-c', 'cd apps/web && node node_modules/.bin/vite']
     environment:
       API_PROXY_TARGET: http://api:3000
     volumes:
