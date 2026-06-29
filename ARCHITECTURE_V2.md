@@ -221,7 +221,8 @@ notifications (id, user_id, kind, payload_json, read_at, created_at)
 audit_log     (id, actor_id, action, entity, entity_id, meta_json, created_at)
 ```
 
-**Phase 2 pridáva:** `notes`, `note_embeddings`, `albums`, `album_photos`, `diary_entries`, `game_sessions`.
+**Phase 2 pridáva:** `notes`, `note_embeddings`, `albums`, `album_photos`, `diary_entries`, `game_sessions`,
+`diary_fragments`, `user_news_prefs`, `news_items` (§15).
 
 ---
 
@@ -347,3 +348,87 @@ rodinna.tvojadomena.synology.me {
 6. **Restore drill:** vymazať `postgres` volume, obnoviť z `pg_dump` → všetky dáta späť.
 7. **LLM-ready:** dummy `/api/llm/chat/completions` vracia stream s mock odpoveďou (Phase 1 acceptance).
 8. **Bezpečnosť:** rate limiter test (curl loop), EXIF strip overený `exiftool` na uploadnutej fotke.
+
+---
+
+## 15. Use cases pre Local LLM (Phase 2, odporúčané a zrealizovateľné)
+
+> Záver diskusie o reálnom využití LLM na CPU-only hardvéri (DS925+, 32 GB RAM, žiadne GPU).
+> Princíp: **real-time chat/feed nikdy nečaká na LLM.** LLM beží buď (a) ako krátky
+> interaktívny dotaz so SSE streamingom, alebo (b) ako async job vo `pg_jobs` queue,
+> ktorý dobehne na pozadí (typicky v noci) a notifikuje cez WS/push, keď je hotový.
+> Ollama na CPU spracúva požiadavky prakticky sériovo → worker používa jeden semafór,
+> nikdy paralelné inferencie. Interaktívne funkcie používajú malý model (`3B Q4`),
+> dávkové joby môžu použiť väčší (`7–8B Q4`), pretože nezáleží na latencii.
+
+### 15.1 Prehľad use cases
+
+| Use case | Typ | Model | Poznámka |
+|---|---|---|---|
+| Týždenný/denný digest aktivity | async job | 3B | zhrnutie feedu/chatu, push notifikácia |
+| Sémantické vyhľadávanie (feed/chat) | interaktívne | embedding (`nomic-embed-text`) | `pgvector`, nájde aj bez presnej zhody slov |
+| Chat assistant (`@asistent`) s function-calling | async job + WS update | 3B | využíva `llmTools` kontrakt modulov (napr. vytvorenie ToDo) |
+| Extrakcia eventov zo správ | async job | 3B | len návrh, nikdy automatická nezvratná akcia |
+| "Spomínaš si?" pripomienky | async job (periodický) | 3B | z `diary_entries`/`album_photos`, na základe dátumu |
+| Personalizované kvízy z rodinnej historie | async job (na vyžiadanie) | 3B–7B | z anonymizovaných faktov diary/album popiskov |
+| Auto-tagging fotiek | nočný batch | malý VLM (napr. Moondream) | nikdy pri uploade, len batch |
+| Prepis hlasových správ | takmer real-time | Whisper.cpp tiny/base | nie je LLM, ale rovnaký CPU rozpočet |
+| **Osobný denník s LLM** | async job (denný) | 3B–7B | detail nižšie §15.2 |
+| **Svet okolo (správy podľa záujmov)** | async job (denný) | 3B | detail nižšie §15.3 |
+
+### 15.2 Osobný denník — detailný návrh
+
+**Zber fragmentov.** Užívateľ priebežne pridáva krátke záznamy (veta, foto, nálada,
+hlasovka) cez "quick capture" UI — nie je to plnohodnotný editor:
+
+```
+diary_fragments (id, user_id, body, source ENUM('manual','feed','chat'),
+                  source_ref_id, created_at)
+```
+
+**Nočný job (per user, per deň).** Worker o 23:30 vezme:
+- `diary_fragments` daného užívateľa za deň,
+- jeho **vlastné** posty z Feedu a **vlastné** odoslané správy z Chatu
+  (cudzí obsah z DM iných ľudí sa nezahŕňa, pokiaľ to užívateľ explicitne nepovolí
+  per-room nastavením),
+
+a poskladá prompt: *"Tu sú surové poznámky a aktivita jedného človeka za deň. Napíš
+z toho súvislý text osobného denníka v 1. osobe, slovensky, teplý a osobný tón.
+Nepridávaj fakty, ktoré tam nie sú."* Pri prázdnom dni (žiadne fragmenty/aktivita)
+job nevytvára draft z ničoho.
+
+**Draft + review (human-in-the-loop, povinné).** Výsledok sa uloží ako návrh, nie
+finálny záznam. Užívateľ ho ráno potvrdí alebo upraví — toto je nutný krok proti
+halucináciám (LLM si nesmie v osobnom denníku domýšľať udalosti, ktoré sa nestali).
+
+**Embedding.** Po potvrdení sa text embedduje (`nomic-embed-text`) do
+`note_embeddings` → umožňuje "Spomínaš si?" pripomienky a sémantické vyhľadávanie
+v denníku.
+
+**Privacy default:** len vlastný obsah užívateľa, zahrnutie skupinového chat
+kontextu je opt-in per room/per užívateľ.
+
+### 15.3 Svet okolo — správy podľa preferencií
+
+Jediné miesto v architektúre, kde je potrebné **výstupné** pripojenie na internet —
+lokálny LLM nepozná aktuálne dianie, dostáva len to, čo mu dodá fetch krok. Ide
+výhradne o jednosmerné čítanie verejných RSS feedov, žiadne rodinné dáta nikam
+neodchádzajú.
+
+```
+user_news_prefs (user_id, category ENUM('sport','politika','technologie','kultura',...))
+news_items       (id, category, title, snippet, source, url, published_at)
+```
+
+- **RSS aggregator job** (bez LLM, čisto sieťový fetch) 2× denne stiahne kurátorované
+  feedy per kategória, uloží len titulok + krátky snippet (1-2 vety) + link + dátum
+  (copyright: nikdy celý článok, rovnaká prax ako napr. FreshRSS).
+- **Diary job rozšírenie:** pri generovaní denníka sa pre kategórie, ktoré má
+  užívateľ nastavené, doplní do promptu 5–10 dnešných titulkov a inštrukcia: *"Na
+  záver denníka doplň krátky odsek 'Svet okolo' — 2-3 vety, použi LEN tieto
+  informácie, nič si nedomýšľaj."*
+- **UI:** sekcia "Svet okolo" je vizuálne oddelená od osobnej časti (iný štýl/farba),
+  aby bolo jasné, že ide o objektívny prehľad, nie súčasť osobného príbehu.
+- **Default:** vypnuté pri registrácii, opt-in s výberom kategórií.
+- **Firewall:** výstupné HTTPS na RSS zdroje treba explicitne povoliť, zvyšok appky
+  zostáva offline-schopný.
