@@ -20,6 +20,13 @@ export function sha256Hex(input: string): string {
   return hasher.digest('hex');
 }
 
+/** SHA-256 hex z binárnych dát (napr. obsah súboru) — kontrola integrity. */
+export function sha256HexBytes(input: Uint8Array): string {
+  const hasher = new Bun.CryptoHasher('sha256');
+  hasher.update(input);
+  return hasher.digest('hex');
+}
+
 /** Hashovanie hesla — argon2id (§8), natívne v Bune (žiadna native závislosť). */
 export function hashPassword(password: string): Promise<string> {
   return Bun.password.hash(password, { algorithm: 'argon2id' });

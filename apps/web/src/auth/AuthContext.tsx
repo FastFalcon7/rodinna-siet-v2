@@ -1,6 +1,11 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
-import type { UserPublic, LoginInput, RegisterInput } from '@rodinna/shared-types';
-import { authApi } from '../lib/api';
+import type {
+  UserPublic,
+  LoginInput,
+  RegisterInput,
+  UpdateProfileInput,
+} from '@rodinna/shared-types';
+import { authApi, usersApi } from '../lib/api';
 
 interface AuthState {
   user: UserPublic | null;
@@ -8,6 +13,8 @@ interface AuthState {
   login: (input: LoginInput) => Promise<void>;
   register: (input: RegisterInput) => Promise<void>;
   logout: () => Promise<void>;
+  updateProfile: (input: UpdateProfileInput) => Promise<void>;
+  uploadAvatar: (file: File) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthState | null>(null);
@@ -40,8 +47,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
   };
 
+  const updateProfile = async (input: UpdateProfileInput) => {
+    const r = await usersApi.updateProfile(input);
+    setUser(r.user);
+  };
+
+  const uploadAvatar = async (file: File) => {
+    const r = await usersApi.uploadAvatar(file);
+    setUser(r.user);
+  };
+
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, logout }}>
+    <AuthContext.Provider
+      value={{ user, loading, login, register, logout, updateProfile, uploadAvatar }}
+    >
       {children}
     </AuthContext.Provider>
   );

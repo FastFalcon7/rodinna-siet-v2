@@ -32,6 +32,11 @@ services:
       DOMAIN: ${DOMAIN:-localhost}
       PUBLIC_WEB_ORIGIN: ${PUBLIC_WEB_ORIGIN:-http://localhost:5173}
       DATABASE_URL: postgres://${POSTGRES_USER:-rodinna}:${POSTGRES_PASSWORD:-rodinna}@postgres:5432/${POSTGRES_DB:-rodinna}
+      MEDIA_PATH: /data/media
+      MAX_IMAGE_MB: ${MAX_IMAGE_MB:-50}
+    volumes:
+      # Nahrané súbory. Na NAS nastav MEDIA_HOST_PATH=/volume1/rodinna/media v .env.
+      - ${MEDIA_HOST_PATH:-./media}:/data/media
     depends_on:
       postgres:
         condition: service_healthy

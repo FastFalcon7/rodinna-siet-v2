@@ -5,7 +5,8 @@
 # Pozn.: build prebieha na NAS/devcontaineri s plným internetom. V cloud sandboxe
 # s reštriktívnym proxy sa image nepullne (to je očakávané, netestuje sa tu).
 
-FROM oven/bun:1.2-alpine AS deps
+# glibc (Debian slim), nie Alpine/musl — `sharp` (libvips) je na glibc spoľahlivejší.
+FROM oven/bun:1.2 AS deps
 WORKDIR /app
 # Najprv len manifesty kvôli docker layer cache.
 COPY package.json bun.lock* ./
@@ -14,7 +15,7 @@ COPY packages/shared-types/package.json ./packages/shared-types/
 COPY packages/ui/package.json ./packages/ui/
 RUN bun install --frozen-lockfile --production || bun install --production
 
-FROM oven/bun:1.2-alpine AS runtime
+FROM oven/bun:1.2 AS runtime
 WORKDIR /app
 ENV NODE_ENV=production
 COPY --from=deps /app/node_modules ./node_modules
@@ -23,8 +24,8 @@ COPY packages ./packages
 COPY apps/api ./apps/api
 
 EXPOSE 3000
-# Healthcheck volá vlastný /api/health endpoint.
+# Healthcheck volá vlastný /api/health endpoint. Cez bun (Debian slim nemá wget/curl).
 HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
-  CMD wget -qO- http://localhost:3000/api/health || exit 1
+  CMD bun -e "fetch('http://localhost:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
 
 CMD ["bun", "apps/api/src/index.ts"]

@@ -36,7 +36,8 @@ Thumbs.db
 .docker-data/
 caddy/data/
 caddy/config/
-media/
+# Iba root upload adresár (nie apps/.../modules/media zdroják!)
+/media/
 
 # Test / coverage
 coverage/

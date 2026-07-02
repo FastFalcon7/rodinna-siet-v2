@@ -5,12 +5,11 @@ import {
   LoginInputSchema,
   RegisterInputSchema,
   InviteInputSchema,
-  type UserPublic,
 } from '@rodinna/shared-types';
 import type { AppEnv } from '../../core/types';
 import type { AppModule } from '../../core/module';
 import { db } from '../../core/db/client';
-import { users, type UserRow } from '../../core/db/schema';
+import { users } from '../../core/db/schema';
 import { env } from '../../config/env';
 import { hashPassword, verifyPassword, DUMMY_PASSWORD_HASH } from './crypto';
 import { createSession, invalidateSession } from './session';
@@ -18,17 +17,7 @@ import { setSessionCookie, clearSessionCookie } from './cookies';
 import { requireAuth, requireAdmin } from './middleware';
 import { createInvite, validateInvite, consumeInvite } from './invite';
 import { rateLimit } from './ratelimit';
-
-function toPublicUser(u: UserRow): UserPublic {
-  return {
-    id: u.id,
-    email: u.email,
-    displayName: u.displayName,
-    avatarUrl: u.avatarUrl,
-    role: u.role,
-    createdAt: u.createdAt.toISOString(),
-  };
-}
+import { toPublicUser } from '../users/service';
 
 function clientIp(c: Context<AppEnv>): string {
   return (

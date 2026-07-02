@@ -7,6 +7,10 @@ import { env } from '../../config/env';
 import { authMiddleware } from '../../modules/auth/middleware';
 import { healthModule } from '../../modules/health';
 import { authModule } from '../../modules/auth';
+import { usersModule } from '../../modules/users';
+import { mediaModule } from '../../modules/media';
+import { feedModule } from '../../modules/feed';
+import { chatModule } from '../../modules/chat';
 
 /**
  * Root Hono app — všetko pod /api. Moduly sa registrujú cez register().
@@ -29,7 +33,14 @@ const api = new Hono<AppEnv>();
 api.use('*', authMiddleware);
 
 /** Kernel + Phase 1 moduly. Phase 2 (feed, chat, notes…) sem pribudnú. */
-const modules: AppModule[] = [healthModule, authModule];
+const modules: AppModule[] = [
+  healthModule,
+  authModule,
+  usersModule,
+  mediaModule,
+  feedModule,
+  chatModule,
+];
 
 function register(target: Hono<AppEnv>, mod: AppModule): void {
   target.route(mod.basePath, mod.router);
