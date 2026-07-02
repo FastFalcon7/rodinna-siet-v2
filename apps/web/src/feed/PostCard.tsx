@@ -78,7 +78,7 @@ export function PostCard({ post, onChange, onDeleted }: PostCardProps) {
         )}
       </div>
 
-      <p className="mt-3 whitespace-pre-wrap text-sm">{post.bodyMd}</p>
+      <p className="mt-3 whitespace-pre-wrap text-sm [overflow-wrap:anywhere]">{post.bodyMd}</p>
 
       {post.media.length > 0 && (
         <div className={`mt-3 grid gap-2 ${post.media.length === 1 ? 'grid-cols-1' : 'grid-cols-2'}`}>

@@ -40,7 +40,7 @@ function MediaGrid({ message }: { message: MessagePublic }) {
             alt=""
             loading="lazy"
             style={m.blurhash ? { backgroundColor: 'rgba(0,0,0,0.05)' } : undefined}
-            className="max-h-72 w-full object-cover"
+            className="max-h-72 w-full max-w-full object-cover"
           />
         </a>
       ))}
@@ -71,7 +71,7 @@ export function MessageBubble({ message, mine, showAuthor, seen, onReply, onEdit
   if (message.deleted) {
     return (
       <div className={`flex ${mine ? 'justify-end' : 'justify-start'}`}>
-        <div className="max-w-[78%] rounded-2xl border border-dashed border-neutral-300 px-3 py-2 text-sm italic text-neutral-400 dark:border-neutral-700">
+        <div className="min-w-0 max-w-[min(78%,32rem)] rounded-2xl border border-dashed border-neutral-300 px-3 py-2 text-sm italic text-neutral-400 dark:border-neutral-700">
           Správa bola zmazaná
         </div>
       </div>
@@ -80,7 +80,9 @@ export function MessageBubble({ message, mine, showAuthor, seen, onReply, onEdit
 
   return (
     <div className={`group flex ${mine ? 'justify-end' : 'justify-start'}`}>
-      <div className={`relative max-w-[78%] ${mine ? 'items-end' : 'items-start'} flex flex-col`}>
+      {/* min-w-0 + overflow-wrap:anywhere: dlhé URL bez medzier inak roztiahnu
+          flex item nad šírku kontajnera (break-word min-content nezmenšuje). */}
+      <div className={`relative min-w-0 max-w-[min(78%,32rem)] ${mine ? 'items-end' : 'items-start'} flex flex-col`}>
         {showAuthor && !mine && (
           <span className="mb-0.5 ml-1 text-xs font-medium text-accent">{message.author.displayName}</span>
         )}
@@ -93,7 +95,7 @@ export function MessageBubble({ message, mine, showAuthor, seen, onReply, onEdit
           }`}
         >
           {message.replyTo && <ReplyQuote message={message.replyTo} mine={mine} />}
-          {message.bodyMd && <p className="whitespace-pre-wrap break-words">{message.bodyMd}</p>}
+          {message.bodyMd && <p className="whitespace-pre-wrap [overflow-wrap:anywhere]">{message.bodyMd}</p>}
           <MediaGrid message={message} />
 
           <span
