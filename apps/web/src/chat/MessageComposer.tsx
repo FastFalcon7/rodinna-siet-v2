@@ -125,7 +125,10 @@ export function MessageComposer({
   };
 
   return (
-    <div className="border-t border-neutral-200 bg-white px-3 py-2 dark:border-neutral-800 dark:bg-neutral-900">
+    <div
+      className="border-t border-neutral-200 bg-white px-3 pt-2 dark:border-neutral-800 dark:bg-neutral-900"
+      style={{ paddingBottom: 'max(0.5rem, env(safe-area-inset-bottom))' }}
+    >
       {(replyTo || editing) && (
         <div className="mb-2 flex items-center gap-2 rounded-lg border-l-2 border-accent bg-neutral-100 px-2 py-1 text-sm dark:bg-neutral-800">
           <div className="min-w-0 flex-1">
