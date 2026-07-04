@@ -319,6 +319,8 @@ rodinna.tvojadomena.synology.me {
 
 > **Pozn.:** Vyhnúť sa DSM built-in reverse proxy (Control Panel → Login Portal) — DSM update prepisuje nginx config. Caddy v Dockeri je čistejší.
 
+> **Aktuálny stav (viď `docs/SYNOLOGY_DOMAIN_ACTIVATION.md`):** Caddy z tohto repa TLS/doménu už nerieši priamo — beží interne za zdieľanou NAS-wide edge vrstvou (samostatný Caddy na 80/443, externá Docker sieť `edge`), spoločnou pre všetky appky na NAS. Umožňuje to pridávať ďalšie appky (poznámky, zápisník letov,…) bez kolízie o porty 80/443.
+
 **Backup:** denný `pg_dump` o 3:00 → `/backups/db-YYYY-MM-DD.sql.gz`; Hyper Backup týždenne na externý USB; mesačne na Synology C2 / Backblaze B2. Retencia 7d/4w/12m. **Restore drill povinný.**
 
 **Monitoring:** Uptime Kuma (endpoint checks + Telegram alert), Glances (CPU/RAM), Caddy structured logs.
