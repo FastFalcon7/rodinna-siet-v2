@@ -8,6 +8,7 @@ import {
   integer,
   unique,
   primaryKey,
+  boolean,
 } from 'drizzle-orm/pg-core';
 
 /**
@@ -288,3 +289,22 @@ export type ChatRoomRow = typeof chatRooms.$inferSelect;
 export type RoomMemberRow = typeof roomMembers.$inferSelect;
 export type MessageRow = typeof messages.$inferSelect;
 export type MessageMediaRow = typeof messageMedia.$inferSelect;
+
+/**
+ * OG link preview cache (DESIGN_REVIEW_FEED_CHAT.md §3.3): každá URL sa
+ * fetchne raz, metadáta sa cachujú tu, og:image ide zmenšený do media.
+ * `ok=false` = negatívna cache (fetch zlyhal), po hodine sa skúsi znova.
+ */
+export const linkPreviews = pgTable('link_previews', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  urlHash: text('url_hash').notNull().unique(),
+  url: text('url').notNull(),
+  ok: boolean('ok').notNull().default(false),
+  title: text('title'),
+  description: text('description'),
+  siteName: text('site_name'),
+  imageMediaId: uuid('image_media_id').references(() => media.id, { onDelete: 'set null' }),
+  fetchedAt: timestamp('fetched_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+export type LinkPreviewRow = typeof linkPreviews.$inferSelect;

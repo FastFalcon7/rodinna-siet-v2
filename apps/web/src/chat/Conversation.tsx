@@ -13,6 +13,15 @@ interface ConversationProps {
   onBack: () => void;
 }
 
+const GROUP_MS = 2 * 60_000;
+
+/** Patria dve susedné správy do jednej skupiny? (rovnaký autor, < 2 min, nie zmazané) */
+function grouped(a: MessagePublic | undefined, b: MessagePublic | undefined): boolean {
+  if (!a || !b) return false;
+  if (a.author.id !== b.author.id || a.deleted || b.deleted) return false;
+  return Math.abs(new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()) < GROUP_MS;
+}
+
 function roomTitle(room: ChatRoomPublic, meId: string): string {
   if (room.kind === 'dm') {
     const other = room.members.find((m) => m.id !== meId);
@@ -182,7 +191,7 @@ export function Conversation({ room, meId, onBack }: ConversationProps) {
       </header>
 
       {/* Správy */}
-      <div ref={scrollRef} onScroll={onScroll} className="flex-1 space-y-1 overflow-y-auto px-3 py-3">
+      <div ref={scrollRef} onScroll={onScroll} className="flex-1 overflow-y-auto px-3 py-3">
         {loadingMore && <p className="py-1 text-center text-xs text-neutral-400">Načítavam staršie…</p>}
         {loading ? (
           <p className="py-10 text-center text-sm text-neutral-400">Načítavam…</p>
@@ -196,12 +205,17 @@ export function Conversation({ room, meId, onBack }: ConversationProps) {
         ) : (
           messages.map((m, i) => {
             const prev = messages[i - 1];
+            const next = messages[i + 1];
             const showDay = !prev || !sameDay(prev.createdAt, m.createdAt);
             const showAuthor = room.kind !== 'dm' && (!prev || prev.author.id !== m.author.id || showDay);
             const mine = m.author.id === meId;
             const seen = mine && !!otherReadMax && m.createdAt <= otherReadMax;
+            // Zoskupovanie (§4.1): po sebe idúce správy autora < 2 min = skupina;
+            // chvost + čas má len posledná, vnútri skupiny je menší rozostup.
+            const groupWithPrev = !showDay && grouped(prev, m);
+            const tail = !(next && sameDay(m.createdAt, next.createdAt) && grouped(m, next));
             return (
-              <div key={m.id}>
+              <div key={m.id} className={groupWithPrev ? 'mt-0.5' : 'mt-2'}>
                 {showDay && (
                   <div className="my-3 flex justify-center">
                     <span className="rounded-full bg-neutral-200/70 px-3 py-0.5 text-xs text-neutral-500 dark:bg-neutral-800">
@@ -214,6 +228,7 @@ export function Conversation({ room, meId, onBack }: ConversationProps) {
                   mine={mine}
                   showAuthor={showAuthor}
                   seen={seen}
+                  tail={tail}
                   onReply={setReplyTo}
                   onEdit={setEditing}
                 />

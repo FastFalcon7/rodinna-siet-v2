@@ -8,6 +8,7 @@ import type {
   FeedPage,
   InviteInput,
   InviteResponse,
+  LinkPreviewPublic,
   LoginInput,
   MediaPublic,
   MessagePublic,
@@ -114,6 +115,11 @@ function uploadWithProgress(file: File, onProgress: (pct: number) => void): Prom
 export const mediaApi = {
   upload: (file: File) => upload<MediaPublic>('/media', file),
   uploadWithProgress,
+};
+
+export const linkPreviewApi = {
+  get: (url: string) =>
+    request<LinkPreviewPublic>(`/link-preview?url=${encodeURIComponent(url)}`),
 };
 
 export const feedApi = {

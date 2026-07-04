@@ -8,3 +8,4 @@ export * from './media';
 export * from './users';
 export * from './feed';
 export * from './chat';
+export * from './linkpreview';
