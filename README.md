@@ -139,7 +139,9 @@ docker compose --profile edge up -d --build
 
 > Synology DDNS doménu (`*.synology.me`, zadarmo) netreba hneď — stačí keď budeš
 > testovať Web Push na iPhone / prístup z mobilnej siete (cca T5–T6). Zmena
-> domény = úprava `DOMAIN` v `.env`, žiadny refactor.
+> domény = úprava `DOMAIN` v `.env`, žiadny refactor. Krok-za-krokom postup
+> aktivácie (DDNS, port forwarding, firewall, `.env`, overenie) je v
+> [`docs/SYNOLOGY_DOMAIN_ACTIVATION.md`](./docs/SYNOLOGY_DOMAIN_ACTIVATION.md).
 
 ## Roadmap
 
