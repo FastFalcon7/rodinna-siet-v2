@@ -20,6 +20,7 @@ Existujúci prototyp (React 19 + Firebase, ~9,6 K riadkov, verzia v0006) je funk
 **Prvá fáza:** Login + **Feed** + **Chat**. Chat musí byť užívateľsky **na úrovni WhatsApp** (push notifikácie na zamknutej obrazovke, real-time, typing indicators, reakcie, attachments).
 
 **Druhá fáza:** Notes/ToDo, Photo Albums, Personal Diary (s LLM), hry/kvízy/krížovky/piškvorky (s LLM).
+Detailný implementačný plán Phase 2 (poradie modulov, integračný kontrakt s Feedom/Chatom, harmonogram): **`docs/MODULES_PLAN_PHASE2.md`**.
 
 ---
 
@@ -339,7 +340,7 @@ rodinna.tvojadomena.synology.me {
 | **T7** | Chat — push notifikácie (web-push/VAPID + worker), video prílohy, hlasovky ← **ďalší krok** |
 | **T8** | PWA polish, install prompts, offline shell, command palette |
 | **T9** | Security audit, rate limiting, **restore drill** |
-| **T10+** | Phase 2 moduly + LLM integrácia |
+| **T10+** | Phase 2 moduly + LLM integrácia — **detailný plán: `docs/MODULES_PLAN_PHASE2.md`** (poradie M0–M7, integračný kontrakt, harmonogram T7–T25) |
 
 ### Odchýlky implementácie oproti návrhu (živý zoznam)
 
