@@ -4,6 +4,8 @@ import { chatApi } from '../lib/api';
 import { MediaItem } from '../shared/MediaItem';
 import { LinkPreviewCard } from '../shared/LinkPreviewCard';
 import { extractFirstUrl, RichBody } from '../shared/linkify';
+import { parseAppLink, stripAppLink } from '../shared/appLink';
+import { EntityCard } from '../app/cards';
 import { useLongPress } from '../shared/useLongPress';
 import { useSwipeReply } from '../shared/useSwipeReply';
 import { formatTime } from './chatTime';
@@ -64,7 +66,11 @@ export function MessageBubble({ message, mine, showAuthor, seen, tail, onReply, 
   // otvorí picker s reakciami + akciami (WhatsApp pattern).
   const longPress = useLongPress(() => setPicker(true));
   const swipe = useSwipeReply(() => onReply(message));
-  const previewUrl = message.media.length === 0 ? extractFirstUrl(message.bodyMd) : null;
+  // Živá karta (app:// link, §M0-4) má prednosť pred OG preview.
+  const appLink = parseAppLink(message.bodyMd);
+  const bodyText = appLink ? stripAppLink(message.bodyMd, appLink) : message.bodyMd;
+  const previewUrl =
+    message.media.length === 0 && !appLink ? extractFirstUrl(message.bodyMd) : null;
 
   const react = async (emoji: string) => {
     if (busy) return;
@@ -126,14 +132,19 @@ export function MessageBubble({ message, mine, showAuthor, seen, tail, onReply, 
           }`}
         >
           {message.replyTo && <ReplyQuote message={message.replyTo} mine={mine} />}
-          {message.bodyMd && (
+          {bodyText && (
             <RichBody
-              text={message.bodyMd}
+              text={bodyText}
               className="whitespace-pre-wrap [overflow-wrap:anywhere]"
               linkClassName={`underline decoration-1 underline-offset-2 hover:opacity-80 ${
                 mine ? 'text-white' : 'text-accent'
               }`}
             />
+          )}
+          {appLink && (
+            <div className={bodyText ? 'mt-1.5' : ''}>
+              <EntityCard module={appLink.module} entityId={appLink.entityId} compact />
+            </div>
           )}
           {previewUrl && (
             <div className="mt-1.5">

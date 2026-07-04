@@ -365,9 +365,35 @@ export const notifications = pgTable(
   (t) => [index('notifications_user_created_idx').on(t.userId, t.createdAt)],
 );
 
+/**
+ * Živé karty vo Feede (plán §M0-4, kontrakt K1): karta ukazuje na entitu
+ * modulu (anketa, album, udalosť…) — render + aktuálny stav si modul rieši
+ * cez vlastné API, feed drží len referenciu a radenie. Prvý konzument: M1
+ * Ankety (UNION s postami v paginácii feedu). V chate karta žije ako
+ * `app://modul/entityId` link v tele správy — bez vlastnej tabuľky.
+ */
+export const feedCards = pgTable(
+  'feed_cards',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    module: text('module').notNull(),
+    entityId: uuid('entity_id').notNull(),
+    authorId: uuid('author_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    deletedAt: timestamp('deleted_at', { withTimezone: true }),
+  },
+  (t) => [
+    index('feed_cards_created_idx').on(t.createdAt),
+    unique('feed_cards_entity_unique').on(t.module, t.entityId),
+  ],
+);
+
 export type JobRow = typeof jobs.$inferSelect;
 export type PushSubRow = typeof pushSubs.$inferSelect;
 export type NotificationRow = typeof notifications.$inferSelect;
+export type FeedCardRow = typeof feedCards.$inferSelect;
 
 export const linkPreviews = pgTable('link_previews', {
   id: uuid('id').primaryKey().defaultRandom(),
