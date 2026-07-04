@@ -83,10 +83,16 @@ function HomeInner() {
             <div className="mx-auto h-full w-full max-w-5xl border-neutral-200 md:border-x dark:border-neutral-800">
               <Chat />
             </div>
+          ) : tab === 'feed' ? (
+            // Feed je edge-to-edge (Bluesky) — bez horizontálneho paddingu na mobile.
+            <div className="h-full overflow-y-auto">
+              <div className="mx-auto max-w-2xl pb-4 md:border-x md:border-neutral-200 dark:md:border-neutral-800">
+                <Feed />
+              </div>
+            </div>
           ) : (
             <div className="h-full overflow-y-auto">
               <div className="mx-auto max-w-2xl space-y-4 px-4 py-4">
-                {tab === 'feed' && <Feed />}
                 {tab === 'profil' && (
                   <>
                     <section className="flex items-center gap-4 rounded-2xl border border-neutral-200 bg-white p-6 dark:border-neutral-800 dark:bg-neutral-900">

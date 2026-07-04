@@ -31,7 +31,11 @@ export function RoomList({ rooms, activeRoomId, meId, onSelect, onNewChat }: Roo
     if (!lm) return 'Zatiaľ žiadne správy';
     if (lm.deleted) return 'Správa bola zmazaná';
     const prefix = room.kind !== 'dm' ? `${lm.author.id === meId ? 'Ty' : lm.author.displayName}: ` : '';
-    if (!lm.bodyMd && lm.media.length > 0) return `${prefix}📷 Fotka`;
+    if (!lm.bodyMd && lm.media.length > 0) {
+      const kind = lm.media[0]!.kind;
+      const label = kind === 'video' ? '🎬 Video' : kind === 'file' ? '📎 Súbor' : '📷 Fotka';
+      return `${prefix}${label}`;
+    }
     return `${prefix}${lm.bodyMd}`;
   };
 

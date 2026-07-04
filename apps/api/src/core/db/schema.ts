@@ -68,9 +68,11 @@ export const inviteTokens = pgTable('invite_tokens', {
  * Media (§7): nahrané obrázky/videá. Súbor žije na disku (MEDIA_PATH),
  * v DB len metadáta + relatívna `storage_path`. `blurhash` slúži ako
  * placeholder pred načítaním (bez CLS). `sha256` na kontrolu integrity.
- * T3 spracúva obrázky (sharp re-encode + EXIF strip); video pribudne s chatom.
+ * T3 spracúva obrázky (sharp re-encode + EXIF strip); video a iné súbory sa
+ * ukladajú ako originál (bez transkódovania — NAS nemá GPU). `file_name` drží
+ * pôvodný názov pre download karty (kind='file').
  */
-export const mediaKindValues = ['image', 'video'] as const;
+export const mediaKindValues = ['image', 'video', 'file'] as const;
 
 export const media = pgTable(
   'media',
@@ -87,6 +89,7 @@ export const media = pgTable(
     durationMs: integer('duration_ms'),
     storagePath: text('storage_path').notNull(),
     blurhash: text('blurhash'),
+    fileName: text('file_name'),
     sha256: text('sha256').notNull(),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },

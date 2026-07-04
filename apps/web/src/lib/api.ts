@@ -81,8 +81,39 @@ export const usersApi = {
   uploadAvatar: (file: File) => upload<AuthUserResponse>('/users/me/avatar', file),
 };
 
+/** Upload cez XHR — jediné API s progress eventmi (fetch ich pri uploade nemá). */
+function uploadWithProgress(file: File, onProgress: (pct: number) => void): Promise<MediaPublic> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', `${API_URL}/media`);
+    xhr.withCredentials = true;
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable) onProgress(Math.round((e.loaded / e.total) * 100));
+    };
+    xhr.onload = () => {
+      let data: unknown = {};
+      try {
+        data = JSON.parse(xhr.responseText);
+      } catch {
+        /* prázdna/nevalidná odpoveď — spadne do error vetvy nižšie */
+      }
+      if (xhr.status >= 200 && xhr.status < 300) {
+        resolve(data as MediaPublic);
+      } else {
+        const err = (data as { error?: unknown } | null)?.error;
+        reject(new ApiError(xhr.status, typeof err === 'string' ? err : `Chyba ${xhr.status}`));
+      }
+    };
+    xhr.onerror = () => reject(new ApiError(0, 'Nahrávanie zlyhalo — skontroluj pripojenie'));
+    const body = new FormData();
+    body.append('file', file);
+    xhr.send(body);
+  });
+}
+
 export const mediaApi = {
   upload: (file: File) => upload<MediaPublic>('/media', file),
+  uploadWithProgress,
 };
 
 export const feedApi = {
