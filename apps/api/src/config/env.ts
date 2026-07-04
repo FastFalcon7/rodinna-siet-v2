@@ -17,6 +17,10 @@ const EnvSchema = z.object({
   MEDIA_PATH: z.string().default('./media'),
   // Max veľkosť nahrávaného obrázka v MB (§9: 50 MB foto).
   MAX_IMAGE_MB: z.coerce.number().int().positive().default(50),
+  // Max veľkosť videa v MB (§9: 200 MB; ukladá sa originál bez transkódovania).
+  MAX_VIDEO_MB: z.coerce.number().int().positive().default(200),
+  // Max veľkosť iného súboru (dokument, PDF…) v MB.
+  MAX_FILE_MB: z.coerce.number().int().positive().default(50),
 });
 
 export const env = EnvSchema.parse(process.env);

@@ -8,6 +8,7 @@ import {
   integer,
   unique,
   primaryKey,
+  boolean,
 } from 'drizzle-orm/pg-core';
 
 /**
@@ -68,9 +69,11 @@ export const inviteTokens = pgTable('invite_tokens', {
  * Media (§7): nahrané obrázky/videá. Súbor žije na disku (MEDIA_PATH),
  * v DB len metadáta + relatívna `storage_path`. `blurhash` slúži ako
  * placeholder pred načítaním (bez CLS). `sha256` na kontrolu integrity.
- * T3 spracúva obrázky (sharp re-encode + EXIF strip); video pribudne s chatom.
+ * T3 spracúva obrázky (sharp re-encode + EXIF strip); video a iné súbory sa
+ * ukladajú ako originál (bez transkódovania — NAS nemá GPU). `file_name` drží
+ * pôvodný názov pre download karty (kind='file').
  */
-export const mediaKindValues = ['image', 'video'] as const;
+export const mediaKindValues = ['image', 'video', 'file'] as const;
 
 export const media = pgTable(
   'media',
@@ -87,6 +90,7 @@ export const media = pgTable(
     durationMs: integer('duration_ms'),
     storagePath: text('storage_path').notNull(),
     blurhash: text('blurhash'),
+    fileName: text('file_name'),
     sha256: text('sha256').notNull(),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
@@ -285,3 +289,22 @@ export type ChatRoomRow = typeof chatRooms.$inferSelect;
 export type RoomMemberRow = typeof roomMembers.$inferSelect;
 export type MessageRow = typeof messages.$inferSelect;
 export type MessageMediaRow = typeof messageMedia.$inferSelect;
+
+/**
+ * OG link preview cache (DESIGN_REVIEW_FEED_CHAT.md §3.3): každá URL sa
+ * fetchne raz, metadáta sa cachujú tu, og:image ide zmenšený do media.
+ * `ok=false` = negatívna cache (fetch zlyhal), po hodine sa skúsi znova.
+ */
+export const linkPreviews = pgTable('link_previews', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  urlHash: text('url_hash').notNull().unique(),
+  url: text('url').notNull(),
+  ok: boolean('ok').notNull().default(false),
+  title: text('title'),
+  description: text('description'),
+  siteName: text('site_name'),
+  imageMediaId: uuid('image_media_id').references(() => media.id, { onDelete: 'set null' }),
+  fetchedAt: timestamp('fetched_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+export type LinkPreviewRow = typeof linkPreviews.$inferSelect;

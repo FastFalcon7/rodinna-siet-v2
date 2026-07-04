@@ -1,7 +1,37 @@
 import sharp from 'sharp';
 import { encode as encodeBlurhash } from 'blurhash';
 import { fileTypeFromBuffer } from 'file-type';
-import { ALLOWED_IMAGE_MIMES } from '@rodinna/shared-types';
+import { ALLOWED_IMAGE_MIMES, ALLOWED_VIDEO_MIMES } from '@rodinna/shared-types';
+
+/** Kategória uploadu podľa magic bytov — určuje spracovanie aj limit veľkosti. */
+export interface DetectedUpload {
+  category: 'image' | 'video' | 'file';
+  mime: string;
+  ext: string;
+}
+
+/**
+ * Rozpozná typ nahraného súboru z magic bytov (nikdy z deklarovaného
+ * Content-Type). Obrázky idú do sharp pipeline, videá zo známych formátov
+ * sa ukladajú ako originál, všetko ostatné je generický súbor.
+ */
+export async function detectUpload(buf: Buffer, fileName: string): Promise<DetectedUpload> {
+  const ft = await fileTypeFromBuffer(buf);
+  if (ft && (ALLOWED_IMAGE_MIMES as readonly string[]).includes(ft.mime)) {
+    return { category: 'image', mime: ft.mime, ext: ft.ext };
+  }
+  if (ft && (ALLOWED_VIDEO_MIMES as readonly string[]).includes(ft.mime)) {
+    return { category: 'video', mime: ft.mime, ext: ft.ext };
+  }
+  // Generický súbor: mime z magic bytov ak existuje, inak octet-stream.
+  // Prípona z pôvodného názvu (len bezpečné znaky), fallback 'bin'.
+  const extFromName = /\.([a-zA-Z0-9]{1,8})$/.exec(fileName)?.[1]?.toLowerCase();
+  return {
+    category: 'file',
+    mime: ft?.mime ?? 'application/octet-stream',
+    ext: ft?.ext ?? extFromName ?? 'bin',
+  };
+}
 
 /** Výsledok spracovania obrázka — pripravený na uloženie + DB záznam. */
 export interface ProcessedImage {
