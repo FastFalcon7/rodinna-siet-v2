@@ -1,9 +1,10 @@
 # ── Rodinná Sieť v2 — Caddy ──────────────────────────────────────────────────
-# DOMAIN je env premenná: lokálne "localhost" (Caddy spraví self-signed),
-# v produkcii napr. "rodinna.tvojmeno.synology.me" → auto Let's Encrypt.
-# Zmena domény = úprava DOMAIN v .env, žiadny refactor (ARCHITECTURE_V2.md §2).
+# Interná appka za zdieľanou NAS-wide edge vrstvou — TLS a doménové routovanie
+# (Synology DDNS, Let's Encrypt) rieši edge Caddy mimo tohto repa, viď
+# docs/SYNOLOGY_DOMAIN_ACTIVATION.md. Tento kontajner len servíruje web
+# statiku a proxuje /api, /ws na čistom HTTP v internej Docker sieti.
 
-{$DOMAIN:localhost} {
+:80 {
 	encode zstd gzip
 
 	# API + WebSocket → api kontajner

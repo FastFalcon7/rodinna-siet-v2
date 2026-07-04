@@ -127,21 +127,20 @@ curl localhost:3000/api/health   # → {"status":"ok",...}
 
 ## Produkčné nasadenie (Synology DS925+)
 
-Plný stack vrátane Caddy (auto-TLS) sa spúšťa s profilom `edge`:
+Web + reverse proxy pre `/api`, `/ws` beží s profilom `edge` — interná appka
+bez publikovaných host portov. TLS (Let's Encrypt) a doménové routovanie rieši
+**zdieľaná NAS-wide edge vrstva** spoločná pre všetky appky na NAS (nielen
+túto), cez externú Docker sieť `edge`:
 
 ```bash
-cp .env.example .env     # nastav DOMAIN, POSTGRES_PASSWORD, atď.
+cp .env.example .env     # nastav DOMAIN, PUBLIC_WEB_ORIGIN, POSTGRES_PASSWORD, atď.
 docker compose --profile edge up -d --build
 ```
 
-- `DOMAIN=localhost` → Caddy self-signed cert (lokálny test).
-- `DOMAIN=rodinna.tvojmeno.synology.me` → Caddy auto Let's Encrypt.
-
-> Synology DDNS doménu (`*.synology.me`, zadarmo) netreba hneď — stačí keď budeš
-> testovať Web Push na iPhone / prístup z mobilnej siete (cca T5–T6). Zmena
-> domény = úprava `DOMAIN` v `.env`, žiadny refactor. Krok-za-krokom postup
-> aktivácie (DDNS, port forwarding, firewall, `.env`, overenie) je v
-> [`docs/SYNOLOGY_DOMAIN_ACTIVATION.md`](./docs/SYNOLOGY_DOMAIN_ACTIVATION.md).
+Kompletný postup — zdieľaná edge vrstva, Synology DDNS, port forwarding,
+pripojenie tejto appky, pridanie ďalších appiek na NAS (napr. poznámky,
+zápisník letov) — je v
+[`docs/SYNOLOGY_DOMAIN_ACTIVATION.md`](./docs/SYNOLOGY_DOMAIN_ACTIVATION.md).
 
 ## Roadmap
 

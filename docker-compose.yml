@@ -41,26 +41,26 @@ services:
       postgres:
         condition: service_healthy
 
-  # Edge: TLS + statický web + reverse proxy. Beží len s `--profile edge` (NAS).
+  # Web + reverse proxy pre /api, /ws. Beží len s `--profile edge` (NAS).
+  # TLS a doménové routovanie rieši zdieľaná NAS-wide edge vrstva (mimo tohto
+  # repa) — preto sa nepublishujú host porty, len pripojenie do siete `edge`.
+  # Postup: docs/SYNOLOGY_DOMAIN_ACTIVATION.md.
   caddy:
     profiles: ['edge']
     build:
       context: .
       dockerfile: infra/docker/web.Dockerfile
     restart: unless-stopped
-    environment:
-      DOMAIN: ${DOMAIN:-localhost}
-    ports:
-      - '80:80'
-      - '443:443'
-      - '443:443/udp'
-    volumes:
-      - caddy-data:/data
-      - caddy-config:/config
+    networks:
+      default: {}
+      edge:
+        aliases: [rodinna-web]
     depends_on:
       - api
 
+networks:
+  edge:
+    external: true
+
 volumes:
   postgres-data:
-  caddy-data:
-  caddy-config:
