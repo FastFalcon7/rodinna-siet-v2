@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { ALLOWED_REACTION_EMOJIS, type MessagePublic } from '@rodinna/shared-types';
 import { chatApi } from '../lib/api';
+import { MediaItem } from '../shared/MediaItem';
+import { useLongPress } from '../shared/useLongPress';
 import { formatTime } from './chatTime';
 
 interface MessageBubbleProps {
@@ -30,19 +32,21 @@ function ReplyQuote({ message, mine }: { message: NonNullable<MessagePublic['rep
 
 function MediaGrid({ message }: { message: MessagePublic }) {
   if (message.media.length === 0) return null;
-  const cols = message.media.length === 1 ? 'grid-cols-1' : 'grid-cols-2';
+  // Obrázky do mriežky; video a súbory pod nimi na plnú šírku bubliny.
+  const images = message.media.filter((m) => m.kind === 'image');
+  const rest = message.media.filter((m) => m.kind !== 'image');
+  const cols = images.length === 1 ? 'grid-cols-1' : 'grid-cols-2';
   return (
-    <div className={`mt-1 grid ${cols} gap-1 overflow-hidden rounded-lg`}>
-      {message.media.map((m) => (
-        <a key={m.id} href={m.url} target="_blank" rel="noreferrer" className="block">
-          <img
-            src={m.url}
-            alt=""
-            loading="lazy"
-            style={m.blurhash ? { backgroundColor: 'rgba(0,0,0,0.05)' } : undefined}
-            className="max-h-72 w-full max-w-full object-cover"
-          />
-        </a>
+    <div className="mt-1 space-y-1">
+      {images.length > 0 && (
+        <div className={`grid ${cols} gap-1 overflow-hidden rounded-lg`}>
+          {images.map((m) => (
+            <MediaItem key={m.id} media={m} className="max-h-72 rounded-none" />
+          ))}
+        </div>
+      )}
+      {rest.map((m) => (
+        <MediaItem key={m.id} media={m} className="max-h-72" />
       ))}
     </div>
   );
@@ -51,6 +55,9 @@ function MediaGrid({ message }: { message: MessagePublic }) {
 export function MessageBubble({ message, mine, showAuthor, seen, onReply, onEdit }: MessageBubbleProps) {
   const [picker, setPicker] = useState(false);
   const [busy, setBusy] = useState(false);
+  // Na dotykových zariadeniach hover akcie neexistujú — long-press na bublinu
+  // otvorí picker s reakciami + akciami (WhatsApp pattern).
+  const longPress = useLongPress(() => setPicker(true));
 
   const react = async (emoji: string) => {
     if (busy) return;
@@ -88,6 +95,7 @@ export function MessageBubble({ message, mine, showAuthor, seen, onReply, onEdit
         )}
 
         <div
+          {...longPress}
           className={`relative rounded-2xl px-3 py-2 text-sm leading-relaxed shadow-sm ${
             mine
               ? 'rounded-br-md bg-accent text-white'
@@ -171,20 +179,62 @@ export function MessageBubble({ message, mine, showAuthor, seen, onReply, onEdit
         </div>
 
         {picker && (
-          <div
-            className={`absolute z-20 ${mine ? 'right-0' : 'left-0'} -top-10 flex gap-1 rounded-2xl border border-neutral-200 bg-white p-1.5 shadow-lg dark:border-neutral-700 dark:bg-neutral-900`}
-          >
-            {ALLOWED_REACTION_EMOJIS.map((emoji) => (
-              <button
-                key={emoji}
-                type="button"
-                onClick={() => react(emoji)}
-                className="rounded-lg px-1 py-0.5 text-lg transition hover:scale-125"
-              >
-                {emoji}
-              </button>
-            ))}
-          </div>
+          <>
+            {/* Klik mimo zavrie picker (dôležité pre touch). */}
+            <div className="fixed inset-0 z-10" onClick={() => setPicker(false)} />
+            <div
+              className={`absolute z-20 ${mine ? 'right-0' : 'left-0'} bottom-full mb-1 w-max rounded-2xl border border-neutral-200 bg-white p-1.5 shadow-lg dark:border-neutral-700 dark:bg-neutral-900`}
+            >
+              <div className="flex gap-1">
+                {ALLOWED_REACTION_EMOJIS.map((emoji) => (
+                  <button
+                    key={emoji}
+                    type="button"
+                    onClick={() => react(emoji)}
+                    className="rounded-lg px-1 py-0.5 text-lg transition hover:scale-125"
+                  >
+                    {emoji}
+                  </button>
+                ))}
+              </div>
+              <div className="mt-1 flex gap-1 border-t border-neutral-100 pt-1 dark:border-neutral-800">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPicker(false);
+                    onReply(message);
+                  }}
+                  className="flex-1 rounded-lg px-2 py-1 text-xs text-neutral-600 transition hover:bg-neutral-100 dark:text-neutral-300 dark:hover:bg-neutral-800"
+                >
+                  ↩ Odpovedať
+                </button>
+                {mine && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPicker(false);
+                        onEdit(message);
+                      }}
+                      className="flex-1 rounded-lg px-2 py-1 text-xs text-neutral-600 transition hover:bg-neutral-100 dark:text-neutral-300 dark:hover:bg-neutral-800"
+                    >
+                      ✎ Upraviť
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPicker(false);
+                        void del();
+                      }}
+                      className="flex-1 rounded-lg px-2 py-1 text-xs text-red-600 transition hover:bg-red-50 dark:hover:bg-red-950"
+                    >
+                      🗑 Zmazať
+                    </button>
+                  </>
+                )}
+              </div>
+            </div>
+          </>
         )}
       </div>
     </div>

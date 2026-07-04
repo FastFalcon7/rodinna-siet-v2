@@ -17,6 +17,7 @@ export function toMediaPublic(row: MediaRow): MediaPublic {
     width: row.width,
     height: row.height,
     blurhash: row.blurhash,
+    fileName: row.fileName,
     createdAt: row.createdAt.toISOString(),
   };
 }
@@ -49,6 +50,42 @@ export async function createImageMedia(
       storagePath,
       blurhash: processed.blurhash,
       sha256: sha256HexBytes(processed.data),
+    })
+    .returning();
+
+  return inserted[0]!;
+}
+
+/**
+ * Uloží video alebo generický súbor ako originál (bez transkódovania —
+ * DS925+ nemá GPU, DESIGN_REVIEW_FEED_CHAT.md §4.3). Pozn.: pri videu sa
+ * na rozdiel od obrázkov nestripujú metadáta (vyžadovalo by ffmpeg re-mux).
+ */
+export async function createRawMedia(
+  ownerId: string,
+  input: Buffer | Uint8Array,
+  info: { kind: 'video' | 'file'; mime: string; ext: string; fileName: string | null },
+): Promise<MediaRow> {
+  const buf = Buffer.isBuffer(input) ? input : Buffer.from(input);
+  const id = crypto.randomUUID();
+  const storagePath = buildStoragePath(id, info.ext);
+
+  await writeMedia(storagePath, buf);
+
+  const inserted = await db
+    .insert(media)
+    .values({
+      id,
+      ownerId,
+      kind: info.kind,
+      mime: info.mime,
+      bytes: buf.length,
+      width: null,
+      height: null,
+      storagePath,
+      blurhash: null,
+      fileName: info.fileName,
+      sha256: sha256HexBytes(buf),
     })
     .returning();
 

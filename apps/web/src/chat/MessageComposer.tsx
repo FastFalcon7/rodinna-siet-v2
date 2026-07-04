@@ -1,7 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
-import type { MediaPublic, MessagePublic } from '@rodinna/shared-types';
-import { chatApi, mediaApi, ApiError } from '../lib/api';
+import type { MessagePublic } from '@rodinna/shared-types';
+import { chatApi, ApiError } from '../lib/api';
 import { useChat } from './ChatProvider';
+import { AttachmentSheet } from '../shared/AttachmentSheet';
+import { UploadPreviews } from '../shared/UploadPreviews';
+import { useMediaUpload } from '../shared/useMediaUpload';
 
 interface MessageComposerProps {
   roomId: string;
@@ -22,12 +25,11 @@ export function MessageComposer({
 }: MessageComposerProps) {
   const { sendTyping } = useChat();
   const [text, setText] = useState('');
-  const [media, setMedia] = useState<MediaPublic[]>([]);
-  const [uploading, setUploading] = useState(false);
+  const uploads = useMediaUpload(10);
+  const [sheet, setSheet] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const taRef = useRef<HTMLTextAreaElement>(null);
-  const fileRef = useRef<HTMLInputElement>(null);
   const typingActive = useRef(false);
   const typingStop = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
@@ -66,27 +68,10 @@ export function MessageComposer({
   // Pri prepnutí miestnosti zhasni typing.
   useEffect(() => () => stopTyping(), [roomId]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const pickFiles = async (files: FileList | null) => {
-    if (!files || files.length === 0) return;
-    setUploading(true);
-    setError(null);
-    try {
-      for (const file of Array.from(files).slice(0, 10)) {
-        const m = await mediaApi.upload(file);
-        setMedia((cur) => (cur.length < 10 ? [...cur, m] : cur));
-      }
-    } catch (e) {
-      setError(e instanceof ApiError ? e.message : 'Nahranie zlyhalo');
-    } finally {
-      setUploading(false);
-      if (fileRef.current) fileRef.current.value = '';
-    }
-  };
-
   const submit = async () => {
     const body = text.trim();
-    if (busy || uploading) return;
-    if (!body && media.length === 0 && !editing) return;
+    if (busy || uploads.uploading) return;
+    if (!body && uploads.mediaIds.length === 0 && !editing) return;
     setBusy(true);
     setError(null);
     stopTyping();
@@ -98,14 +83,14 @@ export function MessageComposer({
       } else {
         const m = await chatApi.sendMessage(roomId, {
           bodyMd: body,
-          mediaIds: media.map((x) => x.id),
+          mediaIds: uploads.mediaIds,
           replyToId: replyTo?.id ?? null,
         });
         onSent(m);
         onClearReply();
       }
       setText('');
-      setMedia([]);
+      uploads.clear();
     } catch (e) {
       setError(e instanceof ApiError ? e.message : 'Odoslanie zlyhalo');
     } finally {
@@ -124,6 +109,12 @@ export function MessageComposer({
     }
   };
 
+  /** Poloha zo sheetu sa vloží do textu — užívateľ môže dopísať poznámku. */
+  const insertLocation = (locText: string) => {
+    setText((cur) => (cur.trim() ? `${cur}\n${locText}` : locText));
+    taRef.current?.focus();
+  };
+
   return (
     <div
       className="border-t border-neutral-200 bg-white px-3 pt-2 dark:border-neutral-800 dark:bg-neutral-900"
@@ -136,7 +127,7 @@ export function MessageComposer({
               {editing ? 'Úprava správy' : `Odpoveď pre ${replyTo!.author.displayName}`}
             </div>
             <div className="truncate text-neutral-500">
-              {editing ? editing.bodyMd : replyTo!.bodyMd || (replyTo!.media.length ? '📷 Fotka' : '')}
+              {editing ? editing.bodyMd : replyTo!.bodyMd || (replyTo!.media.length ? '📎 Príloha' : '')}
             </div>
           </div>
           <button
@@ -149,20 +140,9 @@ export function MessageComposer({
         </div>
       )}
 
-      {media.length > 0 && (
-        <div className="mb-2 flex flex-wrap gap-2">
-          {media.map((m) => (
-            <div key={m.id} className="relative">
-              <img src={m.url} alt="" className="h-16 w-16 rounded-lg object-cover" />
-              <button
-                type="button"
-                onClick={() => setMedia((cur) => cur.filter((x) => x.id !== m.id))}
-                className="absolute -right-1.5 -top-1.5 grid h-5 w-5 place-items-center rounded-full bg-neutral-800 text-xs text-white"
-              >
-                ✕
-              </button>
-            </div>
-          ))}
+      {uploads.items.length > 0 && (
+        <div className="mb-2">
+          <UploadPreviews items={uploads.items} onRemove={uploads.remove} />
         </div>
       )}
 
@@ -172,22 +152,14 @@ export function MessageComposer({
         {!editing && (
           <button
             type="button"
-            onClick={() => fileRef.current?.click()}
-            disabled={uploading}
-            className="shrink-0 rounded-full p-2 text-xl text-neutral-500 transition hover:bg-neutral-100 disabled:opacity-50 dark:hover:bg-neutral-800"
-            title="Pridať fotku"
+            onClick={() => setSheet(true)}
+            className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-2xl leading-none text-neutral-500 transition hover:bg-neutral-100 dark:hover:bg-neutral-800"
+            title="Pridať prílohu"
+            aria-label="Pridať prílohu"
           >
-            {uploading ? '…' : '📎'}
+            +
           </button>
         )}
-        <input
-          ref={fileRef}
-          type="file"
-          accept="image/*"
-          multiple
-          hidden
-          onChange={(e) => pickFiles(e.target.files)}
-        />
         <textarea
           ref={taRef}
           value={text}
@@ -203,12 +175,20 @@ export function MessageComposer({
         <button
           type="button"
           onClick={() => void submit()}
-          disabled={busy || uploading || (!text.trim() && media.length === 0 && !editing)}
+          disabled={busy || uploads.uploading || (!text.trim() && uploads.mediaIds.length === 0 && !editing)}
           className="shrink-0 rounded-full bg-accent px-4 py-2 text-sm font-medium text-white transition hover:opacity-90 disabled:opacity-40"
         >
           {editing ? 'Uložiť' : 'Poslať'}
         </button>
       </div>
+
+      {sheet && (
+        <AttachmentSheet
+          onFiles={uploads.addFiles}
+          onLocation={insertLocation}
+          onClose={() => setSheet(false)}
+        />
+      )}
     </div>
   );
 }

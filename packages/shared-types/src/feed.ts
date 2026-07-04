@@ -35,10 +35,16 @@ export type SetReactionInput = z.infer<typeof SetReactionInputSchema>;
 /** Vnorené komentáre max do hĺbky 3 (depth 0,1,2) — §11. */
 export const MAX_COMMENT_DEPTH = 2;
 
-export const CreatePostInputSchema = z.object({
-  bodyMd: z.string().trim().min(1, 'Príspevok nemôže byť prázdny').max(4000),
-  mediaIds: z.array(z.string().uuid()).max(10).default([]),
-});
+export const CreatePostInputSchema = z
+  .object({
+    // Prázdny text je OK, ak má post aspoň jednu prílohu (rovnaké pravidlo ako chat).
+    bodyMd: z.string().trim().max(4000).default(''),
+    mediaIds: z.array(z.string().uuid()).max(10).default([]),
+  })
+  .refine((v) => v.bodyMd.length > 0 || v.mediaIds.length > 0, {
+    message: 'Príspevok nemôže byť prázdny',
+    path: ['bodyMd'],
+  });
 export type CreatePostInput = z.infer<typeof CreatePostInputSchema>;
 
 export const UpdatePostInputSchema = z.object({

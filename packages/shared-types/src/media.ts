@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
-/** Druh média (§7). T3 spracúva obrázky; video pribudne s chatom. */
-export const MediaKindSchema = z.enum(['image', 'video']);
+/** Druh média (§7): obrázok, video, alebo iný súbor (dokument, PDF…). */
+export const MediaKindSchema = z.enum(['image', 'video', 'file']);
 export type MediaKind = z.infer<typeof MediaKindSchema>;
 
 /**
@@ -18,6 +18,8 @@ export const MediaPublicSchema = z.object({
   width: z.number().int().nullable(),
   height: z.number().int().nullable(),
   blurhash: z.string().nullable(),
+  /** Pôvodný názov súboru — zobrazuje sa pri kind='file' (download karta). */
+  fileName: z.string().nullable(),
   createdAt: z.string(),
 });
 export type MediaPublic = z.infer<typeof MediaPublicSchema>;
@@ -28,4 +30,15 @@ export const ALLOWED_IMAGE_MIMES = [
   'image/png',
   'image/webp',
   'image/gif',
+] as const;
+
+/**
+ * Povolené video MIME typy (magic-byte check). Ukladáme originál bez
+ * transkódovania (DS925+ nemá GPU — DESIGN_REVIEW_FEED_CHAT.md §4.3);
+ * iPhone/Android nahrávajú H.264/HEVC MP4, ktoré prehrá každý klient.
+ */
+export const ALLOWED_VIDEO_MIMES = [
+  'video/mp4',
+  'video/quicktime',
+  'video/webm',
 ] as const;
