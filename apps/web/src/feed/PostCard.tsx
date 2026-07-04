@@ -4,6 +4,8 @@ import { ApiError, feedApi } from '../lib/api';
 import { useAuth } from '../auth/AuthContext';
 import { Avatar } from '../shared/Avatar';
 import { MediaItem } from '../shared/MediaItem';
+import { LinkPreviewCard } from '../shared/LinkPreviewCard';
+import { extractFirstUrl, RichBody } from '../shared/linkify';
 import { fullDateTime, relativeTime } from '../shared/time';
 import { ReactionBar } from './ReactionBar';
 import { CommentThread } from './CommentThread';
@@ -66,6 +68,8 @@ export function PostCard({ post, onChange, onDeleted }: PostCardProps) {
   // Obrázky do mriežky, video a súbory pod nimi na plnú šírku.
   const images = post.media.filter((m) => m.kind === 'image');
   const rest = post.media.filter((m) => m.kind !== 'image');
+  // OG karta len keď post nemá vlastné médiá (inak by sa bili o pozornosť).
+  const previewUrl = post.media.length === 0 ? extractFirstUrl(post.bodyMd) : null;
 
   return (
     <article className="px-4 py-3">
@@ -110,9 +114,17 @@ export function PostCard({ post, onChange, onDeleted }: PostCardProps) {
           </div>
 
           {post.bodyMd && (
-            <p className="mt-1 whitespace-pre-wrap text-[15px] leading-[1.55] [overflow-wrap:anywhere]">
-              {post.bodyMd}
-            </p>
+            <RichBody
+              text={post.bodyMd}
+              className="mt-1 whitespace-pre-wrap text-[15px] leading-[1.55] [overflow-wrap:anywhere]"
+              linkClassName="text-accent underline decoration-1 underline-offset-2 hover:opacity-80"
+            />
+          )}
+
+          {previewUrl && (
+            <div className="mt-2">
+              <LinkPreviewCard url={previewUrl} />
+            </div>
           )}
 
           {post.media.length > 0 && (
