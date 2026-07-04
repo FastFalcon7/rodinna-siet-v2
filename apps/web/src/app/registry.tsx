@@ -1,0 +1,92 @@
+import { useMemo, type ComponentType } from 'react';
+import { Feed } from '../feed/Feed';
+import { Chat } from '../chat/Chat';
+import { useChat } from '../chat/ChatProvider';
+import { consumeRoomParam } from '../shared/deepLink';
+
+/**
+ * Frontend plugin kontrakt (ARCHITECTURE_V2.md §5, plán M0-3 / K4).
+ * Modul = obrazovka + položka v navigácii:
+ *   slot 'bar'  — vlastný slot v bottom nave / sidebari (max ~3),
+ *   slot 'more' — položka v obrazovke „Viac".
+ * Phase 2 modul (Ankety, Albumy…) sa pridá jedným záznamom vo `webModules`
+ * — bez zásahu do Home.tsx.
+ */
+
+export interface WebModule {
+  name: string;
+  label: string;
+  icon: ComponentType<{ className?: string }>;
+  slot: 'bar' | 'more';
+  /**
+   * Layout obrazovky v shelli: 'scroll' = obsah scrolluje v strednom stĺpci
+   * (max-w-2xl, edge-to-edge na mobile), 'full' = modul dostane celú výšku
+   * a scroll si rieši sám (chat).
+   */
+  layout: 'scroll' | 'full';
+  Component: ComponentType;
+  /** Voliteľný badge na ikone (napr. neprečítané správy). Hook — navigácia
+   *  ho volá pri renderi, poradie modulov je stabilné. */
+  useBadge?: () => number;
+}
+
+function FeedScreen() {
+  return <Feed />;
+}
+
+function ChatScreen() {
+  // Deep link z push notifikácie (/?room=…) — skonzumuje sa raz pri mounte.
+  const initialRoomId = useMemo(() => consumeRoomParam(), []);
+  return <Chat initialRoomId={initialRoomId} />;
+}
+
+function useChatBadge(): number {
+  return useChat().totalUnread;
+}
+
+export const webModules: WebModule[] = [
+  {
+    name: 'feed',
+    label: 'Feed',
+    icon: HomeIcon,
+    slot: 'bar',
+    layout: 'scroll',
+    Component: FeedScreen,
+  },
+  {
+    name: 'chat',
+    label: 'Chat',
+    icon: ChatIcon,
+    slot: 'bar',
+    layout: 'full',
+    Component: ChatScreen,
+    useBadge: useChatBadge,
+  },
+];
+
+export function HomeIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden>
+      <path d="M3 10.5 12 3l9 7.5" />
+      <path d="M5 9.5V21h5v-6h4v6h5V9.5" />
+    </svg>
+  );
+}
+
+export function ChatIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden>
+      <path d="M21 11.5a8.5 8.5 0 0 1-8.5 8.5c-1.5 0-2.9-.4-4.1-1L3 20l1.1-5A8.5 8.5 0 1 1 21 11.5Z" />
+    </svg>
+  );
+}
+
+export function MoreIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden>
+      <circle cx="5" cy="12" r="1.6" />
+      <circle cx="12" cy="12" r="1.6" />
+      <circle cx="19" cy="12" r="1.6" />
+    </svg>
+  );
+}

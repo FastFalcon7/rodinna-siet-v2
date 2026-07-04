@@ -12,6 +12,7 @@ import { mediaModule } from '../../modules/media';
 import { feedModule } from '../../modules/feed';
 import { chatModule } from '../../modules/chat';
 import { linkPreviewModule } from '../../modules/linkpreview';
+import { notificationsModule } from '../../modules/notifications';
 
 /**
  * Root Hono app — všetko pod /api. Moduly sa registrujú cez register().
@@ -39,6 +40,7 @@ const modules: AppModule[] = [
   authModule,
   usersModule,
   mediaModule,
+  notificationsModule,
   feedModule,
   chatModule,
   linkPreviewModule,

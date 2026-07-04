@@ -26,6 +26,7 @@ import { toMediaPublic } from '../media/service';
 import { decodeCursor, encodeCursor, type Cursor } from '../feed/cursor';
 import { advanceRead } from './state';
 import { broadcastToRoom, broadcastToUser, joinRoomTopic } from './realtime';
+import { notifyNewMessage } from './notify';
 
 export class NotFoundError extends Error {}
 export class ForbiddenError extends Error {}
@@ -448,6 +449,8 @@ export async function sendMessage(
 
   const [hydrated] = await hydrateMessages([msg], author.id);
   broadcastToRoom(roomId, { t: 'message:new', message: hydrated! });
+  // Push pre offline členov — fire-and-forget, odpoveď naň nečaká.
+  void notifyNewMessage(hydrated!).catch((err) => console.error('notifyNewMessage zlyhal:', err));
   return hydrated!;
 }
 

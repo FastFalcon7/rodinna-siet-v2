@@ -30,6 +30,20 @@ services:
     ports:
       - '${API_HOST_PORT:-3000}:3000'
 
+  worker:
+    build:
+      context: .
+      dockerfile: infra/docker/dev.Dockerfile
+    environment:
+      NODE_ENV: development
+    command: ['bun', '--watch', 'apps/api/src/worker/index.ts']
+    volumes:
+      - ./apps/api:/app/apps/api
+      - ./packages:/app/packages
+      - ./package.json:/app/package.json
+      - ./tsconfig.base.json:/app/tsconfig.base.json
+      - /app/node_modules
+
   web:
     build:
       context: .

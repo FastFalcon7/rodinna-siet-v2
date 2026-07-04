@@ -9,3 +9,4 @@ export * from './users';
 export * from './feed';
 export * from './chat';
 export * from './linkpreview';
+export * from './notifications';

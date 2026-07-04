@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { MediaPublicSchema } from './media';
 import { PostAuthorSchema, ReactionEmojiSchema, ReactionSummarySchema } from './feed';
+import { NotificationPublicSchema } from './notifications';
 
 /**
  * Chat kontrakt (ARCHITECTURE_V2.md §7, T6) — zdieľaný medzi API a webom.
@@ -170,6 +171,8 @@ export const ServerWsEventSchema = z.discriminatedUnion('t', [
     lastReadMessageId: z.string().uuid(),
   }),
   z.object({ t: z.literal('room:new'), room: ChatRoomPublicSchema }),
+  // In-app notifikácia (M0 notifications kernel) — live update zvončeka.
+  z.object({ t: z.literal('notification:new'), notification: NotificationPublicSchema }),
   z.object({ t: z.literal('pong') }),
 ]);
 export type ServerWsEvent = z.infer<typeof ServerWsEventSchema>;

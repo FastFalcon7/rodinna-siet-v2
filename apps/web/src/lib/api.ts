@@ -13,6 +13,11 @@ import type {
   MediaPublic,
   MessagePublic,
   MessagesPage,
+  NotificationPrefs,
+  NotificationPrefsResponse,
+  NotificationsListResponse,
+  PushSubscribeInput,
+  VapidKeyResponse,
   PostPublic,
   RegisterInput,
   ReactionSummary,
@@ -144,6 +149,32 @@ export const feedApi = {
     request<{ reactions: ReactionSummary[] }>('/feed/reactions', {
       method: 'PUT',
       body: JSON.stringify(input),
+    }),
+};
+
+export const notificationsApi = {
+  list: () => request<NotificationsListResponse>('/notifications'),
+  markRead: (ids?: string[]) =>
+    request<NotificationsListResponse>('/notifications/read', {
+      method: 'POST',
+      body: JSON.stringify({ ids }),
+    }),
+  pushKey: () => request<VapidKeyResponse>('/notifications/push/key'),
+  subscribe: (input: PushSubscribeInput) =>
+    request<{ ok: boolean }>('/notifications/push/subscriptions', {
+      method: 'POST',
+      body: JSON.stringify(input),
+    }),
+  unsubscribe: (endpoint: string) =>
+    request<{ ok: boolean }>('/notifications/push/unsubscribe', {
+      method: 'POST',
+      body: JSON.stringify({ endpoint }),
+    }),
+  getPrefs: () => request<NotificationPrefsResponse>('/notifications/prefs'),
+  setPrefs: (prefs: NotificationPrefs) =>
+    request<NotificationPrefsResponse>('/notifications/prefs', {
+      method: 'PUT',
+      body: JSON.stringify(prefs),
     }),
 };
 
