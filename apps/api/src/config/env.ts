@@ -27,6 +27,9 @@ const EnvSchema = z.object({
   VAPID_PRIVATE_KEY: z.string().optional(),
   // Kontakt pre push službu (mailto: alebo https URL) — vyžaduje VAPID spec.
   VAPID_SUBJECT: z.string().default('mailto:admin@rodinna.local'),
+  // Tajomstvo pre read-only ICS feed (M4). Bez neho sa token odvodí
+  // z DATABASE_URL (funguje, ale rotácia hesla DB zneplatní odbery).
+  ICS_SECRET: z.string().optional(),
 });
 
 export const env = EnvSchema.parse(process.env);

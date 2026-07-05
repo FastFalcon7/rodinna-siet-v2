@@ -8,6 +8,7 @@ export function ProfileCard() {
   const { user, updateProfile, uploadAvatar } = useAuth();
   const fileRef = useRef<HTMLInputElement>(null);
   const [name, setName] = useState(user?.displayName ?? '');
+  const [birthday, setBirthday] = useState(user?.birthday ?? '');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
@@ -29,15 +30,17 @@ export function ProfileCard() {
     }
   };
 
+  const dirty = name.trim() !== user?.displayName || (birthday || null) !== (user?.birthday ?? null);
+
   const onSaveName = async (e: React.FormEvent) => {
     e.preventDefault();
     const trimmed = name.trim();
-    if (!trimmed || trimmed === user.displayName) return;
+    if (!trimmed || !dirty) return;
     setBusy(true);
     setError(null);
     setSaved(false);
     try {
-      await updateProfile({ displayName: trimmed });
+      await updateProfile({ displayName: trimmed, birthday: birthday || null });
       setSaved(true);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Uloženie zlyhalo');
@@ -92,9 +95,21 @@ export function ProfileCard() {
             className="mt-1 w-full rounded-lg border border-neutral-300 dark:border-neutral-700 bg-transparent px-3 py-2 outline-none focus:border-accent"
           />
         </label>
+        <label className="min-w-40 text-sm">
+          <span className="text-neutral-600 dark:text-neutral-300">Dátum narodenia 🎂</span>
+          <input
+            type="date"
+            value={birthday}
+            onChange={(e) => {
+              setBirthday(e.target.value);
+              setSaved(false);
+            }}
+            className="mt-1 w-full rounded-lg border border-neutral-300 dark:border-neutral-700 bg-transparent px-3 py-2 outline-none focus:border-accent"
+          />
+        </label>
         <button
           type="submit"
-          disabled={busy || !name.trim() || name.trim() === user.displayName}
+          disabled={busy || !name.trim() || !dirty}
           className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white transition hover:opacity-90 disabled:opacity-40"
         >
           Uložiť

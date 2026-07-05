@@ -7,7 +7,12 @@ import { z } from 'zod';
  */
 
 /** Známe druhy notifikácií. Nové moduly sem pridávajú svoje (K3). */
-export const NOTIFICATION_KINDS = ['chat.message', 'polls.closed'] as const;
+export const NOTIFICATION_KINDS = [
+  'chat.message',
+  'polls.closed',
+  'events.reminder',
+  'events.birthday',
+] as const;
 export const NotificationKindSchema = z.enum(NOTIFICATION_KINDS);
 export type NotificationKind = z.infer<typeof NotificationKindSchema>;
 
@@ -15,6 +20,8 @@ export type NotificationKind = z.infer<typeof NotificationKindSchema>;
 export const NOTIFICATION_KIND_LABELS: Record<NotificationKind, string> = {
   'chat.message': 'Nové správy v chate',
   'polls.closed': 'Výsledky ankiet',
+  'events.reminder': 'Pripomienky udalostí',
+  'events.birthday': 'Blížiace sa narodeniny',
 };
 
 /** Obsah notifikácie — rovnaký tvar konzumuje service worker aj in-app zoznam. */

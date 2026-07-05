@@ -1,6 +1,12 @@
 import type {
   AddAlbumPhotosInput,
+  AgendaResponse,
   AlbumDetail,
+  CreateEventInput,
+  EventPublic,
+  IcsUrlResponse,
+  RsvpStatus,
+  UpdateEventInput,
   AlbumsListResponse,
   AlbumSuggestionsResponse,
   AuthUserResponse,
@@ -184,6 +190,24 @@ export const albumsApi = {
   getMemory: (mediaId: string) => request<MemoryPublic>(`/albums/memories/${mediaId}`),
   hideMemory: (mediaId: string) =>
     request<{ ok: boolean }>(`/albums/memories/${mediaId}/hide`, { method: 'POST' }),
+};
+
+export const eventsApi = {
+  agenda: (from?: string, to?: string) => {
+    const params = new URLSearchParams();
+    if (from) params.set('from', from);
+    if (to) params.set('to', to);
+    return request<AgendaResponse>(`/events?${params}`);
+  },
+  get: (id: string) => request<EventPublic>(`/events/${id}`),
+  create: (input: CreateEventInput) =>
+    request<EventPublic>('/events', { method: 'POST', body: JSON.stringify(input) }),
+  update: (id: string, input: UpdateEventInput) =>
+    request<EventPublic>(`/events/${id}`, { method: 'PATCH', body: JSON.stringify(input) }),
+  remove: (id: string) => request<void>(`/events/${id}`, { method: 'DELETE' }),
+  rsvp: (id: string, status: RsvpStatus) =>
+    request<EventPublic>(`/events/${id}/rsvp`, { method: 'PUT', body: JSON.stringify({ status }) }),
+  icsUrl: () => request<IcsUrlResponse>('/events/ics-url'),
 };
 
 export const notesApi = {

@@ -11,6 +11,8 @@ export const UserPublicSchema = z.object({
   displayName: z.string(),
   avatarUrl: z.string().nullable(),
   role: RoleSchema,
+  /** Dátum narodenia (YYYY-MM-DD) — M4 kalendár z neho počíta narodeniny. */
+  birthday: z.string().nullable(),
   createdAt: z.string(),
 });
 export type UserPublic = z.infer<typeof UserPublicSchema>;

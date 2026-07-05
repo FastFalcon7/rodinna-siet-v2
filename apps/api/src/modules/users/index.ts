@@ -30,7 +30,10 @@ router.patch('/me', requireAuth, zValidator('json', UpdateProfileSchema), async 
   const input = c.req.valid('json');
   const updated = await db
     .update(users)
-    .set({ displayName: input.displayName })
+    .set({
+      ...(input.displayName !== undefined ? { displayName: input.displayName } : {}),
+      ...(input.birthday !== undefined ? { birthday: input.birthday } : {}),
+    })
     .where(eq(users.id, me.id))
     .returning();
   return c.json({ user: toPublicUser(updated[0]!) });
