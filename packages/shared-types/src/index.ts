@@ -12,3 +12,4 @@ export * from './linkpreview';
 export * from './notifications';
 export * from './polls';
 export * from './albums';
+export * from './notes';

@@ -7,7 +7,13 @@ import type {
   ChatRoomPublic,
   CreateAlbumInput,
   MemoryPublic,
+  NoteDetail,
+  NoteRevisionsResponse,
+  NotesListResponse,
+  CreateNoteInput,
   UpdateAlbumInput,
+  UpdateNoteInput,
+  UpdateNoteItemInput,
   CommentsResponse,
   CreateCommentInput,
   CreatePostInput,
@@ -178,6 +184,26 @@ export const albumsApi = {
   getMemory: (mediaId: string) => request<MemoryPublic>(`/albums/memories/${mediaId}`),
   hideMemory: (mediaId: string) =>
     request<{ ok: boolean }>(`/albums/memories/${mediaId}/hide`, { method: 'POST' }),
+};
+
+export const notesApi = {
+  list: () => request<NotesListResponse>('/notes'),
+  get: (id: string) => request<NoteDetail>(`/notes/${id}`),
+  create: (input: CreateNoteInput) =>
+    request<NoteDetail>('/notes', { method: 'POST', body: JSON.stringify(input) }),
+  update: (id: string, input: UpdateNoteInput) =>
+    request<NoteDetail>(`/notes/${id}`, { method: 'PATCH', body: JSON.stringify(input) }),
+  remove: (id: string) => request<void>(`/notes/${id}`, { method: 'DELETE' }),
+  addItem: (id: string, label: string) =>
+    request<NoteDetail>(`/notes/${id}/items`, { method: 'POST', body: JSON.stringify({ label }) }),
+  updateItem: (itemId: string, input: UpdateNoteItemInput) =>
+    request<NoteDetail>(`/notes/items/${itemId}`, { method: 'PATCH', body: JSON.stringify(input) }),
+  removeItem: (itemId: string) => request<NoteDetail>(`/notes/items/${itemId}`, { method: 'DELETE' }),
+  duplicate: (id: string, title?: string) =>
+    request<NoteDetail>(`/notes/${id}/duplicate`, { method: 'POST', body: JSON.stringify({ title }) }),
+  revisions: (id: string) => request<NoteRevisionsResponse>(`/notes/${id}/revisions`),
+  restore: (id: string, revId: string) =>
+    request<NoteDetail>(`/notes/${id}/revisions/${revId}/restore`, { method: 'POST' }),
 };
 
 export const pollsApi = {
