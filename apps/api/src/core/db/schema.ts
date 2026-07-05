@@ -654,6 +654,49 @@ export const diaryEmbeddings = pgTable(
   (t) => [index('diary_embeddings_user_idx').on(t.userId)],
 );
 
+/**
+ * Hry (plán §M6). `stateJson` drží stav podľa druhu (piškvorky: board/turn/
+ * hráči; denná otázka/foto výzva: question/date). Ťahy a odpovede v
+ * game_moves (payloadJson). roomId len pre hry viazané na konverzáciu.
+ */
+export const gameKindValues = ['tictactoe', 'daily', 'photo'] as const;
+export const gameStatusValues = ['open', 'active', 'finished'] as const;
+
+export const gameSessions = pgTable(
+  'game_sessions',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    kind: text('kind', { enum: gameKindValues }).notNull(),
+    roomId: uuid('room_id').references(() => chatRooms.id, { onDelete: 'cascade' }),
+    stateJson: jsonb('state_json').notNull().default({}),
+    status: text('status', { enum: gameStatusValues }).notNull().default('open'),
+    createdBy: uuid('created_by')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index('game_sessions_kind_idx').on(t.kind, t.createdAt)],
+);
+
+export const gameMoves = pgTable(
+  'game_moves',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    sessionId: uuid('session_id')
+      .notNull()
+      .references(() => gameSessions.id, { onDelete: 'cascade' }),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    payloadJson: jsonb('payload_json').notNull().default({}),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index('game_moves_session_idx').on(t.sessionId, t.createdAt)],
+);
+
+export type GameSessionRow = typeof gameSessions.$inferSelect;
+
 export type JobRow = typeof jobs.$inferSelect;
 export type PushSubRow = typeof pushSubs.$inferSelect;
 export type NotificationRow = typeof notifications.$inferSelect;

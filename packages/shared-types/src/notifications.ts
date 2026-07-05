@@ -13,6 +13,7 @@ export const NOTIFICATION_KINDS = [
   'events.reminder',
   'events.birthday',
   'diary.draft',
+  'games.turn',
 ] as const;
 export const NotificationKindSchema = z.enum(NOTIFICATION_KINDS);
 export type NotificationKind = z.infer<typeof NotificationKindSchema>;
@@ -24,6 +25,7 @@ export const NOTIFICATION_KIND_LABELS: Record<NotificationKind, string> = {
   'events.reminder': 'Pripomienky udalostí',
   'events.birthday': 'Blížiace sa narodeniny',
   'diary.draft': 'Hotové návrhy denníka',
+  'games.turn': 'Ťahy v hrách',
 };
 
 /** Obsah notifikácie — rovnaký tvar konzumuje service worker aj in-app zoznam. */

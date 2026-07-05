@@ -3,6 +3,7 @@ import { PollCard } from '../polls/PollCard';
 import { AlbumFeedCard, MemoryCard } from '../albums/cards';
 import { NoteCard } from '../notes/NoteCard';
 import { EventCard } from '../events/EventCard';
+import { GameCard } from '../games/GameCard';
 
 /**
  * Registry živých kariet (plán §M0-4, kontrakty K1/K2): modul zaregistruje
@@ -71,3 +72,4 @@ registerCardRenderer('albums', AlbumFeedCard);
 registerCardRenderer('memories', MemoryCard);
 registerCardRenderer('notes', NoteCard);
 registerCardRenderer('events', EventCard);
+registerCardRenderer('games', GameCard);
