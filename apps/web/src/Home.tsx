@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useAuth } from './auth/AuthContext';
 import { Avatar } from './shared/Avatar';
+import { onAppNavigate } from './app/navigate';
 import { peekRoomParam } from './shared/deepLink';
 import { ChatProvider } from './chat/ChatProvider';
 import { More } from './more/More';
@@ -29,6 +30,10 @@ function HomeInner() {
   const { user } = useAuth();
   // Deep link z push notifikácie (/?room=…) → štart rovno v chate.
   const [tab, setTab] = useState<string>(() => (peekRoomParam() ? 'chat' : webModules[0]!.name));
+
+  // Navigácia z živých kariet (napr. karta albumu vo Feede → modul Albumy).
+  useEffect(() => onAppNavigate((req) => setTab(req.module)), []);
+
   if (!user) return null;
 
   const barModules = webModules.filter((m) => m.slot === 'bar');

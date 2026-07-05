@@ -444,12 +444,56 @@ export const pollVotes = pgTable(
   ],
 );
 
+/**
+ * Albumy (plán §M2). Fotky = referencie na existujúce `media` riadky —
+ * album nič nekopíruje. `coverMediaId` null = obálka je najnovšia fotka.
+ */
+export const albums = pgTable('albums', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  title: text('title').notNull(),
+  coverMediaId: uuid('cover_media_id').references(() => media.id, { onDelete: 'set null' }),
+  createdBy: uuid('created_by')
+    .notNull()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const albumPhotos = pgTable(
+  'album_photos',
+  {
+    albumId: uuid('album_id')
+      .notNull()
+      .references(() => albums.id, { onDelete: 'cascade' }),
+    mediaId: uuid('media_id')
+      .notNull()
+      .references(() => media.id, { onDelete: 'cascade' }),
+    addedBy: uuid('added_by').references(() => users.id, { onDelete: 'set null' }),
+    order: integer('order').notNull().default(0),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.albumId, t.mediaId] }), index('album_photos_media_idx').on(t.mediaId)],
+);
+
+/**
+ * Skryté spomienky („túto už neukazuj"). Odchýlka od plánu: globálne, nie
+ * per-user — spomienková karta vo feede je jedna pre celú rodinu, takže
+ * per-user skrytie by kartu aj tak nechalo visieť ostatným.
+ */
+export const memoryMarks = pgTable('memory_marks', {
+  mediaId: uuid('media_id')
+    .primaryKey()
+    .references(() => media.id, { onDelete: 'cascade' }),
+  hiddenBy: uuid('hidden_by').references(() => users.id, { onDelete: 'set null' }),
+  hiddenAt: timestamp('hidden_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
 export type JobRow = typeof jobs.$inferSelect;
 export type PushSubRow = typeof pushSubs.$inferSelect;
 export type NotificationRow = typeof notifications.$inferSelect;
 export type FeedCardRow = typeof feedCards.$inferSelect;
 export type PollRow = typeof polls.$inferSelect;
 export type PollOptionRow = typeof pollOptions.$inferSelect;
+export type AlbumRow = typeof albums.$inferSelect;
 
 export const linkPreviews = pgTable('link_previews', {
   id: uuid('id').primaryKey().defaultRandom(),

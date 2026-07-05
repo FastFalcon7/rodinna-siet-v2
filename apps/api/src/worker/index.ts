@@ -3,6 +3,7 @@ import { db } from '../core/db/client';
 import { claimNextJob, completeJob, failJob, pruneJobs } from '../core/jobs/queue';
 import { registerNotificationJobs } from '../modules/notifications/worker';
 import { registerPollsJobs } from '../modules/polls/worker';
+import { ensureMemoriesJob, registerAlbumsJobs } from '../modules/albums/worker';
 
 /**
  * Worker proces (§6, M0) — spracúva pg_jobs queue mimo API procesu, nech
@@ -82,7 +83,9 @@ async function loop(): Promise<void> {
 if (import.meta.main) {
   registerNotificationJobs(registerJobHandler);
   registerPollsJobs(registerJobHandler);
+  registerAlbumsJobs(registerJobHandler);
   await waitForSchema();
+  await ensureMemoriesJob();
   console.log(`🟢 rodinna-worker beží — handlery: ${[...handlers.keys()].join(', ') || '(žiadne)'}`);
   await loop();
 }

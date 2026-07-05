@@ -1,5 +1,6 @@
 import { useState, type ComponentType } from 'react';
 import { PollCard } from '../polls/PollCard';
+import { AlbumFeedCard, MemoryCard } from '../albums/cards';
 
 /**
  * Registry živých kariet (plán §M0-4, kontrakty K1/K2): modul zaregistruje
@@ -64,3 +65,5 @@ function DemoCard({ entityId, compact }: EntityCardProps) {
 
 registerCardRenderer('demo', DemoCard);
 registerCardRenderer('polls', PollCard);
+registerCardRenderer('albums', AlbumFeedCard);
+registerCardRenderer('memories', MemoryCard);

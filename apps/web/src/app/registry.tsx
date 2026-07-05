@@ -2,6 +2,7 @@ import { useMemo, type ComponentType } from 'react';
 import { Feed } from '../feed/Feed';
 import { Chat } from '../chat/Chat';
 import { useChat } from '../chat/ChatProvider';
+import { Albums } from '../albums/Albums';
 import { consumeRoomParam } from '../shared/deepLink';
 
 /**
@@ -62,6 +63,14 @@ export const webModules: WebModule[] = [
     Component: ChatScreen,
     useBadge: useChatBadge,
   },
+  {
+    name: 'albums',
+    label: 'Albumy',
+    icon: PhotoIcon,
+    slot: 'bar',
+    layout: 'scroll',
+    Component: Albums,
+  },
 ];
 
 export function HomeIcon({ className }: { className?: string }) {
@@ -77,6 +86,16 @@ export function ChatIcon({ className }: { className?: string }) {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden>
       <path d="M21 11.5a8.5 8.5 0 0 1-8.5 8.5c-1.5 0-2.9-.4-4.1-1L3 20l1.1-5A8.5 8.5 0 1 1 21 11.5Z" />
+    </svg>
+  );
+}
+
+export function PhotoIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden>
+      <rect x="3" y="5" width="18" height="14" rx="2.5" />
+      <circle cx="9" cy="10" r="1.7" />
+      <path d="m5 18 5-5 3 3 3.5-3.5L21 17" />
     </svg>
   );
 }
