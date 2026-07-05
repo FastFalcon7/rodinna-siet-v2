@@ -36,6 +36,16 @@ export function broadcastToRoom(roomId: string, event: ServerWsEvent): void {
   publish(`room:${roomId}`, event);
 }
 
+/**
+ * App-wide topic — všetky pripojené sockety (poll updaty, nové feed karty…).
+ * Subscribe robí chat WS handler pri open().
+ */
+export const APP_TOPIC = 'app';
+
+export function broadcastApp(event: ServerWsEvent): void {
+  publish(APP_TOPIC, event);
+}
+
 /** Pošle event na všetky zariadenia jedného užívateľa (napr. „pridaný do miestnosti"). */
 export function broadcastToUser(userId: string, event: ServerWsEvent): void {
   publish(`user:${userId}`, event);

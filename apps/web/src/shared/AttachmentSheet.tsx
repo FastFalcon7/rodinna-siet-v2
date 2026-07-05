@@ -4,6 +4,8 @@ interface AttachmentSheetProps {
   onFiles: (files: File[]) => void;
   /** Ak je zadané, sheet ponúkne „Poloha" — vráti text s odkazom na mapu. */
   onLocation?: (text: string) => void;
+  /** Ak je zadané, sheet ponúkne „Anketa" (M1) — volajúci otvorí dialóg tvorby. */
+  onPoll?: () => void;
   onClose: () => void;
 }
 
@@ -11,7 +13,7 @@ interface AttachmentSheetProps {
  * Bottom sheet výberu prílohy (DESIGN_REVIEW_FEED_CHAT.md §4.2):
  * fotoaparát / galéria (foto + video) / súbor / poloha.
  */
-export function AttachmentSheet({ onFiles, onLocation, onClose }: AttachmentSheetProps) {
+export function AttachmentSheet({ onFiles, onLocation, onPoll, onClose }: AttachmentSheetProps) {
   const cameraRef = useRef<HTMLInputElement>(null);
   const galleryRef = useRef<HTMLInputElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -55,6 +57,18 @@ export function AttachmentSheet({ onFiles, onLocation, onClose }: AttachmentShee
     { icon: '📄', label: 'Súbor', onClick: () => fileRef.current?.click() },
     ...(onLocation
       ? [{ icon: '📍', label: locating ? 'Zisťujem…' : 'Poloha', onClick: shareLocation, disabled: locating }]
+      : []),
+    ...(onPoll
+      ? [
+          {
+            icon: '📊',
+            label: 'Anketa',
+            onClick: () => {
+              onClose();
+              onPoll();
+            },
+          },
+        ]
       : []),
   ];
 

@@ -1,37 +1,52 @@
 import { useEffect, useState } from 'react';
-import type { PostPublic } from '@rodinna/shared-types';
+import type { FeedCardPublic, FeedItem, PostPublic } from '@rodinna/shared-types';
 import { ApiError, feedApi } from '../lib/api';
 import { PostComposer } from './PostComposer';
 import { PostCard } from './PostCard';
+import { Avatar } from '../shared/Avatar';
+import { relativeTime, fullDateTime } from '../shared/time';
+import { EntityCard } from '../app/cards';
+import { useChat } from '../chat/ChatProvider';
 
 /**
- * Feed à la Bluesky: edge-to-edge zoznam s hairline deličmi. Composer je
- * na desktope inline karta, na mobile FAB ✏️ + compose sheet
+ * Feed à la Bluesky: edge-to-edge zoznam s hairline deličmi. Od M1 je feed
+ * UNION postov a živých kariet modulov (K1) — spoločná keyset pagination.
+ * Composer je na desktope inline karta, na mobile FAB ✏️ + compose sheet
  * (DESIGN_REVIEW_FEED_CHAT.md §3.1).
  */
 export function Feed() {
-  const [posts, setPosts] = useState<PostPublic[] | null>(null);
+  const { subscribe } = useChat();
+  const [items, setItems] = useState<FeedItem[] | null>(null);
   const [cursor, setCursor] = useState<string | null>(null);
   const [loadingMore, setLoadingMore] = useState(false);
   const [compose, setCompose] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
+  const loadFirst = () =>
     feedApi
       .list()
       .then((page) => {
-        setPosts(page.posts);
+        setItems(page.items);
         setCursor(page.nextCursor);
       })
       .catch((err) => setError(err instanceof ApiError ? err.message : 'Načítanie feedu zlyhalo'));
-  }, []);
+
+  useEffect(() => {
+    void loadFirst();
+    // Nová karta modulu (K1) → refetch prvej stránky (obsahuje aj autora karty).
+    const off = subscribe((e) => {
+      if (e.t === 'feed:card') void loadFirst();
+    });
+    return off;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [subscribe]);
 
   const loadMore = async () => {
     if (!cursor || loadingMore) return;
     setLoadingMore(true);
     try {
       const page = await feedApi.list(cursor);
-      setPosts((prev) => [...(prev ?? []), ...page.posts]);
+      setItems((prev) => [...(prev ?? []), ...page.items]);
       setCursor(page.nextCursor);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Načítanie ďalších príspevkov zlyhalo');
@@ -41,32 +56,43 @@ export function Feed() {
   };
 
   const prepend = (post: PostPublic) => {
-    setPosts((prev) => [post, ...(prev ?? [])]);
+    setItems((prev) => [{ type: 'post', post }, ...(prev ?? [])]);
     setCompose(false);
   };
+  const onPollCreated = () => {
+    setCompose(false);
+    void loadFirst();
+  };
   const updatePost = (next: PostPublic) =>
-    setPosts((prev) => prev?.map((p) => (p.id === next.id ? next : p)) ?? null);
-  const removePost = (id: string) => setPosts((prev) => prev?.filter((p) => p.id !== id) ?? null);
+    setItems((prev) =>
+      prev?.map((it) => (it.type === 'post' && it.post.id === next.id ? { type: 'post', post: next } : it)) ?? null,
+    );
+  const removePost = (id: string) =>
+    setItems((prev) => prev?.filter((it) => it.type !== 'post' || it.post.id !== id) ?? null);
 
   return (
     <div>
       {/* Desktop: inline composer nad feedom. Mobil má FAB nižšie. */}
       <div className="hidden px-4 pt-4 md:block">
-        <PostComposer onCreated={prepend} />
+        <PostComposer onCreated={prepend} onPollCreated={onPollCreated} />
       </div>
 
       {error && <p className="px-4 py-3 text-sm text-red-600">{error}</p>}
-      {!posts && !error && <p className="px-4 py-6 text-sm text-neutral-500">Načítavam feed…</p>}
-      {posts?.length === 0 && (
+      {!items && !error && <p className="px-4 py-6 text-sm text-neutral-500">Načítavam feed…</p>}
+      {items?.length === 0 && (
         <p className="px-4 py-10 text-center text-sm text-neutral-500">
           Zatiaľ žiadne príspevky. Buď prvý!
         </p>
       )}
 
       <div className="divide-y divide-neutral-200 md:mt-4 md:border-t dark:divide-neutral-800 dark:md:border-neutral-800 md:border-neutral-200">
-        {posts?.map((post) => (
-          <PostCard key={post.id} post={post} onChange={updatePost} onDeleted={removePost} />
-        ))}
+        {items?.map((it) =>
+          it.type === 'post' ? (
+            <PostCard key={it.post.id} post={it.post} onChange={updatePost} onDeleted={removePost} />
+          ) : (
+            <FeedCardItem key={it.card.id} card={it.card} />
+          ),
+        )}
       </div>
 
       {cursor && (
@@ -101,11 +127,33 @@ export function Feed() {
             onClick={(e) => e.stopPropagation()}
           >
             <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-neutral-300 dark:bg-neutral-700" />
-            <PostComposer variant="sheet" autoFocus onCreated={prepend} />
+            <PostComposer variant="sheet" autoFocus onCreated={prepend} onPollCreated={onPollCreated} />
           </div>
         </div>
       )}
     </div>
+  );
+}
+
+/** Živá karta vo feede — hlavička ako post (autor + čas), obsah renderuje modul. */
+function FeedCardItem({ card }: { card: FeedCardPublic }) {
+  return (
+    <article className="px-4 py-3">
+      <div className="flex gap-3">
+        <Avatar user={card.author} size={40} />
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-1.5">
+            <span className="truncate font-semibold">{card.author.displayName}</span>
+            <span className="shrink-0 text-sm text-neutral-500" title={fullDateTime(card.createdAt)}>
+              · {relativeTime(card.createdAt)}
+            </span>
+          </div>
+          <div className="mt-2">
+            <EntityCard module={card.module} entityId={card.entityId} />
+          </div>
+        </div>
+      </div>
+    </article>
   );
 }
 

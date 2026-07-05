@@ -6,20 +6,24 @@ import { Avatar } from '../shared/Avatar';
 import { AttachmentSheet } from '../shared/AttachmentSheet';
 import { UploadPreviews } from '../shared/UploadPreviews';
 import { useMediaUpload } from '../shared/useMediaUpload';
+import { PollComposerDialog } from '../polls/PollComposerDialog';
 
 interface PostComposerProps {
   onCreated: (post: PostPublic) => void;
+  /** Zavolá sa po vytvorení ankety do Feedu (M1) — feed si refetchne prvú stránku. */
+  onPollCreated?: () => void;
   /** 'card' = inline karta (desktop feed), 'sheet' = obsah compose sheetu (mobil FAB). */
   variant?: 'card' | 'sheet';
   autoFocus?: boolean;
 }
 
 /** Nový príspevok — text + prílohy (foto/video/súbor/poloha cez AttachmentSheet). */
-export function PostComposer({ onCreated, variant = 'card', autoFocus = false }: PostComposerProps) {
+export function PostComposer({ onCreated, onPollCreated, variant = 'card', autoFocus = false }: PostComposerProps) {
   const { user } = useAuth();
   const [body, setBody] = useState('');
   const uploads = useMediaUpload(10);
   const [sheet, setSheet] = useState(false);
+  const [pollDialog, setPollDialog] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const taRef = useRef<HTMLTextAreaElement>(null);
@@ -89,7 +93,18 @@ export function PostComposer({ onCreated, variant = 'card', autoFocus = false }:
         <AttachmentSheet
           onFiles={uploads.addFiles}
           onLocation={insertLocation}
+          onPoll={onPollCreated ? () => setPollDialog(true) : undefined}
           onClose={() => setSheet(false)}
+        />
+      )}
+      {pollDialog && onPollCreated && (
+        <PollComposerDialog
+          toFeed
+          onCreated={() => {
+            setPollDialog(false);
+            onPollCreated();
+          }}
+          onClose={() => setPollDialog(false)}
         />
       )}
     </form>
