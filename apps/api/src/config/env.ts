@@ -27,9 +27,11 @@ const EnvSchema = z.object({
   VAPID_PRIVATE_KEY: z.string().optional(),
   // Kontakt pre push službu (mailto: alebo https URL) — vyžaduje VAPID spec.
   VAPID_SUBJECT: z.string().default('mailto:admin@rodinna.local'),
-  // Tajomstvo pre read-only ICS feed (M4). Bez neho sa token odvodí
-  // z DATABASE_URL (funguje, ale rotácia hesla DB zneplatní odbery).
-  ICS_SECRET: z.string().optional(),
+  // Tajomstvo pre read-only ICS feed (M4). Feed vydáva mená a dátumy narodenia
+  // rodiny bez prihlásenia, chránený len týmto tokenom — preto musí byť silný
+  // a náhodný (napr. `openssl rand -hex 32`). Bez neho je ICS feed vypnutý
+  // (fail-closed) — token sa zámerne NEODVODZUJE z DATABASE_URL (predvídateľné).
+  ICS_SECRET: z.string().min(16).optional(),
   // LLM (M5, §6): OpenAI-kompatibilný server (Ollama: http://ollama:11434).
   // Bez URL beží appka normálne — LLM funkcie sú vypnuté, /api/llm vracia mock.
   LLM_BASE_URL: z.string().url().optional(),
@@ -57,3 +59,6 @@ export const pushEnabled = Boolean(env.VAPID_PUBLIC_KEY && env.VAPID_PRIVATE_KEY
 
 /** LLM funkcie (denník, neskôr kvízy/digest) bežia len s nakonfigurovaným serverom. */
 export const llmEnabled = Boolean(env.LLM_BASE_URL);
+
+/** ICS feed (M4) je zapnutý len s nastaveným silným ICS_SECRET (fail-closed). */
+export const icsEnabled = Boolean(env.ICS_SECRET);

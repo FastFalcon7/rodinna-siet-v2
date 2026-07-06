@@ -37,6 +37,8 @@ services:
       VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
       VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
       VAPID_SUBJECT: ${VAPID_SUBJECT:-mailto:admin@rodinna.local}
+      # ICS feed (M4): silné náhodné tajomstvo, inak je feed vypnutý (fail-closed).
+      ICS_SECRET: ${ICS_SECRET:-}
       # LLM (M5): nastav LLM_BASE_URL=http://ollama:11434 a spusti s --profile llm.
       LLM_BASE_URL: ${LLM_BASE_URL:-}
       LLM_MODEL: ${LLM_MODEL:-llama3.2:3b-instruct-q4_K_M}

@@ -6,6 +6,7 @@ import type { AppEnv } from '../../core/types';
 import type { AppModule } from '../../core/module';
 import { requireAuth } from '../auth/middleware';
 import { rateLimit } from '../auth/ratelimit';
+import { timingSafeEqualStr } from '../auth/crypto';
 import { env } from '../../config/env';
 import {
   BadRequestError,
@@ -51,10 +52,12 @@ router.get('/', requireAuth, zValidator('query', AgendaQuerySchema), async (c) =
 /**
  * GET /api/events/calendar.ics?token=… — read-only odber pre Apple/Google
  * Calendar. Bez session cookie (kalendárové appky ju nemajú) — chráni ho
- * token odvodený zo servrového tajomstva.
+ * token odvodený z ICS_SECRET. Bez nastaveného tajomstva je feed vypnutý.
  */
 router.get('/calendar.ics', async (c) => {
-  if (c.req.query('token') !== icsToken()) {
+  const expected = icsToken();
+  if (!expected) return c.text('ICS feed nie je nakonfigurovaný', 404);
+  if (!timingSafeEqualStr(c.req.query('token') ?? '', expected)) {
     return c.text('Unauthorized', 401);
   }
   return c.body(await buildIcs(), 200, {
@@ -65,7 +68,10 @@ router.get('/calendar.ics', async (c) => {
 
 /** GET /api/events/ics-url — osobná subscribe URL (zobrazí ju kalendár UI). */
 router.get('/ics-url', requireAuth, (c) => {
-  return c.json({ url: `${env.PUBLIC_WEB_ORIGIN}/api/events/calendar.ics?token=${icsToken()}` });
+  const token = icsToken();
+  return c.json({
+    url: token ? `${env.PUBLIC_WEB_ORIGIN}/api/events/calendar.ics?token=${token}` : null,
+  });
 });
 
 /** POST /api/events — nová udalosť (default s RSVP kartou vo Feede). */

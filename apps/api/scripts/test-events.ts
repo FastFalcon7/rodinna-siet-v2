@@ -1,9 +1,10 @@
 /**
  * E2E test modulu Kalendár & Udalosti (M4) — REST + WS + worker funkcie.
  *
- * Spustenie:
+ * Spustenie (ICS_SECRET je povinný — bez neho je feed vypnutý):
  *   DATABASE_URL=postgres://rodinna:rodinna@127.0.0.1:5432/rodinna \
- *   VAPID_PUBLIC_KEY=… VAPID_PRIVATE_KEY=… bun scripts/test-events.ts
+ *   VAPID_PUBLIC_KEY=… VAPID_PRIVATE_KEY=… ICS_SECRET=test-ics-secret-1234 \
+ *   bun scripts/test-events.ts
  *
  * Pokrýva: tvorbu (validácie, feed karta, auto-RSVP autora, reminder joby),
  * RSVP (zmeny, WS event, zákaz na narodeninách), agendu (rozsah, virtuálne
