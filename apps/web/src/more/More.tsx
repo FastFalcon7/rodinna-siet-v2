@@ -4,6 +4,7 @@ import { ProfileCard } from '../users/ProfileCard';
 import { MembersList } from '../users/MembersList';
 import { InvitePanel } from '../users/InvitePanel';
 import { NotificationSettings } from './NotificationSettings';
+import { InstallCard } from './InstallCard';
 import { webModules, type WebModule } from '../app/registry';
 
 /**
@@ -53,6 +54,7 @@ export function More({ onOpenModule }: { onOpenModule: (name: string) => void })
         </section>
       )}
 
+      <InstallCard />
       <NotificationSettings />
       <ProfileCard />
       {user.role === 'admin' && <InvitePanel />}
