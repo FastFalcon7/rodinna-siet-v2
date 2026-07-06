@@ -142,6 +142,10 @@ pripojenie tejto appky, pridanie ďalších appiek na NAS (napr. poznámky,
 zápisník letov) — je v
 [`docs/SYNOLOGY_DOMAIN_ACTIVATION.md`](./docs/SYNOLOGY_DOMAIN_ACTIVATION.md).
 
+**Nasadenie Phase 2** (tajomstvá VAPID/ICS/LLM, poradie mergovania PR, prvý
+štart, smoke checklist, zálohovanie a **restore drill**) —
+krok za krokom v [`docs/DEPLOY_RUNBOOK.md`](./docs/DEPLOY_RUNBOOK.md).
+
 ## Roadmap
 
 Pozri `ARCHITECTURE_V2.md §13`. Hotové: **T1, T2a, T3, T4, T6 (chat jadro).**
