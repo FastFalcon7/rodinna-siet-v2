@@ -39,6 +39,9 @@ const EnvSchema = z.object({
   // Dimenzia embeddingov musí sedieť s modelom (nomic-embed-text = 768)
   // aj so stĺpcom diary_embeddings.embedding — zmena = nová migrácia.
   LLM_EMBED_DIM: z.coerce.number().int().positive().default(768),
+  // Svet okolo (M7): override kurátorovaných RSS feedov (JSON objekt
+  // kategória → pole URL). Používajú ho testy; na NAS-e netreba.
+  NEWS_FEEDS_JSON: z.string().optional(),
 });
 
 export const env = EnvSchema.parse(process.env);

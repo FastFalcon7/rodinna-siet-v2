@@ -13,6 +13,9 @@ import type {
   GameAnswerInput,
   GamePublic,
   LlmStatusResponse,
+  NewsCategory,
+  NewsPrefsResponse,
+  NewsTodayResponse,
   IcsUrlResponse,
   RsvpStatus,
   UpdateEventInput,
@@ -199,6 +202,13 @@ export const albumsApi = {
   getMemory: (mediaId: string) => request<MemoryPublic>(`/albums/memories/${mediaId}`),
   hideMemory: (mediaId: string) =>
     request<{ ok: boolean }>(`/albums/memories/${mediaId}/hide`, { method: 'POST' }),
+};
+
+export const newsApi = {
+  getPrefs: () => request<NewsPrefsResponse>('/news/prefs'),
+  setPrefs: (categories: NewsCategory[]) =>
+    request<NewsPrefsResponse>('/news/prefs', { method: 'PUT', body: JSON.stringify({ categories }) }),
+  today: () => request<NewsTodayResponse>('/news/today'),
 };
 
 export const gamesApi = {

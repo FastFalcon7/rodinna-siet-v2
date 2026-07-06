@@ -7,6 +7,7 @@ import { ensureMemoriesJob, registerAlbumsJobs } from '../modules/albums/worker'
 import { ensureBirthdaysJob, registerEventsJobs } from '../modules/events/worker';
 import { ensureDiaryJob, registerDiaryJobs } from '../modules/diary/worker';
 import { ensureGamesJob, registerGamesJobs } from '../modules/games/worker';
+import { ensureNewsJob, registerNewsJobs } from '../modules/news/worker';
 
 /**
  * Worker proces (§6, M0) — spracúva pg_jobs queue mimo API procesu, nech
@@ -90,11 +91,13 @@ if (import.meta.main) {
   registerEventsJobs(registerJobHandler);
   registerDiaryJobs(registerJobHandler);
   registerGamesJobs(registerJobHandler);
+  registerNewsJobs(registerJobHandler);
   await waitForSchema();
   await ensureMemoriesJob();
   await ensureBirthdaysJob();
   await ensureDiaryJob();
   await ensureGamesJob();
+  await ensureNewsJob();
   console.log(`🟢 rodinna-worker beží — handlery: ${[...handlers.keys()].join(', ') || '(žiadne)'}`);
   await loop();
 }

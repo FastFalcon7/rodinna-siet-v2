@@ -59,7 +59,7 @@ Kontrakty K1–K3 vyžadujú tri malé rozšírenia jadra (detail v M0):
 | M4 ✅ | **Kalendár & Udalosti** 📅 | narodeniny + rodinné akcie; spája Feed (RSVP) a push (pripomienky) | worker, push, Ankety (RSVP ≈ anketa) |
 | M5 ✅ | **LLM kernel + Denník** 📖 | prvý LLM modul podľa §15.2; najinovatívnejšia časť appky | worker, media, embeddings |
 | M6 ✅ | **Hry & Výzvy** 🎲 | zábava/retencia; piškvorky sú „chat s iným payloadom" | WS, LLM (kvízy), media (výzvy) |
-| M7 | **Svet okolo** 🌍 | rozšírenie Denníka podľa §15.3; opt-in | worker, Denník |
+| M7 ✅ | **Svet okolo** 🌍 | rozšírenie Denníka podľa §15.3; opt-in | worker, Denník |
 
 Poradie je zvolené tak, aby **každý modul znovu použil niečo z predchádzajúceho**
 a rodina dostávala novú hodnotu každé ~2 týždne, nie jeden big-bang po pol roku.
