@@ -11,6 +11,7 @@ WORKDIR /app
 # Najprv len manifesty kvôli docker layer cache.
 COPY package.json bun.lock* ./
 COPY apps/api/package.json ./apps/api/
+COPY apps/web/package.json ./apps/web/
 COPY packages/shared-types/package.json ./packages/shared-types/
 COPY packages/ui/package.json ./packages/ui/
 RUN bun install --frozen-lockfile --production || bun install --production
