@@ -12,6 +12,9 @@ import type {
   EventPublic,
   GameAnswerInput,
   GamePublic,
+  QuizPublic,
+  CreateQuizInput,
+  UpdateQuizInput,
   LlmStatusResponse,
   NewsCategory,
   NewsPrefsResponse,
@@ -221,6 +224,20 @@ export const gamesApi = {
   rematch: (id: string) => request<GamePublic>(`/games/${id}/rematch`, { method: 'POST' }),
   answer: (id: string, input: GameAnswerInput) =>
     request<GamePublic>(`/games/${id}/answer`, { method: 'POST', body: JSON.stringify(input) }),
+};
+
+export const quizApi = {
+  list: () => request<{ quizzes: QuizPublic[] }>('/quiz'),
+  create: (input: CreateQuizInput) =>
+    request<QuizPublic>('/quiz', { method: 'POST', body: JSON.stringify(input) }),
+  get: (id: string) => request<QuizPublic>(`/quiz/${id}`),
+  update: (id: string, input: UpdateQuizInput) =>
+    request<QuizPublic>(`/quiz/${id}`, { method: 'PATCH', body: JSON.stringify(input) }),
+  regenerate: (id: string) => request<QuizPublic>(`/quiz/${id}/regenerate`, { method: 'POST' }),
+  publish: (id: string) => request<QuizPublic>(`/quiz/${id}/publish`, { method: 'POST' }),
+  answer: (id: string, answers: number[]) =>
+    request<QuizPublic>(`/quiz/${id}/answers`, { method: 'POST', body: JSON.stringify({ answers }) }),
+  remove: (id: string) => request<void>(`/quiz/${id}`, { method: 'DELETE' }),
 };
 
 export const diaryApi = {

@@ -185,6 +185,8 @@ export const ServerWsEventSchema = z.discriminatedUnion('t', [
   z.object({ t: z.literal('diary:update'), date: z.string() }),
   // Hry (M6): ťah/join/odpoveď — živé karty si refetchnú stav.
   z.object({ t: z.literal('game:update'), gameId: z.string().uuid() }),
+  // Kvízy (M8): draft hotový (user topic) / publish a odpovede (app topic).
+  z.object({ t: z.literal('quiz:update'), quizId: z.string().uuid() }),
   z.object({ t: z.literal('pong') }),
 ]);
 export type ServerWsEvent = z.infer<typeof ServerWsEventSchema>;

@@ -50,6 +50,10 @@ až po tom, čo predchádzajúci je v cieľovej vetve (inak diffy nesadnú):
 #22  M5  LLM kernel + Denník            ← pgvector, Ollama
 #23  M6  Hry & Výzvy
 #23+ M7  Svet okolo (RSS) + fix(security) ICS token   ← na tej istej vetve
+#24  docs deploy runbook + backup/restore skripty
+#25  T8  PWA polish (offline shell, install, Cmd+K)
+#26  T9  rate-limiting sken
+#27  M8  Kvízy (témové LLM kvízy)
 ```
 
 > Čísla PR over v GitHube (`gh pr list` / web) — poradie podľa vetiev
@@ -158,6 +162,9 @@ Rýchly prechod, že Phase 2 žije (5 min):
 - [ ] **Hry (M6)** — piškvorky v chate, dvaja hráči odohrajú ťah naživo.
 - [ ] **Svet okolo (M7)** — v Denníku zapni kategóriu → o pár hodín (job 2×
       denne) sa objavia titulky; alebo vynúť job (viď nižšie).
+- [ ] **Kvízy (M8)** *(ak LLM zapnuté)* — Viac → Kvízy → nová téma → počkaj na
+      draft (push `quiz.ready`), skontroluj otázky, publikuj rodine → karta vo
+      Feede, zahraj si, skóre sedí.
 
 Vynútenie RSS fetchu hneď (bez čakania na job):
 ```bash
