@@ -7,20 +7,28 @@
 :80 {
 	encode zstd gzip
 
-	# API + WebSocket → api kontajner
-	@api path /api/* /ws
-	reverse_proxy @api api:3000
-
-	# SPA statika
-	root * /srv/web
-	try_files {path} /index.html
-	file_server
-
 	# Bezpečnostné hlavičky (ARCHITECTURE_V2.md §9)
 	header {
 		-Server
 		Referrer-Policy strict-origin-when-cross-origin
 		X-Content-Type-Options nosniff
 		X-Frame-Options DENY
+	}
+
+	# handle bloky sa vyhodnocujú zhora nadol a vzájomne sa vylučujú — bez nich
+	# by Caddyfile adapter zoradil try_files/file_server pred reverse_proxy podľa
+	# vlastného pevného poradia direktív a @api matcher by sa nikdy nedostal ku slovu.
+	handle /api/* {
+		reverse_proxy api:3000
+	}
+	handle /ws {
+		reverse_proxy api:3000
+	}
+
+	# SPA statika
+	handle {
+		root * /srv/web
+		try_files {path} /index.html
+		file_server
 	}
 }
