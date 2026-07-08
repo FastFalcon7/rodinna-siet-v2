@@ -487,6 +487,64 @@ export const memoryMarks = pgTable('memory_marks', {
   hiddenAt: timestamp('hidden_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
+/**
+ * Zoznamy & Poznámky (plán §M3). Rodinne zdieľané — editovať môže každý
+ * člen (to je pointa spolupráce), mazať autor/admin. Poznámka drží text
+ * v `bodyMd`; zoznam má položky v note_items. Zmena textu odloží
+ * predchádzajúcu verziu do note_revisions (last-write-wins + história).
+ */
+export const noteKindValues = ['note', 'list'] as const;
+
+export const notes = pgTable(
+  'notes',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    kind: text('kind', { enum: noteKindValues }).notNull(),
+    title: text('title').notNull(),
+    bodyMd: text('body_md').notNull().default(''),
+    pinned: boolean('pinned').notNull().default(false),
+    createdBy: uuid('created_by')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    updatedBy: uuid('updated_by').references(() => users.id, { onDelete: 'set null' }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+    deletedAt: timestamp('deleted_at', { withTimezone: true }),
+  },
+  (t) => [index('notes_updated_idx').on(t.updatedAt)],
+);
+
+export const noteItems = pgTable(
+  'note_items',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    noteId: uuid('note_id')
+      .notNull()
+      .references(() => notes.id, { onDelete: 'cascade' }),
+    label: text('label').notNull(),
+    checkedBy: uuid('checked_by').references(() => users.id, { onDelete: 'set null' }),
+    checkedAt: timestamp('checked_at', { withTimezone: true }),
+    assignedTo: uuid('assigned_to').references(() => users.id, { onDelete: 'set null' }),
+    order: integer('order').notNull().default(0),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index('note_items_note_idx').on(t.noteId)],
+);
+
+export const noteRevisions = pgTable(
+  'note_revisions',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    noteId: uuid('note_id')
+      .notNull()
+      .references(() => notes.id, { onDelete: 'cascade' }),
+    bodyMd: text('body_md').notNull(),
+    savedBy: uuid('saved_by').references(() => users.id, { onDelete: 'set null' }),
+    savedAt: timestamp('saved_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index('note_revisions_note_idx').on(t.noteId, t.savedAt)],
+);
+
 export type JobRow = typeof jobs.$inferSelect;
 export type PushSubRow = typeof pushSubs.$inferSelect;
 export type NotificationRow = typeof notifications.$inferSelect;
@@ -494,6 +552,8 @@ export type FeedCardRow = typeof feedCards.$inferSelect;
 export type PollRow = typeof polls.$inferSelect;
 export type PollOptionRow = typeof pollOptions.$inferSelect;
 export type AlbumRow = typeof albums.$inferSelect;
+export type NoteRow = typeof notes.$inferSelect;
+export type NoteItemRow = typeof noteItems.$inferSelect;
 
 export const linkPreviews = pgTable('link_previews', {
   id: uuid('id').primaryKey().defaultRandom(),

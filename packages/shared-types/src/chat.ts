@@ -177,6 +177,8 @@ export const ServerWsEventSchema = z.discriminatedUnion('t', [
   z.object({ t: z.literal('poll:update'), pollId: z.string().uuid() }),
   // Nová karta vo feede (K1) — klient zobrazí „nový obsah" / prependne.
   z.object({ t: z.literal('feed:card'), module: z.string(), entityId: z.string().uuid() }),
+  // Zmena zoznamu/poznámky (M3) — živé karty a modul si refetchnú stav.
+  z.object({ t: z.literal('note:update'), noteId: z.string().uuid() }),
   z.object({ t: z.literal('pong') }),
 ]);
 export type ServerWsEvent = z.infer<typeof ServerWsEventSchema>;

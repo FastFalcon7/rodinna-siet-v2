@@ -3,6 +3,7 @@ import { Feed } from '../feed/Feed';
 import { Chat } from '../chat/Chat';
 import { useChat } from '../chat/ChatProvider';
 import { Albums } from '../albums/Albums';
+import { Notes } from '../notes/Notes';
 import { consumeRoomParam } from '../shared/deepLink';
 
 /**
@@ -71,6 +72,15 @@ export const webModules: WebModule[] = [
     layout: 'scroll',
     Component: Albums,
   },
+  // Slot 'more': bottom nav má 4 sloty plné — Zoznamy žijú vo „Viac".
+  {
+    name: 'notes',
+    label: 'Zoznamy a poznámky',
+    icon: ChecklistIcon,
+    slot: 'more',
+    layout: 'scroll',
+    Component: Notes,
+  },
 ];
 
 export function HomeIcon({ className }: { className?: string }) {
@@ -86,6 +96,17 @@ export function ChatIcon({ className }: { className?: string }) {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden>
       <path d="M21 11.5a8.5 8.5 0 0 1-8.5 8.5c-1.5 0-2.9-.4-4.1-1L3 20l1.1-5A8.5 8.5 0 1 1 21 11.5Z" />
+    </svg>
+  );
+}
+
+export function ChecklistIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden>
+      <path d="m3.5 6 1.5 1.5L8 4.5" />
+      <path d="m3.5 12.5 1.5 1.5L8 11" />
+      <path d="m3.5 19 1.5 1.5L8 17.5" />
+      <path d="M11 6.5h9.5M11 13h9.5M11 19.5h9.5" />
     </svg>
   );
 }

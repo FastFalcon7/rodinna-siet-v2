@@ -71,6 +71,13 @@
       "when": 1783232160794,
       "tag": "0009_lazy_gargoyle",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1783233386272,
+      "tag": "0010_amazing_vampiro",
+      "breakpoints": true
     }
   ]
 }
