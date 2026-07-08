@@ -21,6 +21,7 @@
     "@rodinna/shared-types": "workspace:*",
     "blurhash": "^2.0.5",
     "drizzle-orm": "^0.38.3",
+    "fflate": "^0.8.3",
     "file-type": "^22.0.0",
     "hono": "^4.6.15",
     "postgres": "^3.4.5",

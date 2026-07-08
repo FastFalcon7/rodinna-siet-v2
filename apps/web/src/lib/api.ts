@@ -1,6 +1,13 @@
 import type {
+  AddAlbumPhotosInput,
+  AlbumDetail,
+  AlbumsListResponse,
+  AlbumSuggestionsResponse,
   AuthUserResponse,
   ChatRoomPublic,
+  CreateAlbumInput,
+  MemoryPublic,
+  UpdateAlbumInput,
   CommentsResponse,
   CreateCommentInput,
   CreatePostInput,
@@ -152,6 +159,25 @@ export const feedApi = {
       method: 'PUT',
       body: JSON.stringify(input),
     }),
+};
+
+export const albumsApi = {
+  list: () => request<AlbumsListResponse>('/albums'),
+  get: (id: string) => request<AlbumDetail>(`/albums/${id}`),
+  create: (input: CreateAlbumInput) =>
+    request<AlbumDetail>('/albums', { method: 'POST', body: JSON.stringify(input) }),
+  update: (id: string, input: UpdateAlbumInput) =>
+    request<AlbumDetail>(`/albums/${id}`, { method: 'PATCH', body: JSON.stringify(input) }),
+  remove: (id: string) => request<void>(`/albums/${id}`, { method: 'DELETE' }),
+  addPhotos: (id: string, mediaIds: string[]) =>
+    request<AlbumDetail>(`/albums/${id}/photos`, { method: 'POST', body: JSON.stringify({ mediaIds }) }),
+  removePhoto: (id: string, mediaId: string) =>
+    request<void>(`/albums/${id}/photos/${mediaId}`, { method: 'DELETE' }),
+  suggestions: () => request<AlbumSuggestionsResponse>('/albums/suggestions'),
+  downloadUrl: (id: string) => `${API_URL}/albums/${id}/download`,
+  getMemory: (mediaId: string) => request<MemoryPublic>(`/albums/memories/${mediaId}`),
+  hideMemory: (mediaId: string) =>
+    request<{ ok: boolean }>(`/albums/memories/${mediaId}/hide`, { method: 'POST' }),
 };
 
 export const pollsApi = {
