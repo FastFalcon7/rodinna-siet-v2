@@ -4,6 +4,7 @@ import { ClientWsEventSchema, type ServerWsEvent } from '@rodinna/shared-types';
 import { db } from '../../core/db/client';
 import { users } from '../../core/db/schema';
 import {
+  APP_TOPIC,
   broadcastToRoom,
   broadcastToUser,
   getOnlineUserIds,
@@ -84,6 +85,7 @@ export const chatWebSocket: WebSocketHandler<WsData> = {
   open(ws) {
     const { userId, roomIds } = ws.data;
     ws.subscribe('presence');
+    ws.subscribe(APP_TOPIC);
     ws.subscribe(`user:${userId}`);
     for (const rid of roomIds) ws.subscribe(`room:${rid}`);
 

@@ -64,8 +64,28 @@ export const PostPublicSchema = z.object({
 });
 export type PostPublic = z.infer<typeof PostPublicSchema>;
 
+/**
+ * Živá karta vo feede (M0-4/K1): referencia na entitu modulu — jej aktuálny
+ * stav si render karty načíta cez API modulu (napr. GET /api/polls/:id).
+ */
+export const FeedCardPublicSchema = z.object({
+  id: z.string().uuid(),
+  module: z.string(),
+  entityId: z.string().uuid(),
+  author: PostAuthorSchema,
+  createdAt: z.string(),
+});
+export type FeedCardPublic = z.infer<typeof FeedCardPublicSchema>;
+
+/** Položka feedu — post alebo živá karta modulu, spoločná keyset pagination. */
+export const FeedItemSchema = z.discriminatedUnion('type', [
+  z.object({ type: z.literal('post'), post: PostPublicSchema }),
+  z.object({ type: z.literal('card'), card: FeedCardPublicSchema }),
+]);
+export type FeedItem = z.infer<typeof FeedItemSchema>;
+
 export const FeedPageSchema = z.object({
-  posts: z.array(PostPublicSchema),
+  items: z.array(FeedItemSchema),
   nextCursor: z.string().nullable(),
 });
 export type FeedPage = z.infer<typeof FeedPageSchema>;

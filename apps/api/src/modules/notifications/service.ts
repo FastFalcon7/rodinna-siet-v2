@@ -9,7 +9,7 @@ import {
 } from '@rodinna/shared-types';
 import { db } from '../../core/db/client';
 import { notifications, pushSubs, users, type NotificationRow } from '../../core/db/schema';
-import { broadcastToUser } from '../../core/realtime';
+import { publishCrossProcess } from '../../core/events';
 import { enqueueJob } from '../../core/jobs/queue';
 import { pushEnabled } from '../../config/env';
 
@@ -67,8 +67,12 @@ export async function notifyUsers(
       .insert(notifications)
       .values(enabled.map((userId) => ({ userId, kind, payload })))
       .returning();
+    // Cross-process (M1): z workera ide event cez Postgres NOTIFY do API socketov.
     for (const row of inserted) {
-      broadcastToUser(row.userId, { t: 'notification:new', notification: toPublic(row) });
+      await publishCrossProcess(`user:${row.userId}`, {
+        t: 'notification:new',
+        notification: toPublic(row),
+      });
     }
   }
 

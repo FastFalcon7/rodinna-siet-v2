@@ -13,12 +13,14 @@ import {
 import { db } from '../../core/db/client';
 import {
   comments,
+  feedCards,
   media,
   postMedia,
   posts,
   reactions,
   users,
   type CommentRow,
+  type FeedCardRow,
   type PostRow,
 } from '../../core/db/schema';
 import { toMediaPublic } from '../media/service';
@@ -137,33 +139,91 @@ async function hydrateComments(rows: CommentRow[], viewerId: string): Promise<Co
   }));
 }
 
-/** Cursor-based (keyset) pagination — stabilná aj keď medzitým pribudnú nové posty. */
+async function hydrateCards(rows: FeedCardRow[]): Promise<Map<string, FeedPage['items'][number]>> {
+  const map = new Map<string, FeedPage['items'][number]>();
+  if (rows.length === 0) return map;
+  const authors = await fetchAuthors([...new Set(rows.map((r) => r.authorId))]);
+  for (const row of rows) {
+    map.set(row.id, {
+      type: 'card',
+      card: {
+        id: row.id,
+        module: row.module,
+        entityId: row.entityId,
+        author: authors.get(row.authorId)!,
+        createdAt: row.createdAt.toISOString(),
+      },
+    });
+  }
+  return map;
+}
+
+/**
+ * Cursor-based (keyset) pagination — stabilná aj keď medzitým pribudnú nové
+ * položky. Feed je od M1 UNION postov a živých kariet modulov (K1): obe
+ * strany zdieľajú kurzor (createdAt, id), merge sa robí v aplikácii —
+ * načíta sa limit+1 z oboch a zoberie sa najnovších `limit`.
+ */
 export async function listFeed(
   viewerId: string,
   opts: { limit?: number; cursorRaw?: string | null },
 ): Promise<FeedPage> {
   const limit = Math.min(Math.max(opts.limit ?? DEFAULT_PAGE_SIZE, 1), MAX_PAGE_SIZE);
   const cursor: Cursor | null = opts.cursorRaw ? decodeCursor(opts.cursorRaw) : null;
+  const cAt = cursor ? new Date(cursor.createdAt) : null;
 
-  const where = [isNull(posts.deletedAt)];
-  if (cursor) {
-    const cAt = new Date(cursor.createdAt);
-    where.push(or(lt(posts.createdAt, cAt), and(eq(posts.createdAt, cAt), lt(posts.id, cursor.id)))!);
+  const postWhere = [isNull(posts.deletedAt)];
+  const cardWhere = [isNull(feedCards.deletedAt)];
+  if (cursor && cAt) {
+    postWhere.push(
+      or(lt(posts.createdAt, cAt), and(eq(posts.createdAt, cAt), lt(posts.id, cursor.id)))!,
+    );
+    cardWhere.push(
+      or(lt(feedCards.createdAt, cAt), and(eq(feedCards.createdAt, cAt), lt(feedCards.id, cursor.id)))!,
+    );
   }
 
-  const rows = await db
-    .select()
-    .from(posts)
-    .where(and(...where))
-    .orderBy(desc(posts.createdAt), desc(posts.id))
-    .limit(limit + 1);
+  const [postRows, cardRows] = await Promise.all([
+    db
+      .select()
+      .from(posts)
+      .where(and(...postWhere))
+      .orderBy(desc(posts.createdAt), desc(posts.id))
+      .limit(limit + 1),
+    db
+      .select()
+      .from(feedCards)
+      .where(and(...cardWhere))
+      .orderBy(desc(feedCards.createdAt), desc(feedCards.id))
+      .limit(limit + 1),
+  ]);
 
-  const hasMore = rows.length > limit;
-  const pageRows = hasMore ? rows.slice(0, limit) : rows;
-  const hydrated = await hydratePosts(pageRows, viewerId);
-  const last = pageRows[pageRows.length - 1];
-  const nextCursor = hasMore && last ? encodeCursor({ createdAt: last.createdAt.toISOString(), id: last.id }) : null;
-  return { posts: hydrated, nextCursor };
+  // Merge podľa (createdAt, id) desc a orez na limit(+1 na hasMore).
+  type Ref = { kind: 'post' | 'card'; createdAt: Date; id: string };
+  const refs: Ref[] = [
+    ...postRows.map((r) => ({ kind: 'post' as const, createdAt: r.createdAt, id: r.id })),
+    ...cardRows.map((r) => ({ kind: 'card' as const, createdAt: r.createdAt, id: r.id })),
+  ].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime() || b.id.localeCompare(a.id));
+
+  const hasMore = refs.length > limit;
+  const pageRefs = refs.slice(0, limit);
+
+  const pagePosts = new Set(pageRefs.filter((r) => r.kind === 'post').map((r) => r.id));
+  const pageCards = new Set(pageRefs.filter((r) => r.kind === 'card').map((r) => r.id));
+  const [hydratedPosts, cardMap] = await Promise.all([
+    hydratePosts(postRows.filter((r) => pagePosts.has(r.id)), viewerId),
+    hydrateCards(cardRows.filter((r) => pageCards.has(r.id))),
+  ]);
+  const postMap = new Map(hydratedPosts.map((p) => [p.id, p]));
+
+  const items: FeedPage['items'] = pageRefs.map((ref) =>
+    ref.kind === 'post' ? { type: 'post', post: postMap.get(ref.id)! } : cardMap.get(ref.id)!,
+  );
+
+  const last = pageRefs[pageRefs.length - 1];
+  const nextCursor =
+    hasMore && last ? encodeCursor({ createdAt: last.createdAt.toISOString(), id: last.id }) : null;
+  return { items, nextCursor };
 }
 
 export async function createPost(authorId: string, input: CreatePostInput, viewerId: string): Promise<PostPublic> {

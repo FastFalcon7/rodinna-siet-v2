@@ -23,6 +23,10 @@ const server = Bun.serve({
 // Sprístupní server pub/sub REST vrstve (broadcast nových správ, presence…).
 setServer(server);
 
+// Cross-process WS most: eventy z workera (NOTIFY) sa republishnú do socketov.
+const { startWsBridge } = await import('./core/events');
+await startWsBridge();
+
 console.log(
   `🟢 rodinna-api beží na http://${server.hostname}:${server.port} ` +
     `(${env.NODE_ENV}) — moduly: ${modules.map((m) => m.name).join(', ')}`,

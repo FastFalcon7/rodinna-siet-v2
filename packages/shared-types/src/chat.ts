@@ -173,6 +173,10 @@ export const ServerWsEventSchema = z.discriminatedUnion('t', [
   z.object({ t: z.literal('room:new'), room: ChatRoomPublicSchema }),
   // In-app notifikácia (M0 notifications kernel) — live update zvončeka.
   z.object({ t: z.literal('notification:new'), notification: NotificationPublicSchema }),
+  // Zmena stavu ankety (M1) — klient si refetchne viewer-specific stav.
+  z.object({ t: z.literal('poll:update'), pollId: z.string().uuid() }),
+  // Nová karta vo feede (K1) — klient zobrazí „nový obsah" / prependne.
+  z.object({ t: z.literal('feed:card'), module: z.string(), entityId: z.string().uuid() }),
   z.object({ t: z.literal('pong') }),
 ]);
 export type ServerWsEvent = z.infer<typeof ServerWsEventSchema>;

@@ -2,6 +2,7 @@ import type { ChatRoomPublic } from '@rodinna/shared-types';
 import { Avatar } from '../shared/Avatar';
 import { useChat } from './ChatProvider';
 import { formatRoomTime } from './chatTime';
+import { parseAppLink, stripAppLink } from '../shared/appLink';
 
 interface RoomListProps {
   rooms: ChatRoomPublic[];
@@ -35,6 +36,13 @@ export function RoomList({ rooms, activeRoomId, meId, onSelect, onNewChat }: Roo
       const kind = lm.media[0]!.kind;
       const label = kind === 'video' ? '🎬 Video' : kind === 'file' ? '📎 Súbor' : '📷 Fotka';
       return `${prefix}${label}`;
+    }
+    // Živá karta (app:// link) — surová URL v preview nič nehovorí.
+    const appLink = parseAppLink(lm.bodyMd);
+    if (appLink) {
+      const label = appLink.module === 'polls' ? '📊 Anketa' : '🧩 Karta';
+      const rest = stripAppLink(lm.bodyMd, appLink);
+      return `${prefix}${label}${rest ? ` · ${rest}` : ''}`;
     }
     return `${prefix}${lm.bodyMd}`;
   };

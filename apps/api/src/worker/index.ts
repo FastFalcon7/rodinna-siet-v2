@@ -2,6 +2,7 @@ import { sql } from 'drizzle-orm';
 import { db } from '../core/db/client';
 import { claimNextJob, completeJob, failJob, pruneJobs } from '../core/jobs/queue';
 import { registerNotificationJobs } from '../modules/notifications/worker';
+import { registerPollsJobs } from '../modules/polls/worker';
 
 /**
  * Worker proces (§6, M0) — spracúva pg_jobs queue mimo API procesu, nech
@@ -80,6 +81,7 @@ async function loop(): Promise<void> {
 
 if (import.meta.main) {
   registerNotificationJobs(registerJobHandler);
+  registerPollsJobs(registerJobHandler);
   await waitForSchema();
   console.log(`🟢 rodinna-worker beží — handlery: ${[...handlers.keys()].join(', ') || '(žiadne)'}`);
   await loop();

@@ -390,10 +390,66 @@ export const feedCards = pgTable(
   ],
 );
 
+/**
+ * Ankety (plán §M1). `closedAt` = skutočné uzavretie (manuálne autorom alebo
+ * worker jobom po `closesAt`) — anketa je uzavretá aj keď closesAt < now()
+ * a job ešte nedobehol (server aj klient derivujú `closed` z oboch).
+ */
+export const pollKindValues = ['single', 'multi'] as const;
+
+export const polls = pgTable('polls', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  authorId: uuid('author_id')
+    .notNull()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  question: text('question').notNull(),
+  kind: text('kind', { enum: pollKindValues }).notNull().default('single'),
+  anonymous: boolean('anonymous').notNull().default(false),
+  closesAt: timestamp('closes_at', { withTimezone: true }),
+  closedAt: timestamp('closed_at', { withTimezone: true }),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const pollOptions = pgTable(
+  'poll_options',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    pollId: uuid('poll_id')
+      .notNull()
+      .references(() => polls.id, { onDelete: 'cascade' }),
+    label: text('label').notNull(),
+    order: integer('order').notNull().default(0),
+  },
+  (t) => [index('poll_options_poll_idx').on(t.pollId)],
+);
+
+/** Hlas = (anketa, možnosť, užívateľ). Single-choice vynucuje service (replace). */
+export const pollVotes = pgTable(
+  'poll_votes',
+  {
+    pollId: uuid('poll_id')
+      .notNull()
+      .references(() => polls.id, { onDelete: 'cascade' }),
+    optionId: uuid('option_id')
+      .notNull()
+      .references(() => pollOptions.id, { onDelete: 'cascade' }),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.pollId, t.optionId, t.userId] }),
+    index('poll_votes_poll_idx').on(t.pollId),
+  ],
+);
+
 export type JobRow = typeof jobs.$inferSelect;
 export type PushSubRow = typeof pushSubs.$inferSelect;
 export type NotificationRow = typeof notifications.$inferSelect;
 export type FeedCardRow = typeof feedCards.$inferSelect;
+export type PollRow = typeof polls.$inferSelect;
+export type PollOptionRow = typeof pollOptions.$inferSelect;
 
 export const linkPreviews = pgTable('link_previews', {
   id: uuid('id').primaryKey().defaultRandom(),

@@ -21,6 +21,7 @@ import { hashPassword } from '../src/modules/auth/crypto';
 import { createSession } from '../src/modules/auth/session';
 import { app } from '../src/core/rpc/app';
 import { chatWebSocket, handleChatUpgrade, setServer } from '../src/modules/chat/realtime';
+import { startWsBridge } from '../src/core/events';
 import { notifyUsers } from '../src/modules/notifications/service';
 import { claimNextJob, completeJob, enqueueJob, failJob } from '../src/core/jobs/queue';
 import { pushEnabled } from '../src/config/env';
@@ -137,6 +138,7 @@ async function main() {
     websocket: chatWebSocket,
   });
   setServer(server);
+  await startWsBridge();
 
   const alica = await seedUser('alica@rodina.sk', 'Alica', 'admin');
   const bob = await seedUser('bob@rodina.sk', 'Bob', 'member');

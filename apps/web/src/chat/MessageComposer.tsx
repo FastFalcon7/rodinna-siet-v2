@@ -5,6 +5,8 @@ import { useChat } from './ChatProvider';
 import { AttachmentSheet } from '../shared/AttachmentSheet';
 import { UploadPreviews } from '../shared/UploadPreviews';
 import { useMediaUpload } from '../shared/useMediaUpload';
+import { buildAppLink } from '../shared/appLink';
+import { PollComposerDialog } from '../polls/PollComposerDialog';
 
 interface MessageComposerProps {
   roomId: string;
@@ -27,6 +29,7 @@ export function MessageComposer({
   const [text, setText] = useState('');
   const uploads = useMediaUpload(10);
   const [sheet, setSheet] = useState(false);
+  const [pollDialog, setPollDialog] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const taRef = useRef<HTMLTextAreaElement>(null);
@@ -186,7 +189,22 @@ export function MessageComposer({
         <AttachmentSheet
           onFiles={uploads.addFiles}
           onLocation={insertLocation}
+          onPoll={() => setPollDialog(true)}
           onClose={() => setSheet(false)}
+        />
+      )}
+      {pollDialog && (
+        <PollComposerDialog
+          toFeed={false}
+          onCreated={(poll) => {
+            setPollDialog(false);
+            // Anketa sa do miestnosti pošle ako app:// správa → živá karta (K2).
+            void chatApi
+              .sendMessage(roomId, { bodyMd: buildAppLink('polls', poll.id), mediaIds: [] })
+              .then(onSent)
+              .catch(() => setError('Anketu sa nepodarilo poslať do chatu'));
+          }}
+          onClose={() => setPollDialog(false)}
         />
       )}
     </div>

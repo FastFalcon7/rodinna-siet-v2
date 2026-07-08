@@ -13,9 +13,11 @@ import type {
   MediaPublic,
   MessagePublic,
   MessagesPage,
+  CreatePollInput,
   NotificationPrefs,
   NotificationPrefsResponse,
   NotificationsListResponse,
+  PollPublic,
   PushSubscribeInput,
   VapidKeyResponse,
   PostPublic,
@@ -150,6 +152,15 @@ export const feedApi = {
       method: 'PUT',
       body: JSON.stringify(input),
     }),
+};
+
+export const pollsApi = {
+  create: (input: CreatePollInput) =>
+    request<PollPublic>('/polls', { method: 'POST', body: JSON.stringify(input) }),
+  get: (id: string) => request<PollPublic>(`/polls/${id}`),
+  vote: (id: string, optionIds: string[]) =>
+    request<PollPublic>(`/polls/${id}/vote`, { method: 'PUT', body: JSON.stringify({ optionIds }) }),
+  close: (id: string) => request<PollPublic>(`/polls/${id}/close`, { method: 'POST' }),
 };
 
 export const notificationsApi = {
