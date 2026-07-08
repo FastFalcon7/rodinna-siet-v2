@@ -21,6 +21,12 @@ const EnvSchema = z.object({
   MAX_VIDEO_MB: z.coerce.number().int().positive().default(200),
   // Max veľkosť iného súboru (dokument, PDF…) v MB.
   MAX_FILE_MB: z.coerce.number().int().positive().default(50),
+  // Web Push (M0): pár vygeneruj `bun run vapid` a ulož do .env. Bez kľúčov
+  // beží appka normálne, len sa push notifikácie neodosielajú (log warning).
+  VAPID_PUBLIC_KEY: z.string().optional(),
+  VAPID_PRIVATE_KEY: z.string().optional(),
+  // Kontakt pre push službu (mailto: alebo https URL) — vyžaduje VAPID spec.
+  VAPID_SUBJECT: z.string().default('mailto:admin@rodinna.local'),
 });
 
 export const env = EnvSchema.parse(process.env);
@@ -30,3 +36,6 @@ export const isProd = env.NODE_ENV === 'production';
 
 /** Cookie 'Secure' iba v produkcii (dev na NAS beží cez http://IP:port). */
 export const cookieSecure = isProd;
+
+/** Push je zapnutý len s kompletným VAPID párom. */
+export const pushEnabled = Boolean(env.VAPID_PUBLIC_KEY && env.VAPID_PRIVATE_KEY);

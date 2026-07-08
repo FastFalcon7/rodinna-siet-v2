@@ -6,6 +6,8 @@ import { Avatar } from '../shared/Avatar';
 import { MediaItem } from '../shared/MediaItem';
 import { LinkPreviewCard } from '../shared/LinkPreviewCard';
 import { extractFirstUrl, RichBody } from '../shared/linkify';
+import { parseAppLink, stripAppLink } from '../shared/appLink';
+import { EntityCard } from '../app/cards';
 import { fullDateTime, relativeTime } from '../shared/time';
 import { ReactionBar } from './ReactionBar';
 import { CommentThread } from './CommentThread';
@@ -68,8 +70,11 @@ export function PostCard({ post, onChange, onDeleted }: PostCardProps) {
   // Obrázky do mriežky, video a súbory pod nimi na plnú šírku.
   const images = post.media.filter((m) => m.kind === 'image');
   const rest = post.media.filter((m) => m.kind !== 'image');
+  // Živá karta (app:// link, §M0-4) má prednosť pred OG preview.
+  const appLink = parseAppLink(post.bodyMd);
+  const bodyText = appLink ? stripAppLink(post.bodyMd, appLink) : post.bodyMd;
   // OG karta len keď post nemá vlastné médiá (inak by sa bili o pozornosť).
-  const previewUrl = post.media.length === 0 ? extractFirstUrl(post.bodyMd) : null;
+  const previewUrl = post.media.length === 0 && !appLink ? extractFirstUrl(post.bodyMd) : null;
 
   return (
     <article className="px-4 py-3">
@@ -113,12 +118,18 @@ export function PostCard({ post, onChange, onDeleted }: PostCardProps) {
             )}
           </div>
 
-          {post.bodyMd && (
+          {bodyText && (
             <RichBody
-              text={post.bodyMd}
+              text={bodyText}
               className="mt-1 whitespace-pre-wrap text-[15px] leading-[1.55] [overflow-wrap:anywhere]"
               linkClassName="text-accent underline decoration-1 underline-offset-2 hover:opacity-80"
             />
+          )}
+
+          {appLink && (
+            <div className="mt-2">
+              <EntityCard module={appLink.module} entityId={appLink.entityId} />
+            </div>
           )}
 
           {previewUrl && (

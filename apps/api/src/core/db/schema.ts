@@ -295,6 +295,106 @@ export type MessageMediaRow = typeof messageMedia.$inferSelect;
  * fetchne raz, metadáta sa cachujú tu, og:image ide zmenšený do media.
  * `ok=false` = negatívna cache (fetch zlyhal), po hodine sa skúsi znova.
  */
+/**
+ * DB-based job queue (§4, §6) — žiadny Redis pre 10 užívateľov. API (alebo
+ * worker sám) joby enqueuje, worker proces ich claimuje cez
+ * FOR UPDATE SKIP LOCKED a spracúva **sériovo** (jeden semafór, §15 — dôležité
+ * až pre LLM joby, ale disciplína platí od začiatku). Zlyhaný job sa retryuje
+ * s backoffom do `maxAttempts`, potom ostáva 'failed' na inšpekciu.
+ */
+export const jobStatusValues = ['pending', 'running', 'done', 'failed'] as const;
+
+export const jobs = pgTable(
+  'jobs',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    kind: text('kind').notNull(),
+    payload: jsonb('payload').notNull().default({}),
+    status: text('status', { enum: jobStatusValues }).notNull().default('pending'),
+    // Kedy najskôr job spustiť (odložené joby, retry backoff).
+    runAt: timestamp('run_at', { withTimezone: true }).notNull().defaultNow(),
+    attempts: integer('attempts').notNull().default(0),
+    maxAttempts: integer('max_attempts').notNull().default(3),
+    lastError: text('last_error'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index('jobs_status_run_at_idx').on(t.status, t.runAt)],
+);
+
+/**
+ * Web Push subscription per zariadenie (§7, M0). `endpoint` je unikátny
+ * identifikátor zariadenia u push provideru (FCM/APNs mostík) — upsert podľa
+ * neho, takže re-subscribe toho istého prehliadača neduplikuje riadky.
+ * Neplatné subscriptions (410 Gone) worker pri odosielaní maže.
+ */
+export const pushSubs = pgTable(
+  'push_subs',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    endpoint: text('endpoint').notNull().unique(),
+    p256dh: text('p256dh').notNull(),
+    auth: text('auth').notNull(),
+    // Voľný popis zariadenia (z user-agentu) pre správu subscriptions v profile.
+    deviceLabel: text('device_label'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index('push_subs_user_idx').on(t.userId)],
+);
+
+/**
+ * In-app notifikácie (§7) — zvonček/„Viac". Chat správy sem nejdú (ich in-app
+ * signál je unread badge); patria sem udalosti modulov: reakcia na tvoj post,
+ * nový komentár, neskôr narodeniny, hotový denník… `payload` nesie title/body/url.
+ */
+export const notifications = pgTable(
+  'notifications',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    kind: text('kind').notNull(),
+    payload: jsonb('payload_json').notNull().default({}),
+    readAt: timestamp('read_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index('notifications_user_created_idx').on(t.userId, t.createdAt)],
+);
+
+/**
+ * Živé karty vo Feede (plán §M0-4, kontrakt K1): karta ukazuje na entitu
+ * modulu (anketa, album, udalosť…) — render + aktuálny stav si modul rieši
+ * cez vlastné API, feed drží len referenciu a radenie. Prvý konzument: M1
+ * Ankety (UNION s postami v paginácii feedu). V chate karta žije ako
+ * `app://modul/entityId` link v tele správy — bez vlastnej tabuľky.
+ */
+export const feedCards = pgTable(
+  'feed_cards',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    module: text('module').notNull(),
+    entityId: uuid('entity_id').notNull(),
+    authorId: uuid('author_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    deletedAt: timestamp('deleted_at', { withTimezone: true }),
+  },
+  (t) => [
+    index('feed_cards_created_idx').on(t.createdAt),
+    unique('feed_cards_entity_unique').on(t.module, t.entityId),
+  ],
+);
+
+export type JobRow = typeof jobs.$inferSelect;
+export type PushSubRow = typeof pushSubs.$inferSelect;
+export type NotificationRow = typeof notifications.$inferSelect;
+export type FeedCardRow = typeof feedCards.$inferSelect;
+
 export const linkPreviews = pgTable('link_previews', {
   id: uuid('id').primaryKey().defaultRandom(),
   urlHash: text('url_hash').notNull().unique(),

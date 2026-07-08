@@ -337,7 +337,7 @@ rodinna.tvojadomena.synology.me {
 | **T3** ✅ | Users + Media (upload, sharp, blurhash, EXIF strip), avatary |
 | **T4–5** | Feed (posty, reakcie, komentáre, ~~infinite scroll~~). **Jadro ✅ overené na NAS-e.** Zostáva: virtualizácia (react-virtuoso + TanStack `useInfiniteQuery`) — viď Odchýlky nižšie a §14.5 |
 | **T6** ✅ | Chat — **real-time jadro**: natívne Bun WebSockets (pub/sub), DM + skupiny + „Rodina", typing, online presence, read receipts, reakcie + odpovede na správach, foto prílohy, cursor pagination. **Overené E2E (36/36) + browser smoke (2 prehliadače, real-time).** |
-| **T7** | Chat — push notifikácie (web-push/VAPID + worker), video prílohy, hlasovky ← **ďalší krok** |
+| **T7** ✅ | Chat — push notifikácie (web-push/VAPID + worker + pg_jobs queue, `docs/MODULES_PLAN_PHASE2.md` M0-1/M0-2), notifications kernel (in-app + per-druh preferencie), registry-driven app shell (M0-3). *Hlasovky presunuté do M5 (prepis Whisperom); živé karty (M0-4) nasledujú.* |
 | **T8** | PWA polish, install prompts, offline shell, command palette |
 | **T9** | Security audit, rate limiting, **restore drill** |
 | **T10+** | Phase 2 moduly + LLM integrácia — **detailný plán: `docs/MODULES_PLAN_PHASE2.md`** (poradie M0–M7, integračný kontrakt, harmonogram T7–T25) |

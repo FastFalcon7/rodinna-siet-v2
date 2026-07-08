@@ -34,12 +34,41 @@ services:
       DATABASE_URL: postgres://${POSTGRES_USER:-rodinna}:${POSTGRES_PASSWORD:-rodinna}@postgres:5432/${POSTGRES_DB:-rodinna}
       MEDIA_PATH: /data/media
       MAX_IMAGE_MB: ${MAX_IMAGE_MB:-50}
+      VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
+      VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
+      VAPID_SUBJECT: ${VAPID_SUBJECT:-mailto:admin@rodinna.local}
     volumes:
       # Nahrané súbory. Na NAS nastav MEDIA_HOST_PATH=/volume1/rodinna/media v .env.
       - ${MEDIA_HOST_PATH:-./media}:/data/media
     depends_on:
       postgres:
         condition: service_healthy
+
+  # Worker (M0): pg_jobs queue — push fan-out, neskôr ffmpeg/LLM joby.
+  # Rovnaký image ako api, iný entrypoint. Migrácie aplikuje api pri boote,
+  # worker na schému len počká.
+  worker:
+    build:
+      context: .
+      dockerfile: infra/docker/api.Dockerfile
+    restart: unless-stopped
+    command: ['bun', 'apps/api/src/worker/index.ts']
+    healthcheck:
+      disable: true
+    environment:
+      NODE_ENV: ${NODE_ENV:-production}
+      DATABASE_URL: postgres://${POSTGRES_USER:-rodinna}:${POSTGRES_PASSWORD:-rodinna}@postgres:5432/${POSTGRES_DB:-rodinna}
+      MEDIA_PATH: /data/media
+      VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
+      VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
+      VAPID_SUBJECT: ${VAPID_SUBJECT:-mailto:admin@rodinna.local}
+    volumes:
+      - ${MEDIA_HOST_PATH:-./media}:/data/media
+    depends_on:
+      postgres:
+        condition: service_healthy
+      api:
+        condition: service_started
 
   # Web + reverse proxy pre /api, /ws. Beží len s `--profile edge` (NAS).
   # TLS a doménové routovanie rieši zdieľaná NAS-wide edge vrstva (mimo tohto

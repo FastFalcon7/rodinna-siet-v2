@@ -3,6 +3,15 @@ import { eq } from 'drizzle-orm';
 import { ClientWsEventSchema, type ServerWsEvent } from '@rodinna/shared-types';
 import { db } from '../../core/db/client';
 import { users } from '../../core/db/schema';
+import {
+  broadcastToRoom,
+  broadcastToUser,
+  getOnlineUserIds,
+  publish,
+  setServer,
+  userSockets,
+  type WsData,
+} from '../../core/realtime';
 import { validateSessionToken } from '../auth/session';
 import { SESSION_COOKIE } from '../auth/cookies';
 import { advanceRead, getUserRoomIds } from './state';
@@ -14,45 +23,12 @@ import { advanceRead, getUserRoomIds } from './state';
  *   user:{id}   — cielené eventy pre užívateľa (pridanie do novej miestnosti)
  *   presence    — globálny online/offline stav (10 členov rodiny)
  *
- * Beží v jednom procese spolu s HTTP serverom, takže `server.publish` z REST
- * vrstvy a zo socketov zdieľa rovnaký pub/sub. (Phase 2 multi-proces → LISTEN/NOTIFY.)
+ * Zdieľaný stav (register socketov, publish helpery) žije v core/realtime.ts —
+ * odtiaľ ho používa aj notifications kernel (M0). Tu ostáva WS handler,
+ * upgrade s auth a chatové eventy.
  */
 
-export interface WsData {
-  userId: string;
-  displayName: string;
-  avatarUrl: string | null;
-  roomIds: string[];
-}
-
-let server: Server<WsData> | null = null;
-
-/** Registru živých socketov per užívateľ (na presence + dosubscribovanie nových miestností). */
-const userSockets = new Map<string, Set<ServerWebSocket<WsData>>>();
-
-/** Zavolá index.ts po Bun.serve(), nech máme referenciu na server pre publish. */
-export function setServer(s: Server<WsData>): void {
-  server = s;
-}
-
-function publish(topic: string, event: ServerWsEvent): void {
-  server?.publish(topic, JSON.stringify(event));
-}
-
-/** Pošle event všetkým členom miestnosti (REST vrstva volá pri novej správe atď.). */
-export function broadcastToRoom(roomId: string, event: ServerWsEvent): void {
-  publish(`room:${roomId}`, event);
-}
-
-/** Pošle event na všetky zariadenia jedného užívateľa (napr. „pridaný do miestnosti"). */
-export function broadcastToUser(userId: string, event: ServerWsEvent): void {
-  publish(`user:${userId}`, event);
-}
-
-/** Zoznam práve online užívateľov (z registra socketov). */
-export function getOnlineUserIds(): string[] {
-  return [...userSockets.keys()];
-}
+export { broadcastToRoom, broadcastToUser, getOnlineUserIds, setServer, type WsData };
 
 /**
  * Dosubscribuje živé sockety užívateľa na novú miestnosť (po jej založení /

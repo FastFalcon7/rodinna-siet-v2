@@ -6,19 +6,23 @@ import { Conversation } from './Conversation';
 import { NewChatDialog } from './NewChatDialog';
 
 /** Chat: responzívne dva panely. Desktop = zoznam + konverzácia vedľa seba;
- *  mobil = jeden z nich (späť tlačidlom). */
-export function Chat() {
+ *  mobil = jeden z nich (späť tlačidlom). `initialRoomId` = deep link
+ *  (klik na push notifikáciu → /?room=…). */
+export function Chat({ initialRoomId = null }: { initialRoomId?: string | null }) {
   const { user } = useAuth();
   const { rooms, connected } = useChat();
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(initialRoomId);
   const [showNew, setShowNew] = useState(false);
 
   const meId = user?.id ?? '';
   const selectedRoom = rooms.find((r) => r.id === selectedId) ?? null;
 
-  // Ak vybraná miestnosť zmizne zo zoznamu, zruš výber.
+  // Ak vybraná miestnosť zmizne zo zoznamu, zruš výber. (Prázdny zoznam =
+  // ešte sa načítava — deep link z push notifikácie musí prežiť prvý render.)
   useEffect(() => {
-    if (selectedId && !rooms.some((r) => r.id === selectedId)) setSelectedId(null);
+    if (selectedId && rooms.length > 0 && !rooms.some((r) => r.id === selectedId)) {
+      setSelectedId(null);
+    }
   }, [rooms, selectedId]);
 
   return (

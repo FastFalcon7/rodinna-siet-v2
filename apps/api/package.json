@@ -5,7 +5,10 @@
   "type": "module",
   "scripts": {
     "dev": "bun --watch src/index.ts",
+    "dev:worker": "bun --watch src/worker/index.ts",
     "start": "bun src/index.ts",
+    "start:worker": "bun src/worker/index.ts",
+    "vapid": "bun scripts/generate-vapid.ts",
     "build": "bun build src/index.ts --target bun --outdir dist",
     "typecheck": "tsc --noEmit",
     "lint": "echo 'lint: api (noop)'",
@@ -22,10 +25,12 @@
     "hono": "^4.6.15",
     "postgres": "^3.4.5",
     "sharp": "^0.35.0",
+    "web-push": "^3.6.7",
     "zod": "^3.24.1"
   },
   "devDependencies": {
     "@types/bun": "^1.1.14",
+    "@types/web-push": "^3.6.4",
     "drizzle-kit": "^0.30.1"
   }
 }
