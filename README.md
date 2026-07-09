@@ -6,11 +6,16 @@ Synology DS925+. Architektonický návrh: [`ARCHITECTURE_V2.md`](./ARCHITECTURE_
 **Stack:** Bun + Hono + PostgreSQL/pgvector (backend) · Vite 7 + React 19 PWA
 (frontend) · Caddy (TLS) · Docker Compose. Monorepo cez **Bun workspaces**.
 
-> **Stav:** T6 — Chat (real-time jadro). Monorepo, `/api/health`, Docker (T1), DB +
-> session auth + invite-only registrácia (T2a), profily/avatary/upload obrázkov (T3),
-> rodinný feed (T4), a teraz **real-time chat**: WebSocket správy naživo, DM + skupiny +
-> „Rodina", typing, online presence, read receipts, reakcie a odpovede, foto prílohy.
-> Push notifikácie + video (T7), Passkey (T2b) ďalej (`ARCHITECTURE_V2.md §13`).
+> **Stav:** Phase 1 (T1–T9) aj celá Phase 2 (moduly M0–M8) sú **implementované a
+> nasadené** na produkčnom NAS-e. Jadro: monorepo, auth (email+heslo,
+> invite-only), profily/média, rodinný Feed, real-time Chat (WhatsApp-úroveň:
+> push, typing, read receipts, reakcie, prílohy), PWA (offline shell, install
+> prompt). Nad tým Phase 2 moduly: Ankety, Albumy, Zoznamy/Poznámky, Kalendár
+> (+ ICS), Denník (LLM), Hry (piškvorky 10×10 + AI súper, denná otázka, foto
+> výzva), Svet okolo (RSS), Kvízy (LLM). Detail per modul:
+> [`docs/MODULES_PLAN_PHASE2.md`](./docs/MODULES_PLAN_PHASE2.md). Otvorené:
+> Passkey (T2b), feed virtualizácia, kvalita LLM obsahu — pozri
+> `ARCHITECTURE_V2.md §13` (Odchýlky) a [`docs/DEPLOY_RUNBOOK.md` §9](./docs/DEPLOY_RUNBOOK.md).
 
 ## Auth (T2a)
 
@@ -148,5 +153,7 @@ krok za krokom v [`docs/DEPLOY_RUNBOOK.md`](./docs/DEPLOY_RUNBOOK.md).
 
 ## Roadmap
 
-Pozri `ARCHITECTURE_V2.md §13`. Hotové: **T1, T2a, T3, T4, T6 (chat jadro).**
-Ďalej: T7 (chat push + video), T8 (PWA polish), T2b (Passkey), feed virtualizácia.
+Pozri `ARCHITECTURE_V2.md §13` a [`docs/MODULES_PLAN_PHASE2.md`](./docs/MODULES_PLAN_PHASE2.md).
+Hotové: **T1–T9 (Phase 1 jadro) + M0–M8 (Phase 2 moduly).**
+Otvorené: T2b (Passkey), feed virtualizácia, diary push po manuálnom zápise,
+kvalita LLM obsahu (denník, kvízy) — pozri [`docs/DEPLOY_RUNBOOK.md` §9](./docs/DEPLOY_RUNBOOK.md).
