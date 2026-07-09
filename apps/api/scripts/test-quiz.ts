@@ -60,7 +60,11 @@ const llmServer = Bun.serve({
     lastPrompt = body.messages?.map((m: any) => m.content).join('\n') ?? '';
     const content =
       llmMode === 'good'
-        ? `Tu je kvíz:\n${JSON.stringify(GOOD_QUESTIONS)}\nDobrú zábavu!`
+        // Chatnejšie modely (napr. qwen2.5) radi pridajú vetu ZA JSON poľom,
+        // ktorá môže obsahovať vlastnú zátvorku — extractJsonArray to musí
+        // prežiť (regresia na bug: naivné lastIndexOf(']') si zobralo túto
+        // neskoršiu zátvorku namiesto skutočného konca poľa).
+        ? `Tu je kvíz:\n${JSON.stringify(GOOD_QUESTIONS)}\nDobrú zábavu! [Bonus otázka nabudúce?]`
         : 'Ako veľký jazykový model ti bohužiaľ neviem pomôcť s JSON.';
     return Response.json({ choices: [{ message: { role: 'assistant', content } }] });
   },
