@@ -37,7 +37,8 @@ router.post('/tictactoe', requireAuth, zValidator('json', CreateTictactoeInputSc
     return c.json({ error: 'Priveľa hier, skús o chvíľu' }, 429);
   }
   try {
-    return c.json(await createTictactoe(me.id, c.req.valid('json').roomId), 201);
+    const input = c.req.valid('json');
+    return c.json(await createTictactoe(me.id, input.roomId, input.opponent, input.difficulty), 201);
   } catch (err) {
     const m = mapError(err);
     if (m) return c.json({ error: m.message }, m.status);

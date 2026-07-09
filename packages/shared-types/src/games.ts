@@ -18,14 +18,31 @@ export type GameStatus = z.infer<typeof GameStatusSchema>;
 export const TttMarkSchema = z.enum(['x', 'o']);
 export type TttMark = z.infer<typeof TttMarkSchema>;
 
+/** Piškvorky (slovenský variant, nie 3×3 tic-tac-toe): 10×10, vyhráva 5 v rade. */
+export const TTT_BOARD_SIZE = 10;
+export const TTT_CELLS = TTT_BOARD_SIZE * TTT_BOARD_SIZE;
+export const TTT_WIN_COUNT = 5;
+
+export const TttOpponentSchema = z.enum(['human', 'bot']);
+export type TttOpponent = z.infer<typeof TttOpponentSchema>;
+
+export const TttDifficultySchema = z.enum(['easy', 'medium', 'hard']);
+export type TttDifficulty = z.infer<typeof TttDifficultySchema>;
+
+/** Nulové UUID ako sentinel pre bota — nikdy nekoliduje so skutočným `users.id`. */
+export const BOT_USER_ID = '00000000-0000-0000-0000-000000000000';
+
 export const CreateTictactoeInputSchema = z.object({
   roomId: z.string().uuid(),
+  opponent: TttOpponentSchema.default('human'),
+  /** Relevantné len pri opponent='bot'. */
+  difficulty: TttDifficultySchema.default('medium'),
 });
 export type CreateTictactoeInput = z.infer<typeof CreateTictactoeInputSchema>;
 
 export const TttMoveInputSchema = z.object({
-  /** Index políčka 0–8 (3×3, po riadkoch). */
-  cell: z.number().int().min(0).max(8),
+  /** Index políčka 0–99 (10×10, po riadkoch). */
+  cell: z.number().int().min(0).max(TTT_CELLS - 1),
 });
 export type TttMoveInput = z.infer<typeof TttMoveInputSchema>;
 
@@ -54,7 +71,7 @@ export const GamePublicSchema = z.object({
   createdAt: z.string(),
 
   // Piškvorky:
-  board: z.array(TttMarkSchema.nullable()).length(9).optional(),
+  board: z.array(TttMarkSchema.nullable()).length(TTT_CELLS).optional(),
   players: z.object({ x: PostAuthorSchema, o: PostAuthorSchema.nullable() }).optional(),
   turn: TttMarkSchema.nullable().optional(),
   winner: z.enum(['x', 'o', 'draw']).nullable().optional(),

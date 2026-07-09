@@ -8,6 +8,7 @@ import { useMediaUpload } from '../shared/useMediaUpload';
 import { buildAppLink } from '../shared/appLink';
 import { PollComposerDialog } from '../polls/PollComposerDialog';
 import { EventComposerDialog } from '../events/EventComposerDialog';
+import { GameComposerDialog } from '../games/GameComposerDialog';
 
 interface MessageComposerProps {
   roomId: string;
@@ -32,6 +33,7 @@ export function MessageComposer({
   const [sheet, setSheet] = useState(false);
   const [pollDialog, setPollDialog] = useState(false);
   const [eventDialog, setEventDialog] = useState(false);
+  const [gameDialog, setGameDialog] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const taRef = useRef<HTMLTextAreaElement>(null);
@@ -192,17 +194,7 @@ export function MessageComposer({
           onFiles={uploads.addFiles}
           onLocation={insertLocation}
           onPoll={() => setPollDialog(true)}
-          onGame={() => {
-            setSheet(false);
-            // Piškvorky: založ partiu a pošli živú kartu do konverzácie (K2).
-            void gamesApi
-              .createTictactoe(roomId)
-              .then((g) =>
-                chatApi.sendMessage(roomId, { bodyMd: buildAppLink('games', g.id), mediaIds: [] }),
-              )
-              .then(onSent)
-              .catch(() => setError('Piškvorky sa nepodarilo založiť'));
-          }}
+          onGame={() => setGameDialog(true)}
           onEvent={() => setEventDialog(true)}
           onClose={() => setSheet(false)}
         />
@@ -233,6 +225,22 @@ export function MessageComposer({
               .catch(() => setError('Udalosť sa nepodarilo poslať do chatu'));
           }}
           onClose={() => setEventDialog(false)}
+        />
+      )}
+      {gameDialog && (
+        <GameComposerDialog
+          onChosen={(opponent, difficulty) => {
+            setGameDialog(false);
+            // Piškvorky: založ partiu (proti hráčovi alebo botovi) a pošli živú kartu (K2).
+            void gamesApi
+              .createTictactoe(roomId, opponent, difficulty)
+              .then((g) =>
+                chatApi.sendMessage(roomId, { bodyMd: buildAppLink('games', g.id), mediaIds: [] }),
+              )
+              .then(onSent)
+              .catch(() => setError('Piškvorky sa nepodarilo založiť'));
+          }}
+          onClose={() => setGameDialog(false)}
         />
       )}
     </div>
