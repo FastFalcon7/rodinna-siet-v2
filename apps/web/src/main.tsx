@@ -6,7 +6,7 @@ import { App } from './App';
 import { AuthProvider } from './auth/AuthContext';
 import { registerServiceWorker } from './shared/usePushSubscription';
 
-// Service worker pre Web Push (M0). Offline cache príde s PWA polishom (T8).
+// Service worker: Web Push (M0) + offline app shell (T8).
 registerServiceWorker();
 
 const root = document.getElementById('root');

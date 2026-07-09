@@ -10,6 +10,9 @@ export interface NavRequest {
   entityId?: string;
 }
 
+/** Špeciálny „tab" pre obrazovku Viac (nie je to modul v registry). */
+export const MORE_TAB = '__more__';
+
 let pending: NavRequest | null = null;
 const listeners = new Set<(r: NavRequest) => void>();
 

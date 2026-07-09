@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from './auth/AuthContext';
 import { Avatar } from './shared/Avatar';
-import { onAppNavigate } from './app/navigate';
+import { onAppNavigate, MORE_TAB } from './app/navigate';
 import { peekRoomParam } from './shared/deepLink';
 import { ChatProvider } from './chat/ChatProvider';
 import { More } from './more/More';
+import { CommandPalette } from './app/CommandPalette';
 import { MoreIcon, webModules, type WebModule } from './app/registry';
 
 /**
@@ -13,8 +14,6 @@ import { MoreIcon, webModules, type WebModule } from './app/registry';
  * registrovaných v app/registry.tsx (slot 'bar') + fixného „Viac" — Phase 2
  * modul sa pridá záznamom v registry, bez zásahu sem.
  */
-
-const MORE_TAB = '__more__';
 
 function NavBadge({ module }: { module: WebModule }) {
   const count = module.useBadge?.() ?? 0;
@@ -85,6 +84,7 @@ function HomeInner() {
 
   return (
     <div className="flex h-dvh overflow-hidden">
+      <CommandPalette />
       {/* Sidebar (desktop) */}
       <aside className="hidden w-60 shrink-0 flex-col border-r border-neutral-200 bg-white md:flex dark:border-neutral-800 dark:bg-neutral-900">
         <div className="px-5 py-4 text-lg font-semibold tracking-tight">Rodinná sieť</div>
