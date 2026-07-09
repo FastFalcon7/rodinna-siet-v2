@@ -4,9 +4,12 @@ import { PostAuthorSchema } from './feed';
 
 /**
  * Hry & Výzvy (plán §M6) — všetko sa hrá v chate a vo Feede, žiadna
- * izolovaná „herňa". Piškvorky = živá karta v konverzácii (ťahy real-time,
- * push „si na ťahu"); denná rodinná otázka a týždenná foto výzva = karty
- * vo Feede (denný worker job).
+ * izolovaná „herňa" — okrem jednej výnimky: piškvorky proti počítaču sú
+ * súkromná praktika (`roomId: null`, vidí len autor), lebo naťahovať do
+ * spoločnej miestnosti hru, ktorú hrá len jeden človek proti botovi, nedáva
+ * zmysel. Piškvorky proti človeku = živá karta v konverzácii (ťahy
+ * real-time, push „si na ťahu"); denná rodinná otázka a týždenná foto
+ * výzva = karty vo Feede (denný worker job).
  */
 
 export const GameKindSchema = z.enum(['tictactoe', 'daily', 'photo']);
@@ -23,20 +26,15 @@ export const TTT_BOARD_SIZE = 10;
 export const TTT_CELLS = TTT_BOARD_SIZE * TTT_BOARD_SIZE;
 export const TTT_WIN_COUNT = 5;
 
-export const TttOpponentSchema = z.enum(['human', 'bot']);
-export type TttOpponent = z.infer<typeof TttOpponentSchema>;
-
-export const TttDifficultySchema = z.enum(['easy', 'medium', 'hard']);
-export type TttDifficulty = z.infer<typeof TttDifficultySchema>;
-
 /** Nulové UUID ako sentinel pre bota — nikdy nekoliduje so skutočným `users.id`. */
 export const BOT_USER_ID = '00000000-0000-0000-0000-000000000000';
 
 export const CreateTictactoeInputSchema = z.object({
-  roomId: z.string().uuid(),
-  opponent: TttOpponentSchema.default('human'),
-  /** Relevantné len pri opponent='bot'. */
-  difficulty: TttDifficultySchema.default('medium'),
+  /**
+   * `null` = súkromná praktika proti počítaču (mimo chatu, vidí len autor).
+   * UUID miestnosti = výzva pre človeka v danej miestnosti (pôvodný flow).
+   */
+  roomId: z.string().uuid().nullable(),
 });
 export type CreateTictactoeInput = z.infer<typeof CreateTictactoeInputSchema>;
 

@@ -15,8 +15,6 @@ import type {
   LlmStatusResponse,
   IcsUrlResponse,
   RsvpStatus,
-  TttDifficulty,
-  TttOpponent,
   UpdateEventInput,
   AlbumsListResponse,
   AlbumSuggestionsResponse,
@@ -204,11 +202,9 @@ export const albumsApi = {
 };
 
 export const gamesApi = {
-  createTictactoe: (roomId: string, opponent?: TttOpponent, difficulty?: TttDifficulty) =>
-    request<GamePublic>('/games/tictactoe', {
-      method: 'POST',
-      body: JSON.stringify({ roomId, opponent, difficulty }),
-    }),
+  /** roomId = null → súkromná praktika proti počítaču (nikde sa neposiela ako správa). */
+  createTictactoe: (roomId: string | null) =>
+    request<GamePublic>('/games/tictactoe', { method: 'POST', body: JSON.stringify({ roomId }) }),
   get: (id: string) => request<GamePublic>(`/games/${id}`),
   join: (id: string) => request<GamePublic>(`/games/${id}/join`, { method: 'POST' }),
   move: (id: string, cell: number) =>

@@ -1,12 +1,12 @@
-import { TTT_BOARD_SIZE, TTT_WIN_COUNT, type TttDifficulty, type TttMark } from '@rodinna/shared-types';
+import { TTT_BOARD_SIZE, TTT_WIN_COUNT, type TttMark } from '@rodinna/shared-types';
 
 /**
  * AI súper pre piškvorky (M6 doplnok). Žiadny LLM — na 10×10 doske je
  * jednoduchý heuristický bot rýchlejší aj spoľahlivejší než promptovanie
- * Ollamy pre herné ťahy. Tri úrovne sa líšia hĺbkou uvažovania, nie
- * algoritmom: easy = náhoda, medium = win/block + náhoda, hard = win/block
- * + heuristické skóre línií (bez plného minimaxu — na 100 poliach by bol
- * príliš drahý).
+ * Ollamy pre herné ťahy. Jediná úroveň (žiadne "ľahká/stredná" — tie boli
+ * v praxi skoro nerozoznateľné, keďže po win/block ťahali len náhodne):
+ * win-if-possible → block-if-necessary → inak heuristické skóre línií
+ * (bez plného minimaxu — na 100 poliach by bol príliš drahý).
  */
 
 const DIRS: [number, number][] = [
@@ -98,11 +98,9 @@ function scoreCell(board: (TttMark | null)[], cell: number, mark: TttMark, opp: 
 }
 
 /** Vráti index políčka pre ťah bota, alebo null ak je doska plná (remíza). */
-export function pickBotMove(board: (TttMark | null)[], botMark: TttMark, difficulty: TttDifficulty): number | null {
+export function pickBotMove(board: (TttMark | null)[], botMark: TttMark): number | null {
   const empty = emptyCells(board);
   if (empty.length === 0) return null;
-
-  if (difficulty === 'easy') return pickRandom(empty);
 
   const oppMark: TttMark = botMark === 'x' ? 'o' : 'x';
   const winning = findWinningCell(board, botMark);
@@ -110,9 +108,7 @@ export function pickBotMove(board: (TttMark | null)[], botMark: TttMark, difficu
   const blocking = findWinningCell(board, oppMark);
   if (blocking !== null) return blocking;
 
-  if (difficulty === 'medium') return pickRandom(empty);
-
-  // hard: heuristické skóre — najlepšie políčko (s náhodou medzi remízovými top výsledkami).
+  // Heuristické skóre — najlepšie políčko (s náhodou medzi remízovými top výsledkami).
   let best: number[] = [];
   let bestScore = -Infinity;
   for (const cell of empty) {

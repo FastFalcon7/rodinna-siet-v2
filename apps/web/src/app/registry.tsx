@@ -6,6 +6,7 @@ import { Albums } from '../albums/Albums';
 import { Notes } from '../notes/Notes';
 import { Calendar } from '../events/Calendar';
 import { Diary } from '../diary/Diary';
+import { Practice } from '../games/Practice';
 import { consumeRoomParam } from '../shared/deepLink';
 import { consumePendingNav } from './navigate';
 
@@ -104,6 +105,14 @@ export const webModules: WebModule[] = [
     layout: 'scroll',
     Component: Diary,
   },
+  {
+    name: 'games-practice',
+    label: 'Piškvorky proti počítaču',
+    icon: GameIcon,
+    slot: 'more',
+    layout: 'scroll',
+    Component: Practice,
+  },
 ];
 
 export function HomeIcon({ className }: { className?: string }) {
@@ -159,6 +168,14 @@ export function PhotoIcon({ className }: { className?: string }) {
       <rect x="3" y="5" width="18" height="14" rx="2.5" />
       <circle cx="9" cy="10" r="1.7" />
       <path d="m5 18 5-5 3 3 3.5-3.5L21 17" />
+    </svg>
+  );
+}
+
+export function GameIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden>
+      <path d="M9 3.5v17M15 3.5v17M3.5 9h17M3.5 15h17" />
     </svg>
   );
 }

@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { BOT_USER_ID, type GamePublic, type PostAuthor } from '@rodinna/shared-types';
-import { ApiError, gamesApi, mediaApi } from '../lib/api';
+import { ApiError, chatApi, gamesApi, mediaApi } from '../lib/api';
 import { useAuth } from '../auth/AuthContext';
 import { useChat } from '../chat/ChatProvider';
+import { buildAppLink } from '../shared/appLink';
 import type { EntityCardProps } from '../app/cards';
 
 /** Krstné meno pre kompaktnú hlavičku — bot label sa neskracuje (nemá priezvisko). */
@@ -58,6 +59,34 @@ export function GameCard({ entityId, compact }: EntityCardProps) {
       setGame(await fn());
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Nepodarilo sa');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  /**
+   * Odveta je INÁ entita než táto karta (nová hra, nový id) — na rozdiel
+   * od `act` ju preto nemôžeme len tak nastaviť ako `game`, lebo táto karta
+   * počúva WS len na svoj pôvodný `entityId` a najbližší update by ju
+   * prepísal späť na starú dohratú partiu. Pri hre proti človeku treba
+   * novú hru poslať ako novú chat správu (živú kartu); pri súkromnej
+   * praktike proti botovi (roomId null) niet kam posielať, len prepneme
+   * zobrazenie priamo na novú hru.
+   */
+  const rematch = async () => {
+    if (busy || !game) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const fresh = await gamesApi.rematch(game.id);
+      if (game.roomId) {
+        await chatApi.sendMessage(game.roomId, { bodyMd: buildAppLink('games', fresh.id), mediaIds: [] });
+        setGame((g) => (g ? { ...g, rematchId: fresh.id } : g));
+      } else {
+        setGame(fresh);
+      }
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Odvetu sa nepodarilo založiť');
     } finally {
       setBusy(false);
     }
@@ -133,7 +162,7 @@ export function GameCard({ entityId, compact }: EntityCardProps) {
           )}
           {game.status === 'finished' && myMark && !game.rematchId && (
             <button
-              onClick={() => void act(() => gamesApi.rematch(game.id))}
+              onClick={() => void rematch()}
               disabled={busy}
               className="rounded-lg border border-neutral-300 px-3 py-1.5 text-sm transition hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-800"
             >
