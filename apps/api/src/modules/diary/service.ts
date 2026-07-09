@@ -203,6 +203,17 @@ export async function generateEntry(userId: string, dateIso: string): Promise<st
   const material = await collectDayMaterial(userId, dateIso);
   if (material.length === 0) return null;
 
+  // Svet okolo (M7, §15.3): titulky odoberaných kategórií — LEN ako podklad
+  // pre oddelený záverečný odsek, nikdy sa nemiešajú do osobného príbehu.
+  const { headlinesForUser } = await import('../news/service');
+  const headlines = await headlinesForUser(userId);
+  const worldBlock =
+    headlines.length > 0
+      ? `\n\nDnešné titulky zo sveta (kategórie podľa mojich preferencií):\n${headlines
+          .map((h) => `- [${h.category}] ${h.title}${h.snippet ? ` — ${h.snippet}` : ''}`)
+          .join('\n')}`
+      : '';
+
   const bodyMd = await chatCompletion(
     [
       {
@@ -212,9 +223,14 @@ export async function generateEntry(userId: string, dateIso: string): Promise<st
           'a aktivity jedného človeka za deň napíš súvislý text osobného denníka ' +
           'v 1. osobe, po slovensky, teplý a osobný tón, 1–3 odseky. ' +
           'Píš LEN o tom, čo je v podkladoch — nepridávaj žiadne fakty, mená ani ' +
-          'udalosti, ktoré tam nie sú. Neuvádzaj dátum ani nadpis.',
+          'udalosti, ktoré tam nie sú. Neuvádzaj dátum ani nadpis.' +
+          (worldBlock
+            ? ' Na úplný záver doplň krátky oddelený odsek začínajúci presne riadkom ' +
+              '"## Svet okolo" — 2–3 vety o dnešnom dianí, použi VÝHRADNE dodané titulky, ' +
+              'nič si nedomýšľaj.'
+            : ''),
       },
-      { role: 'user', content: `Podklady za deň ${dateIso}:\n${material.join('\n')}` },
+      { role: 'user', content: `Podklady za deň ${dateIso}:\n${material.join('\n')}${worldBlock}` },
     ],
     { temperature: 0.6 },
   );

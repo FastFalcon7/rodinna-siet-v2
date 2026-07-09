@@ -232,8 +232,13 @@ export async function setRsvp(eventId: string, userId: string, status: RsvpStatu
 
 // ── ICS feed (read-only subscribe) ──────────────────────────────────────────
 
-export function icsToken(): string {
-  return sha256Hex(`rodinna-ics:${env.ICS_SECRET ?? env.DATABASE_URL}`).slice(0, 40);
+/**
+ * Bearer token pre read-only ICS feed. Odvodený VÝHRADNE z ICS_SECRET —
+ * bez neho je feed vypnutý (null), nikdy sa nepoužije predvídateľná náhrada.
+ */
+export function icsToken(): string | null {
+  if (!env.ICS_SECRET) return null;
+  return sha256Hex(`rodinna-ics:${env.ICS_SECRET}`).slice(0, 40);
 }
 
 function icsEscape(s: string): string {

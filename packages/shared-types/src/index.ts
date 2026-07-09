@@ -16,3 +16,4 @@ export * from './notes';
 export * from './events';
 export * from './diary';
 export * from './games';
+export * from './news';

@@ -1,12 +1,16 @@
 import { useEffect, useState } from 'react';
 import {
   MOODS,
+  NEWS_CATEGORIES,
+  NEWS_CATEGORY_LABELS,
   type DiaryEntryPublic,
   type DiaryFragmentPublic,
   type DiarySearchResponse,
   type Mood,
+  type NewsCategory,
+  type NewsItemPublic as NewsTodayItem,
 } from '@rodinna/shared-types';
-import { ApiError, diaryApi } from '../lib/api';
+import { ApiError, diaryApi, newsApi } from '../lib/api';
 import { useChat } from '../chat/ChatProvider';
 import { relativeTime } from '../shared/time';
 
@@ -125,6 +129,8 @@ export function Diary() {
         )
       )}
 
+      <WorldSection />
+
       <section>
         <h3 className="mb-1.5 text-sm font-semibold text-neutral-500">Zápisy</h3>
         {!entries && !error && <p className="py-4 text-sm text-neutral-500">Načítavam…</p>}
@@ -171,6 +177,89 @@ export function Diary() {
         </div>
       )}
     </div>
+  );
+}
+
+/**
+ * Svet okolo (M7, §15.3): opt-in kategórie správ. Denník potom dostane
+ * záverečný odsek „Svet okolo" z dnešných titulkov (len titulky + snippet,
+ * rodinné dáta nikam neodchádzajú).
+ */
+function WorldSection() {
+  const [cats, setCats] = useState<NewsCategory[] | null>(null);
+  const [items, setItems] = useState<NewsTodayItem[]>([]);
+  const [open, setOpen] = useState(false);
+
+  const loadToday = () => void newsApi.today().then((r) => setItems(r.items)).catch(() => {});
+
+  useEffect(() => {
+    void newsApi
+      .getPrefs()
+      .then((r) => {
+        setCats(r.categories);
+        if (r.categories.length > 0) loadToday();
+      })
+      .catch(() => setCats([]));
+  }, []);
+
+  if (cats === null) return null;
+
+  const toggle = async (c: NewsCategory) => {
+    const next = cats.includes(c) ? cats.filter((x) => x !== c) : [...cats, c];
+    setCats(next);
+    const r = await newsApi.setPrefs(next);
+    setCats(r.categories);
+    loadToday();
+  };
+
+  return (
+    <section className="rounded-2xl border border-neutral-200 bg-white p-4 dark:border-neutral-800 dark:bg-neutral-900">
+      <button onClick={() => setOpen(!open)} className="flex w-full items-center justify-between text-left">
+        <span className="text-sm font-semibold">🌍 Svet okolo</span>
+        <span className="text-xs text-neutral-400">
+          {cats.length > 0 ? `${cats.length} kategórie · ` : 'vypnuté · '}
+          {open ? 'skryť' : 'nastaviť'}
+        </span>
+      </button>
+      {open && (
+        <>
+          <p className="mt-2 text-xs text-neutral-500">
+            Vyber si kategórie — na záver denníka pribudne krátky odsek o dnešnom dianí.
+            Sťahujú sa len titulky verejných správ, tvoje dáta nikam neodchádzajú.
+          </p>
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {NEWS_CATEGORIES.map((c) => (
+              <button
+                key={c}
+                onClick={() => void toggle(c)}
+                className={`rounded-full border px-2.5 py-1 text-xs transition ${
+                  cats.includes(c)
+                    ? 'border-accent bg-accent/10 text-accent'
+                    : 'border-neutral-300 text-neutral-600 hover:border-neutral-400 dark:border-neutral-700 dark:text-neutral-300'
+                }`}
+              >
+                {NEWS_CATEGORY_LABELS[c]}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+      {cats.length > 0 && items.length > 0 && (
+        <ul className="mt-3 space-y-1.5">
+          {items.slice(0, 5).map((it) => (
+            <li key={it.id} className="text-sm">
+              <a href={it.url} target="_blank" rel="noreferrer" className="hover:underline">
+                <span className="font-medium">{it.title}</span>
+              </a>
+              <span className="ml-1 text-xs text-neutral-400">{it.source}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+      {cats.length > 0 && items.length === 0 && (
+        <p className="mt-2 text-xs text-neutral-400">Titulky sa stiahnu pri najbližšom behu (2× denne).</p>
+      )}
+    </section>
   );
 }
 

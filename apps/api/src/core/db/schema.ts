@@ -697,6 +697,39 @@ export const gameMoves = pgTable(
 
 export type GameSessionRow = typeof gameSessions.$inferSelect;
 
+/**
+ * Svet okolo (plán §M7, §15.3). news_items drží len titulok + snippet +
+ * link (copyright: nikdy celý článok); unique(url) = dedupe pri opakovanom
+ * fetchi. Preferencie sú opt-in per užívateľ a kategória.
+ */
+export const userNewsPrefs = pgTable(
+  'user_news_prefs',
+  {
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    category: text('category').notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.category] })],
+);
+
+export const newsItems = pgTable(
+  'news_items',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    category: text('category').notNull(),
+    title: text('title').notNull(),
+    snippet: text('snippet').notNull().default(''),
+    source: text('source').notNull(),
+    url: text('url').notNull().unique(),
+    publishedAt: timestamp('published_at', { withTimezone: true }).notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index('news_items_cat_pub_idx').on(t.category, t.publishedAt)],
+);
+
+export type NewsItemRow = typeof newsItems.$inferSelect;
+
 export type JobRow = typeof jobs.$inferSelect;
 export type PushSubRow = typeof pushSubs.$inferSelect;
 export type NotificationRow = typeof notifications.$inferSelect;

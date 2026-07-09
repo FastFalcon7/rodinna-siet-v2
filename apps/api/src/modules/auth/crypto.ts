@@ -1,4 +1,5 @@
 /** Kryptografické pomôcky pre auth — postavené na Bun natívnych API. */
+import { timingSafeEqual } from 'node:crypto';
 
 function bytesToHex(bytes: Uint8Array): string {
   return Array.from(bytes)
@@ -25,6 +26,18 @@ export function sha256HexBytes(input: Uint8Array): string {
   const hasher = new Bun.CryptoHasher('sha256');
   hasher.update(input);
   return hasher.digest('hex');
+}
+
+/**
+ * Konštantné (timing-safe) porovnanie dvoch reťazcov — pre bearer tokeny,
+ * ktoré sa porovnávajú s hodnotou od klienta (napr. ICS feed token).
+ * Nerovná dĺžka skratuje rovno na false; dĺžka tokenu je verejná, netajíme ju.
+ */
+export function timingSafeEqualStr(a: string, b: string): boolean {
+  const ab = Buffer.from(a);
+  const bb = Buffer.from(b);
+  if (ab.length !== bb.length) return false;
+  return timingSafeEqual(ab, bb);
 }
 
 /** Hashovanie hesla — argon2id (§8), natívne v Bune (žiadna native závislosť). */
