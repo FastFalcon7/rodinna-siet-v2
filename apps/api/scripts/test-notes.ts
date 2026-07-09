@@ -197,6 +197,30 @@ async function main() {
   r = await http(bob.token, 'PATCH', `/api/notes/items/${i1.id}`, { checked: true });
   check('položka zmazaného zoznamu → 404', r.status === 404, r.status);
 
+  console.log('\n— Rate limity (T9) —');
+  // Čerstvý užívateľ = čistý in-memory kôš; limity zdieľa proces test servera.
+  const dana = await seedUser('dana@rodina.sk', 'Dana', 'member');
+  r = await http(dana.token, 'POST', '/api/notes', { kind: 'list', title: 'RL zoznam' });
+  const rlListId = r.body.id;
+  let saw429Items = false;
+  for (let i = 0; i < 61 && !saw429Items; i++) {
+    const rr = await http(dana.token, 'POST', `/api/notes/${rlListId}/items`, { label: `p${i}` });
+    if (rr.status === 429) saw429Items = true;
+  }
+  check('pridávanie položiek → po limite 429', saw429Items, saw429Items);
+  let saw429Edit = false;
+  for (let i = 0; i < 31 && !saw429Edit; i++) {
+    const rr = await http(dana.token, 'PATCH', `/api/notes/${rlListId}`, { bodyMd: `v${i}` });
+    if (rr.status === 429) saw429Edit = true;
+  }
+  check('úpravy textu (revízie) → po limite 429', saw429Edit, saw429Edit);
+  let saw429Dup = false;
+  for (let i = 0; i < 20 && !saw429Dup; i++) {
+    const rr = await http(dana.token, 'POST', `/api/notes/${rlListId}/duplicate`, {});
+    if (rr.status === 429) saw429Dup = true;
+  }
+  check('duplikát zdieľa kôš s tvorbou → po limite 429', saw429Dup, saw429Dup);
+
   aliceWs.close();
   console.log(`\n══ Výsledok: ${passed} ✓ / ${failed} ✗ ══`);
   server.stop(true);

@@ -71,6 +71,10 @@ router.get('/:id', requireAuth, async (c) => {
 /** PATCH /api/notes/:id — názov / text (verzia sa odloží) / pripnutie. */
 router.patch('/:id', requireAuth, zValidator('json', UpdateNoteInputSchema), async (c) => {
   const me = c.get('user')!;
+  // Každá zmena textu odkladá revíziu (rast riadkov) — limit ako pri tvorbe.
+  if (!rateLimit(`notesedit:${me.id}`, 30, 60_000)) {
+    return c.json({ error: 'Príliš veľa úprav, skús o chvíľu' }, 429);
+  }
   try {
     return c.json(await updateNote(c.req.param('id'), me.id, c.req.valid('json')));
   } catch (err) {
@@ -96,6 +100,10 @@ router.delete('/:id', requireAuth, async (c) => {
 /** POST /api/notes/:id/items — nová položka zoznamu. */
 router.post('/:id/items', requireAuth, zValidator('json', AddNoteItemInputSchema), async (c) => {
   const me = c.get('user')!;
+  // Veľkorysý limit — rýchle diktovanie nákupného zoznamu je legitímne.
+  if (!rateLimit(`noteitem:${me.id}`, 60, 60_000)) {
+    return c.json({ error: 'Príliš veľa položiek naraz, skús o chvíľu' }, 429);
+  }
   try {
     return c.json(await addItem(c.req.param('id'), me.id, c.req.valid('json').label));
   } catch (err) {
@@ -136,6 +144,10 @@ router.post(
   zValidator('json', z.object({ title: z.string().trim().min(1).max(120).optional() })),
   async (c) => {
     const me = c.get('user')!;
+    // Duplikát tvorí celú poznámku s položkami — rovnaký kôš ako POST /notes.
+    if (!rateLimit(`notes:${me.id}`, 20, 60_000)) {
+      return c.json({ error: 'Príliš veľa zoznamov, skús o chvíľu' }, 429);
+    }
     try {
       return c.json(await duplicateNote(c.req.param('id'), me.id, c.req.valid('json').title), 201);
     } catch (err) {
@@ -160,6 +172,10 @@ router.get('/:id/revisions', requireAuth, async (c) => {
 /** POST /api/notes/:id/revisions/:revId/restore — obnoviť verziu. */
 router.post('/:id/revisions/:revId/restore', requireAuth, async (c) => {
   const me = c.get('user')!;
+  // Restore ide cez updateNote (odkladá revíziu) — rovnaký kôš ako PATCH.
+  if (!rateLimit(`notesedit:${me.id}`, 30, 60_000)) {
+    return c.json({ error: 'Príliš veľa úprav, skús o chvíľu' }, 429);
+  }
   try {
     return c.json(await restoreRevision(c.req.param('id'), c.req.param('revId'), me.id));
   } catch (err) {
