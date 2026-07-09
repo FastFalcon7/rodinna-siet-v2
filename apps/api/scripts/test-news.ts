@@ -59,6 +59,12 @@ const RSS_XML = `<?xml version="1.0"?>
   <pubDate>${now.toUTCString()}</pubDate>
 </item>
 <item>
+  <title>Kto nie je s&#160;Naďom, je s&#160;Ficom</title>
+  <link>https://sport.example.sk/entity-test</link>
+  <description>Text s&#160;nedeliteľnou medzerou a&#xA0;hex entitou.</description>
+  <pubDate>${now.toUTCString()}</pubDate>
+</item>
+<item>
   <title>Starý článok spred mesiaca</title>
   <link>https://sport.example.sk/stary</link>
   <description>Toto je staré.</description>
@@ -150,9 +156,12 @@ async function main() {
 
   console.log('\n— Parser —');
   const parsed = parseRss(RSS_XML);
-  check('RSS: 3 položky', parsed.length === 3, parsed.length);
+  check('RSS: 4 položky', parsed.length === 4, parsed.length);
   check('CDATA titulok', parsed[0]!.title === 'Slovan vyhral derby 3:1', parsed[0]!.title);
   check('snippet bez HTML tagov a entít', parsed[0]!.snippet === 'Skvelý zápas & tri góly Šimoviča.', parsed[0]!.snippet);
+  const entityItem = parsed.find((p) => p.url.includes('entity-test'));
+  check('numerické HTML entity (&#160; aj &#xA0;) dekódované na medzeru', entityItem?.title === 'Kto nie je s Naďom, je s Ficom', entityItem?.title);
+  check('hex entita v snippete dekódovaná', entityItem?.snippet === 'Text s nedeliteľnou medzerou a hex entitou.', entityItem?.snippet);
 
   console.log('\n— Preferencie —');
   let r = await http(alica.token, 'GET', '/api/news/prefs');
@@ -164,14 +173,14 @@ async function main() {
 
   console.log('\n— Fetch job —');
   let res = await fetchNews(MOCK_FEEDS);
-  check('stiahnuté len odoberané kategórie, starý článok preskočený', res.stored === 2, res);
+  check('stiahnuté len odoberané kategórie, starý článok preskočený', res.stored === 3, res);
   res = await fetchNews(MOCK_FEEDS);
   check('dedupe cez unique url (0 nových)', res.stored === 0, res);
   const allItems = await db.select().from(newsItems);
-  check('v DB len čerstvé položky', allItems.length === 2, allItems.length);
+  check('v DB len čerstvé položky', allItems.length === 3, allItems.length);
 
   r = await http(alica.token, 'GET', '/api/news/today');
-  check('today: 2 dnešné titulky', r.body.items.length === 2, r.body.items?.length);
+  check('today: 3 dnešné titulky', r.body.items.length === 3, r.body.items?.length);
   check('titulok + zdroj', r.body.items.some((i: any) => i.title.includes('Slovan') && i.source === '127.0.0.1'), r.body.items?.[0]);
   r = await http(bob.token, 'GET', '/api/news/today');
   check('bob bez prefs → prázdne', r.body.items.length === 0, r.body.items?.length);
