@@ -4,7 +4,9 @@ import { Chat } from '../chat/Chat';
 import { useChat } from '../chat/ChatProvider';
 import { Albums } from '../albums/Albums';
 import { Notes } from '../notes/Notes';
+import { Calendar } from '../events/Calendar';
 import { consumeRoomParam } from '../shared/deepLink';
+import { consumePendingNav } from './navigate';
 
 /**
  * Frontend plugin kontrakt (ARCHITECTURE_V2.md §5, plán M0-3 / K4).
@@ -37,8 +39,12 @@ function FeedScreen() {
 }
 
 function ChatScreen() {
-  // Deep link z push notifikácie (/?room=…) — skonzumuje sa raz pri mounte.
-  const initialRoomId = useMemo(() => consumeRoomParam(), []);
+  // Deep link z push notifikácie (/?room=…) alebo z inej časti appky
+  // (napr. „Napísať gratuláciu" na narodeninovej karte) — raz pri mounte.
+  const initialRoomId = useMemo(
+    () => consumeRoomParam() ?? consumePendingNav('chat')?.entityId ?? null,
+    [],
+  );
   return <Chat initialRoomId={initialRoomId} />;
 }
 
@@ -72,7 +78,7 @@ export const webModules: WebModule[] = [
     layout: 'scroll',
     Component: Albums,
   },
-  // Slot 'more': bottom nav má 4 sloty plné — Zoznamy žijú vo „Viac".
+  // Slot 'more': bottom nav má 4 sloty plné — Zoznamy a Kalendár žijú vo „Viac".
   {
     name: 'notes',
     label: 'Zoznamy a poznámky',
@@ -80,6 +86,14 @@ export const webModules: WebModule[] = [
     slot: 'more',
     layout: 'scroll',
     Component: Notes,
+  },
+  {
+    name: 'calendar',
+    label: 'Kalendár',
+    icon: CalendarIcon,
+    slot: 'more',
+    layout: 'scroll',
+    Component: Calendar,
   },
 ];
 
@@ -96,6 +110,16 @@ export function ChatIcon({ className }: { className?: string }) {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden>
       <path d="M21 11.5a8.5 8.5 0 0 1-8.5 8.5c-1.5 0-2.9-.4-4.1-1L3 20l1.1-5A8.5 8.5 0 1 1 21 11.5Z" />
+    </svg>
+  );
+}
+
+export function CalendarIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden>
+      <rect x="3.5" y="5" width="17" height="16" rx="2.5" />
+      <path d="M3.5 10h17M8 3v4M16 3v4" />
+      <circle cx="12" cy="15.5" r="1.4" fill="currentColor" stroke="none" />
     </svg>
   );
 }

@@ -56,7 +56,7 @@ Kontrakty K1–K3 vyžadujú tri malé rozšírenia jadra (detail v M0):
 | M1 ✅ | **Ankety** 🗳 | najmenší modul, end-to-end overí kontrakt K1–K4; okamžitá hodnota | WS, Feed, Chat |
 | M2 ✅ | **Albumy + Spomienky** 📷 | najväčšia emočná hodnota; média už máme, chýba len organizácia | media, worker |
 | M3 ✅ | **Zoznamy & Poznámky** | denná praktická hodnota (nákupy); predvedie živé karty naplno | WS, živé karty |
-| M4 | **Kalendár & Udalosti** 📅 | narodeniny + rodinné akcie; spája Feed (RSVP) a push (pripomienky) | worker, push, Ankety (RSVP ≈ anketa) |
+| M4 ✅ | **Kalendár & Udalosti** 📅 | narodeniny + rodinné akcie; spája Feed (RSVP) a push (pripomienky) | worker, push, Ankety (RSVP ≈ anketa) |
 | M5 | **LLM kernel + Denník** 📖 | prvý LLM modul podľa §15.2; najinovatívnejšia časť appky | worker, media, embeddings |
 | M6 | **Hry & Výzvy** 🎲 | zábava/retencia; piškvorky sú „chat s iným payloadom" | WS, LLM (kvízy), media (výzvy) |
 | M7 | **Svet okolo** 🌍 | rozšírenie Denníka podľa §15.3; opt-in | worker, Denník |

@@ -9,6 +9,7 @@ export function toPublicUser(u: UserRow): UserPublic {
     displayName: u.displayName,
     avatarUrl: u.avatarUrl,
     role: u.role,
+    birthday: u.birthday,
     createdAt: u.createdAt.toISOString(),
   };
 }

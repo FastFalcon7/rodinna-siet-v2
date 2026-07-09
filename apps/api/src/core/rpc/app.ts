@@ -16,6 +16,7 @@ import { notificationsModule } from '../../modules/notifications';
 import { pollsModule } from '../../modules/polls';
 import { albumsModule } from '../../modules/albums';
 import { notesModule } from '../../modules/notes';
+import { eventsModule } from '../../modules/events';
 
 /**
  * Root Hono app — všetko pod /api. Moduly sa registrujú cez register().
@@ -50,6 +51,7 @@ const modules: AppModule[] = [
   pollsModule,
   albumsModule,
   notesModule,
+  eventsModule,
 ];
 
 function register(target: Hono<AppEnv>, mod: AppModule): void {

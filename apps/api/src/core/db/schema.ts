@@ -9,6 +9,7 @@ import {
   unique,
   primaryKey,
   boolean,
+  date,
 } from 'drizzle-orm/pg-core';
 
 /**
@@ -29,6 +30,8 @@ export const users = pgTable('users', {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   lastSeenAt: timestamp('last_seen_at', { withTimezone: true }),
   pushPref: jsonb('push_pref_json'),
+  // M4: kalendár z dátumu narodenia počíta narodeniny (agenda + ranná karta).
+  birthday: date('birthday'),
 });
 
 /**
@@ -545,10 +548,56 @@ export const noteRevisions = pgTable(
   (t) => [index('note_revisions_note_idx').on(t.noteId, t.savedAt)],
 );
 
+/**
+ * Kalendár (plán §M4). `source='birthday'` riadky materializuje denný job
+ * len ako nosič feed karty (agenda narodeniny počíta virtuálne
+ * z users.birthday — riadok na každý rok dopredu by nedával zmysel).
+ */
+export const eventSourceValues = ['manual', 'birthday', 'poll', 'suggested'] as const;
+export const rsvpStatusValues = ['yes', 'no', 'maybe'] as const;
+
+export const events = pgTable(
+  'events',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    title: text('title').notNull(),
+    startsAt: timestamp('starts_at', { withTimezone: true }).notNull(),
+    endsAt: timestamp('ends_at', { withTimezone: true }),
+    allDay: boolean('all_day').notNull().default(false),
+    location: text('location').notNull().default(''),
+    bodyMd: text('body_md').notNull().default(''),
+    source: text('source', { enum: eventSourceValues }).notNull().default('manual'),
+    // Pri source='birthday' odkazuje na oslávenca (kvôli gratulácii z karty).
+    subjectUserId: uuid('subject_user_id').references(() => users.id, { onDelete: 'cascade' }),
+    createdBy: uuid('created_by')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    deletedAt: timestamp('deleted_at', { withTimezone: true }),
+  },
+  (t) => [index('events_starts_idx').on(t.startsAt)],
+);
+
+export const eventRsvps = pgTable(
+  'event_rsvps',
+  {
+    eventId: uuid('event_id')
+      .notNull()
+      .references(() => events.id, { onDelete: 'cascade' }),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    status: text('status', { enum: rsvpStatusValues }).notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.eventId, t.userId] })],
+);
+
 export type JobRow = typeof jobs.$inferSelect;
 export type PushSubRow = typeof pushSubs.$inferSelect;
 export type NotificationRow = typeof notifications.$inferSelect;
 export type FeedCardRow = typeof feedCards.$inferSelect;
+export type EventRow = typeof events.$inferSelect;
 export type PollRow = typeof polls.$inferSelect;
 export type PollOptionRow = typeof pollOptions.$inferSelect;
 export type AlbumRow = typeof albums.$inferSelect;
