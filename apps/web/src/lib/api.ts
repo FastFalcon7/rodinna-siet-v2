@@ -10,6 +10,8 @@ import type {
   DiaryListResponse,
   DiarySearchResponse,
   EventPublic,
+  GameAnswerInput,
+  GamePublic,
   LlmStatusResponse,
   IcsUrlResponse,
   RsvpStatus,
@@ -197,6 +199,18 @@ export const albumsApi = {
   getMemory: (mediaId: string) => request<MemoryPublic>(`/albums/memories/${mediaId}`),
   hideMemory: (mediaId: string) =>
     request<{ ok: boolean }>(`/albums/memories/${mediaId}/hide`, { method: 'POST' }),
+};
+
+export const gamesApi = {
+  createTictactoe: (roomId: string) =>
+    request<GamePublic>('/games/tictactoe', { method: 'POST', body: JSON.stringify({ roomId }) }),
+  get: (id: string) => request<GamePublic>(`/games/${id}`),
+  join: (id: string) => request<GamePublic>(`/games/${id}/join`, { method: 'POST' }),
+  move: (id: string, cell: number) =>
+    request<GamePublic>(`/games/${id}/move`, { method: 'POST', body: JSON.stringify({ cell }) }),
+  rematch: (id: string) => request<GamePublic>(`/games/${id}/rematch`, { method: 'POST' }),
+  answer: (id: string, input: GameAnswerInput) =>
+    request<GamePublic>(`/games/${id}/answer`, { method: 'POST', body: JSON.stringify(input) }),
 };
 
 export const diaryApi = {

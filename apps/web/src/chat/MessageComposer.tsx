@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { MessagePublic } from '@rodinna/shared-types';
-import { chatApi, ApiError } from '../lib/api';
+import { chatApi, ApiError, gamesApi } from '../lib/api';
 import { useChat } from './ChatProvider';
 import { AttachmentSheet } from '../shared/AttachmentSheet';
 import { UploadPreviews } from '../shared/UploadPreviews';
@@ -192,6 +192,17 @@ export function MessageComposer({
           onFiles={uploads.addFiles}
           onLocation={insertLocation}
           onPoll={() => setPollDialog(true)}
+          onGame={() => {
+            setSheet(false);
+            // Piškvorky: založ partiu a pošli živú kartu do konverzácie (K2).
+            void gamesApi
+              .createTictactoe(roomId)
+              .then((g) =>
+                chatApi.sendMessage(roomId, { bodyMd: buildAppLink('games', g.id), mediaIds: [] }),
+              )
+              .then(onSent)
+              .catch(() => setError('Piškvorky sa nepodarilo založiť'));
+          }}
           onEvent={() => setEventDialog(true)}
           onClose={() => setSheet(false)}
         />
