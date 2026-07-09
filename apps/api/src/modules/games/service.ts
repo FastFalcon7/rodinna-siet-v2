@@ -7,9 +7,7 @@ import {
   type GameAnswerInput,
   type GamePublic,
   type PostAuthor,
-  type TttDifficulty,
   type TttMark,
-  type TttOpponent,
 } from '@rodinna/shared-types';
 import { db } from '../../core/db/client';
 import {
@@ -40,8 +38,6 @@ interface TttState {
   turn: TttMark;
   winner: TttMark | 'draw' | null;
   rematchId?: string | null;
-  /** Len pri hre proti počítaču. */
-  difficulty?: TttDifficulty;
 }
 
 interface QuestState {
@@ -49,14 +45,8 @@ interface QuestState {
   date: string;
 }
 
-const BOT_LABELS: Record<TttDifficulty, string> = {
-  easy: '🤖 Počítač (Ľahká)',
-  medium: '🤖 Počítač (Stredná)',
-  hard: '🤖 Počítač (Ťažká)',
-};
-
-function botAuthor(difficulty: TttDifficulty): PostAuthor {
-  return { id: BOT_USER_ID, displayName: BOT_LABELS[difficulty], avatarUrl: null };
+function botAuthor(): PostAuthor {
+  return { id: BOT_USER_ID, displayName: '🤖 Počítač', avatarUrl: null };
 }
 
 async function fetchAuthors(userIds: (string | null)[]): Promise<Map<string, PostAuthor>> {
@@ -77,7 +67,14 @@ async function getSession(gameId: string): Promise<GameSessionRow> {
 
 /** Hry viazané na miestnosť vidia len jej členovia (nepriznávame existenciu). */
 async function requireAccess(session: GameSessionRow, userId: string): Promise<void> {
-  if (!session.roomId) return; // denná otázka / foto výzva = family-wide
+  if (!session.roomId) {
+    // Piškvorky proti počítaču (roomId null) sú súkromná praktika — len autor.
+    // Denná otázka / foto výzva (tiež roomId null) ostávajú family-wide.
+    if (session.kind === 'tictactoe' && session.createdBy !== userId) {
+      throw new NotFoundError('Hra nenájdená');
+    }
+    return;
+  }
   const rows = await db
     .select({ userId: roomMembers.userId })
     .from(roomMembers)
@@ -107,7 +104,7 @@ export async function getGame(gameId: string, viewerId: string): Promise<GamePub
   if (session.kind === 'tictactoe') {
     const st = session.stateJson as unknown as TttState;
     const authors = await fetchAuthors([session.createdBy, st.xUserId, st.oUserId]);
-    if (st.oUserId === BOT_USER_ID) authors.set(BOT_USER_ID, botAuthor(st.difficulty ?? 'medium'));
+    if (st.oUserId === BOT_USER_ID) authors.set(BOT_USER_ID, botAuthor());
     return {
       ...base,
       createdBy: authors.get(session.createdBy)!,
@@ -159,27 +156,28 @@ function sqlMediaJoin() {
 
 // ── Piškvorky ────────────────────────────────────────────────────────────────
 
-export async function createTictactoe(
-  creatorId: string,
-  roomId: string,
-  opponent: TttOpponent = 'human',
-  difficulty: TttDifficulty = 'medium',
-): Promise<GamePublic> {
-  const member = await db
-    .select({ userId: roomMembers.userId })
-    .from(roomMembers)
-    .where(and(eq(roomMembers.roomId, roomId), eq(roomMembers.userId, creatorId)))
-    .limit(1);
-  if (!member[0]) throw new NotFoundError('Miestnosť nenájdená');
+/**
+ * `roomId` = null → súkromná praktika proti počítaču (žiadna izba, žiadny
+ * druhý hráč). `roomId` = UUID → výzva pre človeka v danej miestnosti
+ * (pôvodný flow, čaká na join).
+ */
+export async function createTictactoe(creatorId: string, roomId: string | null): Promise<GamePublic> {
+  const isBot = roomId === null;
+  if (!isBot) {
+    const member = await db
+      .select({ userId: roomMembers.userId })
+      .from(roomMembers)
+      .where(and(eq(roomMembers.roomId, roomId), eq(roomMembers.userId, creatorId)))
+      .limit(1);
+    if (!member[0]) throw new NotFoundError('Miestnosť nenájdená');
+  }
 
-  const isBot = opponent === 'bot';
   const state: TttState = {
     board: Array(TTT_CELLS).fill(null),
     xUserId: creatorId,
     oUserId: isBot ? BOT_USER_ID : null,
     turn: 'x',
     winner: null,
-    difficulty: isBot ? difficulty : undefined,
   };
   const inserted = await db
     .insert(gameSessions)
@@ -265,7 +263,7 @@ export async function moveTictactoe(gameId: string, userId: string, cell: number
   // Bot ťahá hneď v tom istom requeste — žiadny druhý round-trip ani čakanie.
   const isBotGame = st.oUserId === BOT_USER_ID;
   if (isBotGame && st.winner === null && st.turn === 'o') {
-    const botCell = pickBotMove(st.board, 'o', st.difficulty ?? 'medium');
+    const botCell = pickBotMove(st.board, 'o');
     if (botCell !== null) {
       st.board[botCell] = 'o';
       st.winner = winnerOf(st.board);
@@ -316,12 +314,7 @@ export async function rematchTictactoe(gameId: string, userId: string): Promise<
   if (userId !== st.xUserId && userId !== st.oUserId) throw new ForbiddenError('Nie si hráčom tejto partie');
 
   const isBotGame = st.oUserId === BOT_USER_ID;
-  const fresh = await createTictactoe(
-    userId,
-    session.roomId!,
-    isBotGame ? 'bot' : 'human',
-    st.difficulty ?? 'medium',
-  );
+  const fresh = await createTictactoe(userId, isBotGame ? null : session.roomId!);
   st.rematchId = fresh.id;
   await db.update(gameSessions).set({ stateJson: st }).where(eq(gameSessions.id, gameId));
   await broadcast(gameId);
