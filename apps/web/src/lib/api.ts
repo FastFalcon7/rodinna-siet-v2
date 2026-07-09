@@ -3,7 +3,14 @@ import type {
   AgendaResponse,
   AlbumDetail,
   CreateEventInput,
+  CreateFragmentInput,
+  DiaryEntryPublic,
+  DiaryFragmentPublic,
+  DiaryFragmentsResponse,
+  DiaryListResponse,
+  DiarySearchResponse,
   EventPublic,
+  LlmStatusResponse,
   IcsUrlResponse,
   RsvpStatus,
   UpdateEventInput,
@@ -190,6 +197,27 @@ export const albumsApi = {
   getMemory: (mediaId: string) => request<MemoryPublic>(`/albums/memories/${mediaId}`),
   hideMemory: (mediaId: string) =>
     request<{ ok: boolean }>(`/albums/memories/${mediaId}/hide`, { method: 'POST' }),
+};
+
+export const diaryApi = {
+  entries: () => request<DiaryListResponse>('/diary'),
+  status: () => request<LlmStatusResponse>('/diary/status'),
+  fragments: (date?: string) =>
+    request<DiaryFragmentsResponse>(`/diary/fragments${date ? `?date=${date}` : ''}`),
+  addFragment: (input: CreateFragmentInput) =>
+    request<DiaryFragmentPublic>('/diary/fragments', { method: 'POST', body: JSON.stringify(input) }),
+  removeFragment: (id: string) => request<void>(`/diary/fragments/${id}`, { method: 'DELETE' }),
+  generate: (date?: string) =>
+    request<{ queued: boolean; date: string }>('/diary/generate', {
+      method: 'POST',
+      body: JSON.stringify({ date }),
+    }),
+  search: (q: string) => request<DiarySearchResponse>(`/diary/search?q=${encodeURIComponent(q)}`),
+  updateEntry: (id: string, bodyMd: string) =>
+    request<DiaryEntryPublic>(`/diary/entries/${id}`, { method: 'PATCH', body: JSON.stringify({ bodyMd }) }),
+  confirmEntry: (id: string) =>
+    request<DiaryEntryPublic>(`/diary/entries/${id}/confirm`, { method: 'POST' }),
+  removeEntry: (id: string) => request<void>(`/diary/entries/${id}`, { method: 'DELETE' }),
 };
 
 export const eventsApi = {

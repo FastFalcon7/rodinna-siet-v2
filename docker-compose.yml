@@ -37,6 +37,10 @@ services:
       VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
       VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
       VAPID_SUBJECT: ${VAPID_SUBJECT:-mailto:admin@rodinna.local}
+      # LLM (M5): nastav LLM_BASE_URL=http://ollama:11434 a spusti s --profile llm.
+      LLM_BASE_URL: ${LLM_BASE_URL:-}
+      LLM_MODEL: ${LLM_MODEL:-llama3.2:3b-instruct-q4_K_M}
+      LLM_EMBED_MODEL: ${LLM_EMBED_MODEL:-nomic-embed-text}
     volumes:
       # Nahrané súbory. Na NAS nastav MEDIA_HOST_PATH=/volume1/rodinna/media v .env.
       - ${MEDIA_HOST_PATH:-./media}:/data/media
@@ -62,6 +66,9 @@ services:
       VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
       VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
       VAPID_SUBJECT: ${VAPID_SUBJECT:-mailto:admin@rodinna.local}
+      LLM_BASE_URL: ${LLM_BASE_URL:-}
+      LLM_MODEL: ${LLM_MODEL:-llama3.2:3b-instruct-q4_K_M}
+      LLM_EMBED_MODEL: ${LLM_EMBED_MODEL:-nomic-embed-text}
     volumes:
       - ${MEDIA_HOST_PATH:-./media}:/data/media
     depends_on:
@@ -69,6 +76,17 @@ services:
         condition: service_healthy
       api:
         condition: service_started
+
+  # LLM server (M5, §6): Ollama na CPU. Spúšťa sa len s `--profile llm`.
+  # Modely: docker compose exec ollama ollama pull llama3.2:3b-instruct-q4_K_M
+  #         docker compose exec ollama ollama pull nomic-embed-text
+  # Na NAS nastav OLLAMA_HOST_PATH=/volume1/rodinna/ollama (bind-mount modelov).
+  ollama:
+    profiles: ['llm']
+    image: ollama/ollama:latest
+    restart: unless-stopped
+    volumes:
+      - ${OLLAMA_HOST_PATH:-./ollama}:/root/.ollama
 
   # Web + reverse proxy pre /api, /ws. Beží len s `--profile edge` (NAS).
   # TLS a doménové routovanie rieši zdieľaná NAS-wide edge vrstva (mimo tohto

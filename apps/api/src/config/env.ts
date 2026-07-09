@@ -30,6 +30,15 @@ const EnvSchema = z.object({
   // Tajomstvo pre read-only ICS feed (M4). Bez neho sa token odvodí
   // z DATABASE_URL (funguje, ale rotácia hesla DB zneplatní odbery).
   ICS_SECRET: z.string().optional(),
+  // LLM (M5, §6): OpenAI-kompatibilný server (Ollama: http://ollama:11434).
+  // Bez URL beží appka normálne — LLM funkcie sú vypnuté, /api/llm vracia mock.
+  LLM_BASE_URL: z.string().url().optional(),
+  // Interaktívne/nočné joby (§15: malý CPU-friendly model).
+  LLM_MODEL: z.string().default('llama3.2:3b-instruct-q4_K_M'),
+  LLM_EMBED_MODEL: z.string().default('nomic-embed-text'),
+  // Dimenzia embeddingov musí sedieť s modelom (nomic-embed-text = 768)
+  // aj so stĺpcom diary_embeddings.embedding — zmena = nová migrácia.
+  LLM_EMBED_DIM: z.coerce.number().int().positive().default(768),
 });
 
 export const env = EnvSchema.parse(process.env);
@@ -42,3 +51,6 @@ export const cookieSecure = isProd;
 
 /** Push je zapnutý len s kompletným VAPID párom. */
 export const pushEnabled = Boolean(env.VAPID_PUBLIC_KEY && env.VAPID_PRIVATE_KEY);
+
+/** LLM funkcie (denník, neskôr kvízy/digest) bežia len s nakonfigurovaným serverom. */
+export const llmEnabled = Boolean(env.LLM_BASE_URL);

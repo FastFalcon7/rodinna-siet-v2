@@ -5,6 +5,7 @@ import { useChat } from '../chat/ChatProvider';
 import { Albums } from '../albums/Albums';
 import { Notes } from '../notes/Notes';
 import { Calendar } from '../events/Calendar';
+import { Diary } from '../diary/Diary';
 import { consumeRoomParam } from '../shared/deepLink';
 import { consumePendingNav } from './navigate';
 
@@ -95,6 +96,14 @@ export const webModules: WebModule[] = [
     layout: 'scroll',
     Component: Calendar,
   },
+  {
+    name: 'diary',
+    label: 'Denník',
+    icon: BookIcon,
+    slot: 'more',
+    layout: 'scroll',
+    Component: Diary,
+  },
 ];
 
 export function HomeIcon({ className }: { className?: string }) {
@@ -110,6 +119,15 @@ export function ChatIcon({ className }: { className?: string }) {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden>
       <path d="M21 11.5a8.5 8.5 0 0 1-8.5 8.5c-1.5 0-2.9-.4-4.1-1L3 20l1.1-5A8.5 8.5 0 1 1 21 11.5Z" />
+    </svg>
+  );
+}
+
+export function BookIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden>
+      <path d="M4.5 4.5A2 2 0 0 1 6.5 3H19v16H6.5a2 2 0 0 0-2 2Z" />
+      <path d="M4.5 4.5V21M19 19v2H6.5" />
     </svg>
   );
 }

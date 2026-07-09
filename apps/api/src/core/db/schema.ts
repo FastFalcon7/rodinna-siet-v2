@@ -10,6 +10,7 @@ import {
   primaryKey,
   boolean,
   date,
+  vector,
 } from 'drizzle-orm/pg-core';
 
 /**
@@ -593,11 +594,73 @@ export const eventRsvps = pgTable(
   (t) => [primaryKey({ columns: [t.eventId, t.userId] })],
 );
 
+/**
+ * Denník (plán §M5, §15.2) — striktne privátny (všetky dopyty filtrujú
+ * podľa vlastníka). Fragmenty = quick capture cez deň; entries = jeden
+ * zápis na (užívateľ, deň), vždy najprv draft; embeddingy sa počítajú
+ * až po potvrdení (pgvector, nomic-embed-text 768 dim).
+ */
+export const diaryFragmentSourceValues = ['manual', 'feed', 'chat'] as const;
+export const diaryEntryStatusValues = ['draft', 'confirmed'] as const;
+
+export const diaryFragments = pgTable(
+  'diary_fragments',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    body: text('body').notNull().default(''),
+    mood: text('mood'),
+    mediaId: uuid('media_id').references(() => media.id, { onDelete: 'set null' }),
+    source: text('source', { enum: diaryFragmentSourceValues }).notNull().default('manual'),
+    sourceRefId: uuid('source_ref_id'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index('diary_fragments_user_created_idx').on(t.userId, t.createdAt)],
+);
+
+export const diaryEntries = pgTable(
+  'diary_entries',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    date: date('date').notNull(),
+    bodyMd: text('body_md').notNull(),
+    status: text('status', { enum: diaryEntryStatusValues }).notNull().default('draft'),
+    confirmedAt: timestamp('confirmed_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [unique('diary_entries_user_date_unique').on(t.userId, t.date)],
+);
+
+export const diaryEmbeddings = pgTable(
+  'diary_embeddings',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    entryId: uuid('entry_id')
+      .notNull()
+      .unique()
+      .references(() => diaryEntries.id, { onDelete: 'cascade' }),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    // Dimenzia musí sedieť s LLM_EMBED_DIM (nomic-embed-text = 768).
+    embedding: vector('embedding', { dimensions: 768 }).notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index('diary_embeddings_user_idx').on(t.userId)],
+);
+
 export type JobRow = typeof jobs.$inferSelect;
 export type PushSubRow = typeof pushSubs.$inferSelect;
 export type NotificationRow = typeof notifications.$inferSelect;
 export type FeedCardRow = typeof feedCards.$inferSelect;
 export type EventRow = typeof events.$inferSelect;
+export type DiaryEntryRow = typeof diaryEntries.$inferSelect;
+export type DiaryFragmentRow = typeof diaryFragments.$inferSelect;
 export type PollRow = typeof polls.$inferSelect;
 export type PollOptionRow = typeof pollOptions.$inferSelect;
 export type AlbumRow = typeof albums.$inferSelect;

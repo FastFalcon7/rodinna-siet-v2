@@ -85,6 +85,13 @@
       "when": 1783248344772,
       "tag": "0011_nostalgic_hitman",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1783249526132,
+      "tag": "0012_curved_power_man",
+      "breakpoints": true
     }
   ]
 }

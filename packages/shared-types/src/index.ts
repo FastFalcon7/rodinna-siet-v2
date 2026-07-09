@@ -14,3 +14,4 @@ export * from './polls';
 export * from './albums';
 export * from './notes';
 export * from './events';
+export * from './diary';
