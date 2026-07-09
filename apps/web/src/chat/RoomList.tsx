@@ -43,11 +43,13 @@ export function RoomList({ rooms, activeRoomId, meId, onSelect, onNewChat }: Roo
       const label =
         appLink.module === 'polls'
           ? '📊 Anketa'
-          : appLink.module === 'games'
-            ? '⭕ Piškvorky'
-            : appLink.module === 'quiz'
-              ? '🧠 Kvíz'
-              : '🧩 Karta';
+          : appLink.module === 'events'
+            ? '📅 Udalosť'
+            : appLink.module === 'games'
+              ? '⭕ Piškvorky'
+              : appLink.module === 'quiz'
+                ? '🧠 Kvíz'
+                : '🧩 Karta';
       const rest = stripAppLink(lm.bodyMd, appLink);
       return `${prefix}${label}${rest ? ` · ${rest}` : ''}`;
     }

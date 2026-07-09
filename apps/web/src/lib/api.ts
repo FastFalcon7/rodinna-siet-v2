@@ -215,7 +215,8 @@ export const newsApi = {
 };
 
 export const gamesApi = {
-  createTictactoe: (roomId: string) =>
+  /** roomId = null → súkromná praktika proti počítaču (nikde sa neposiela ako správa). */
+  createTictactoe: (roomId: string | null) =>
     request<GamePublic>('/games/tictactoe', { method: 'POST', body: JSON.stringify({ roomId }) }),
   get: (id: string) => request<GamePublic>(`/games/${id}`),
   join: (id: string) => request<GamePublic>(`/games/${id}/join`, { method: 'POST' }),

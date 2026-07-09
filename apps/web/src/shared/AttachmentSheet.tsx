@@ -8,6 +8,8 @@ interface AttachmentSheetProps {
   onPoll?: () => void;
   /** Ak je zadané, sheet ponúkne „Piškvorky" (M6) — výzva v konverzácii. */
   onGame?: () => void;
+  /** Ak je zadané, sheet ponúkne „Udalosť" (M4) — volajúci otvorí dialóg tvorby. */
+  onEvent?: () => void;
   onClose: () => void;
 }
 
@@ -15,7 +17,14 @@ interface AttachmentSheetProps {
  * Bottom sheet výberu prílohy (DESIGN_REVIEW_FEED_CHAT.md §4.2):
  * fotoaparát / galéria (foto + video) / súbor / poloha.
  */
-export function AttachmentSheet({ onFiles, onLocation, onPoll, onGame, onClose }: AttachmentSheetProps) {
+export function AttachmentSheet({
+  onFiles,
+  onLocation,
+  onPoll,
+  onGame,
+  onEvent,
+  onClose,
+}: AttachmentSheetProps) {
   const cameraRef = useRef<HTMLInputElement>(null);
   const galleryRef = useRef<HTMLInputElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -80,6 +89,18 @@ export function AttachmentSheet({ onFiles, onLocation, onPoll, onGame, onClose }
             onClick: () => {
               onClose();
               onGame();
+            },
+          },
+        ]
+      : []),
+    ...(onEvent
+      ? [
+          {
+            icon: '📅',
+            label: 'Udalosť',
+            onClick: () => {
+              onClose();
+              onEvent();
             },
           },
         ]

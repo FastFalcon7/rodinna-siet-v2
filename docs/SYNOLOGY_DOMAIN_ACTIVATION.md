@@ -63,9 +63,9 @@ services:
     image: caddy:2-alpine
     restart: unless-stopped
     ports:
-      - '80:80'
-      - '443:443'
-      - '443:443/udp'
+      - '8080:80'
+      - '8443:443'
+      - '8443:443/udp'
     volumes:
       - ../caddy/Caddyfile:/etc/caddy/Caddyfile
       - ../data:/data
@@ -77,6 +77,16 @@ networks:
   edge:
     external: true
 ```
+
+> **Prečo `8080`/`8443`, nie priamo `80`/`443`:** DSM (aspoň 7.x na DS925+) si natrvalo
+> drží port 443 pre vlastný systémový nginx (`nginx: master`) — beží tam fallback
+> `default_server` blok (`root /var/tmp/nginx/html; rewrite ... /redirect.html`), ktorý
+> nesúvisí s DSM Desktop portom (5000/5001) a **nedá sa vypnúť cez žiadne DSM GUI
+> nastavenie** (over cez `sudo netstat -tlnp | grep :443` → uvidíš `nginx: master`).
+> Namiesto boja s DSM je jednoduchšie nechať edge Caddy na alternatívnych hostiteľských
+> portoch a presmerovanie urobiť už na routeri (§4) — z internetu appka aj tak beží na
+> štandardných `80`/`443`, len posledný skok na NAS ide inak. Podrobnosti v
+> Troubleshooting sekcii nižšie.
 
 Sieť treba vytvoriť pred prvým spustením:
 
@@ -114,13 +124,19 @@ rodinna-<meno>.synology.me {
 ## 4. Port forwarding na routeri
 
 Presmerovať na internú IP NAS-u (**raz, spoločné pre všetky appky** — smeruje na
-zdieľaný edge Caddy):
+zdieľaný edge Caddy). Keďže edge Caddy počúva na `8080`/`8443` (§2, kvôli DSM
+konfliktu na 443), presmerovanie ide na tieto porty, nie priamo na 80/443 NAS-u:
 
-| Externý port | Interný port | Protokol | Účel |
+| Externý port | Interný port (NAS) | Protokol | Účel |
 |---|---|---|---|
-| 80 | 80 | TCP | HTTP-01 ACME challenge (Let's Encrypt) + redirect na 443 |
-| 443 | 443 | TCP | HTTPS appky |
-| 443 | 443 | UDP | HTTP/3 (QUIC) — voliteľné, ale odporúčané |
+| 80 | 8080 | TCP | HTTP-01 ACME challenge (Let's Encrypt) + redirect na 443 |
+| 443 | 8443 | TCP | HTTPS appky |
+| 443 | 8443 | UDP | HTTP/3 (QUIC) — voliteľné, ale odporúčané |
+
+Z pohľadu internetu appka stále beží na štandardných `80`/`443` — presmerovanie na
+`8080`/`8443` je len posledný skok vnútri LAN. Na UniFi/podobných routeroch treba aj
+**DHCP rezerváciu (fixed IP)** pre NAS (§1), inak sa presmerovanie po reštarte NAS-u
+rozbije.
 
 Ak ISP port 80 blokuje (časté u niektorých mobilných/CGNAT pripojení), Let's Encrypt
 HTTP-01 zlyhá — treba DNS-01 challenge (API token u DNS providera) alebo zmenu ISP
@@ -128,9 +144,14 @@ plánu. Over najprv jednoducho: `curl -I http://<WAN-IP>` zvonka siete.
 
 ## 5. DSM firewall / Control Panel → Security
 
-- **Control Panel → Security → Firewall**: povoliť len porty 80/443 smerom von,
-  všetko ostatné (5000/5001 DSM, SSH) nechať blokované z WAN, alebo aspoň obmedziť
-  na dôveryhodné IP/VPN.
+- **Ak router už port forwarduje len úzko** (len pravidlá z §4, nič iné smerom na NAS),
+  DSM vstavaná brána firewall je voliteľná — router už sám o sebe zabezpečuje, že
+  SSH/DSM porty (5000/5001/22) nie sú z internetu dosiahnuteľné vôbec. V praxi to
+  stačí a šetrí to riziko, že sa zlým pravidlom zablokuješ von z DSM/SSH.
+- Ak ju napriek tomu chceš zapnúť pre ďalšiu vrstvu ochrany: **Control Panel →
+  Security → Firewall** — povoliť LAN podsieť na všetko, z WAN povoliť len
+  `8080`/`8443` (nie 80/443 — edge Caddy na ne nepočúva, viď §2), všetko ostatné
+  blokovať. Postupuj opatrne, aby si sa neuzamkol von.
 - **Dôležité:** nepoužívať DSM vstavaný reverse proxy (Control Panel → Login Portal
   → Advanced → Reverse Proxy) pre žiadnu appku — DSM update vie prepísať jeho nginx
   config a appku zhodiť. Celý TLS/reverse-proxy layer nech drží výhradne zdieľaný
@@ -140,6 +161,15 @@ plánu. Over najprv jednoducho: `curl -I http://<WAN-IP>` zvonka siete.
 
 Repo je na toto už pripravené (`docker-compose.yml`, `infra/caddy/Caddyfile`) —
 appka len treba nasadiť a zaregistrovať v zdieľanom Caddyfile.
+
+> **Over si vetvu pred buildom.** Ak appka na NAS-e bola predtým naklonovaná/testovaná
+> na feature branchi (napr. lokálne testovanie pred merge do `main`), edge vrstva
+> (external `edge` sieť, žiadne publikované host porty) tam ešte nemusí byť. Over:
+> `git status` (aktuálna vetva) a `git log --oneline -1 -- docker-compose.yml` — pred
+> nasadením prepni na `main` (`git fetch origin && git checkout main && git pull`).
+> Ak appka predtým bežala v dev režime (`docker-compose.dev.yml`, publikované porty
+> 3001/5433/5173 priamo na LAN), pred prechodom na `--profile edge` ju treba zastaviť
+> (`docker compose -f docker-compose.yml -f docker-compose.dev.yml down`).
 
 **`.env` na NAS** (`/volume1/rodinna/compose/.env`, viď README):
 
@@ -185,6 +215,20 @@ duplicitných certov / týždeň na doménu) — pri opakovaných testoch radše
 cez staging CA (`caddy` env `CADDY_ACME_CA` nastavená na
 `https://acme-staging-v02.api.letsencrypt.org/directory`), aby sa produkčný limit
 nevyčerpal skúšaním.
+
+**Bootstrap prvého (admin) účtu.** Appka je invite-only — samoregistrácia bez
+pozvánky nejde a čerstvá databáza nemá ani jedného používateľa, takže ani admin
+nemôže vygenerovať pozvánku cez web. Prvá pozvánka sa preto vytvára cez CLI skript
+priamo v bežiacom `api` kontajneri:
+
+```bash
+sudo docker exec -it rodinna-api-1 bun apps/api/scripts/create-invite.ts tvoj@email.sk admin
+```
+
+Vypíše registračný link (`https://<doména>/register?token=...`) — kto sa cez neho
+zaregistruje **ako prvý v celej appke**, automaticky dostane rolu `admin` (bootstrap
+logika v `apps/api/src/modules/auth/index.ts`). Ďalšie pozvánky už vie admin generovať
+cez web (`POST /api/auth/invite`), tento CLI krok treba len raz.
 
 ## 7. Overenie
 
@@ -244,7 +288,9 @@ netreba ich opakovať pre ďalšie appky.
 | Web beží, ale API volania padajú na CORS | `PUBLIC_WEB_ORIGIN` nesedí s doménou v prehliadači (napr. chýba/naviac `https://`) | zosynchronizovať s `DOMAIN`, reštartovať `api` |
 | `502`/`504` zo zdieľaného edge Caddy | appka nie je pripojená do siete `edge`, zlý alias v `reverse_proxy`, alebo appkin kontajner ešte beží | `docker network inspect edge` — over, že appkin kontajner (napr. `rodinna-web`) je v zozname |
 | Appkin vlastný Caddy hlási TLS/ACME chyby | appka si omylom stále myslí, že rieši TLS sama (starý `{$DOMAIN}` block namiesto `:80`) | skontrolovať `infra/caddy/Caddyfile` danej appky — má byť plain `:80`, žiadny doménový match |
-| DSM Login Portal preberá port 443 | DSM vlastný reverse proxy/HTTPS beží na rovnakom porte ako zdieľaný edge Caddy | vypnúť DSM HTTPS na porte 443 pre DSM samotné, alebo presmerovať DSM na iný port |
+| Edge Caddy pri `docker compose up` padá na `bind: address already in use` na 443 | DSM systémový nginx (`nginx: master`) si natrvalo drží 443 pre vlastný `default_server` fallback (`/var/tmp/nginx/html/redirect.html`) — nesúvisí s DSM Desktop portom 5000/5001 a **nedá sa vypnúť cez DSM GUI** (over: `sudo netstat -tlnp \| grep :443`) | edge Caddy nechať na `8080`/`8443` (§2) a presmerovanie riešiť na routeri (§4), nie na NAS-e priamo |
+| `/api/*` alebo `/ws` vždy vráti SPA `index.html` namiesto JSON/WS (appkin vlastný Caddy) | Caddyfile direktívy sa nevyhodnocujú v poradí zápisu — bez explicitných `handle` blokov vyhráva `file_server` pred pomenovaným `@api` matcherom | over `infra/caddy/Caddyfile` appky — `reverse_proxy` má byť v `handle /api/*` / `handle /ws` bloku, statika v samostatnom `handle {}` (opravené v `main` od PR #28) |
+| Docker build appky padá na `error: lockfile had changes, but lockfile is frozen` | `api.Dockerfile`/`web.Dockerfile` kopírovali do build kontextu `package.json` len pre vlastný `apps/*` workspace, chýbal ten druhý (monorepo `workspaces` glob) | over, že `COPY apps/web/package.json` je aj v `api.Dockerfile` a `COPY apps/api/package.json` aj v `web.Dockerfile` (opravené v `main` od PR #28) |
 
 ## Lokálne testovanie appky bez zdieľanej edge vrstvy
 

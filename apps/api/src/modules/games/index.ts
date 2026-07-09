@@ -30,7 +30,11 @@ function mapError(err: unknown): { message: string; status: 400 | 403 | 404 } | 
   return null;
 }
 
-/** POST /api/games/tictactoe — nová partia v miestnosti (kartu pošle klient). */
+/**
+ * POST /api/games/tictactoe — nová partia. `roomId: null` = súkromná praktika
+ * proti počítaču (kartu appka nikam neposiela); `roomId` = výzva pre človeka
+ * v danej miestnosti (kartu pošle klient ako chat správu).
+ */
 router.post('/tictactoe', requireAuth, zValidator('json', CreateTictactoeInputSchema), async (c) => {
   const me = c.get('user')!;
   if (!rateLimit(`games:${me.id}`, 10, 60_000)) {

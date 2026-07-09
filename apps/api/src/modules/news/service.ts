@@ -16,11 +16,11 @@ import { env } from '../../config/env';
 
 /** Kurátorované feedy per kategória — uprav podľa chuti rodiny. */
 export const NEWS_FEEDS: Record<NewsCategory, string[]> = {
-  spravy: ['https://www.aktuality.sk/rss/', 'https://dennikn.sk/feed/'],
-  sport: ['https://sport.aktuality.sk/rss/'],
-  technologie: ['https://zive.aktuality.sk/rss/', 'https://touchit.sk/feed/'],
-  kultura: ['https://dennikn.sk/kultura/feed/'],
-  veda: ['https://dennikn.sk/veda/feed/'],
+  spravy: ['https://www.irozhlas.cz/rss/irozhlas', 'https://denikn.cz/feed/'],
+  sport: ['https://www.irozhlas.cz/rss/irozhlas/sport'],
+  technologie: ['https://www.lupa.cz/rss/clanky/'],
+  kultura: ['https://denikn.cz/kultura/feed/'],
+  veda: ['https://denikn.cz/veda/feed/'],
 };
 
 const FETCH_TIMEOUT_MS = 10_000;
@@ -77,16 +77,35 @@ export async function todaysItems(categories: NewsCategory[], limit = 10): Promi
 
 // ── RSS parser (bez závislostí — RSS 2.0 aj Atom v miere, akú feedy vyžadujú) ─
 
-function stripTags(s: string): string {
+/** Nedeliteľná medzera (aj &#160;/&#xA0;) sa normalizuje na bežnú medzeru. */
+const NBSP_CODEPOINTS = new Set([160]);
+
+function decodeEntities(s: string): string {
   return s
-    .replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, '$1')
-    .replace(/<[^>]+>/g, ' ')
     .replace(/&nbsp;/g, ' ')
     .replace(/&amp;/g, '&')
     .replace(/&lt;/g, '<')
     .replace(/&gt;/g, '>')
     .replace(/&quot;/g, '"')
     .replace(/&#0?39;|&apos;/g, "'")
+    // Všeobecné numerické entity (&#160; aj &#xA0;/&#XA0;) — feedy z aktuality.sk/
+    // dennikn.sk kódujú nedeliteľnú medzeru takto namiesto &nbsp;.
+    .replace(/&#x([0-9a-f]+);/gi, (_, hex: string) => {
+      const code = parseInt(hex, 16);
+      return NBSP_CODEPOINTS.has(code) ? ' ' : String.fromCodePoint(code);
+    })
+    .replace(/&#(\d+);/g, (_, dec: string) => {
+      const code = parseInt(dec, 10);
+      return NBSP_CODEPOINTS.has(code) ? ' ' : String.fromCodePoint(code);
+    });
+}
+
+function stripTags(s: string): string {
+  return decodeEntities(
+    s
+      .replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, '$1')
+      .replace(/<[^>]+>/g, ' '),
+  )
     .replace(/\s+/g, ' ')
     // Tagy nahradené medzerou nechajú „slovo ." — prilep interpunkciu späť.
     .replace(/\s+([.,!?;:])/g, '$1')
