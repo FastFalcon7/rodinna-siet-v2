@@ -730,6 +730,56 @@ export const newsItems = pgTable(
 
 export type NewsItemRow = typeof newsItems.$inferSelect;
 
+/**
+ * Kvízy (plán §M8). LLM vygeneruje otázky na zadanú tému vo worker jobe;
+ * questions_json = [{q, options[4], correct}] — vzniká ako DRAFT, autor
+ * skontroluje (human-in-the-loop, malý model halucinuje) a publikuje.
+ * audience: private (len autor) / room (členovia miestnosti, karta v chate)
+ * / family (karta vo Feede). quiz_answers = jeden pokus na užívateľa
+ * (skóre počíta server, výsledky vidíš po vlastnom dohraní).
+ */
+export const quizStatusValues = ['generating', 'draft', 'published', 'failed'] as const;
+export const quizAudienceValues = ['private', 'room', 'family'] as const;
+
+export const quizzes = pgTable(
+  'quizzes',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    topic: text('topic').notNull(),
+    title: text('title').notNull().default(''),
+    facts: text('facts'),
+    questionCount: integer('question_count').notNull().default(5),
+    questionsJson: jsonb('questions_json').notNull().default([]),
+    status: text('status', { enum: quizStatusValues }).notNull().default('generating'),
+    audience: text('audience', { enum: quizAudienceValues }).notNull(),
+    roomId: uuid('room_id').references(() => chatRooms.id, { onDelete: 'cascade' }),
+    createdBy: uuid('created_by')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    publishedAt: timestamp('published_at', { withTimezone: true }),
+  },
+  (t) => [index('quizzes_created_by_idx').on(t.createdBy, t.createdAt)],
+);
+
+export const quizAnswers = pgTable(
+  'quiz_answers',
+  {
+    quizId: uuid('quiz_id')
+      .notNull()
+      .references(() => quizzes.id, { onDelete: 'cascade' }),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    answersJson: jsonb('answers_json').notNull(),
+    score: integer('score').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.quizId, t.userId] })],
+);
+
+export type QuizRow = typeof quizzes.$inferSelect;
+
 export type JobRow = typeof jobs.$inferSelect;
 export type PushSubRow = typeof pushSubs.$inferSelect;
 export type NotificationRow = typeof notifications.$inferSelect;

@@ -8,6 +8,7 @@ import { ensureBirthdaysJob, registerEventsJobs } from '../modules/events/worker
 import { ensureDiaryJob, registerDiaryJobs } from '../modules/diary/worker';
 import { ensureGamesJob, registerGamesJobs } from '../modules/games/worker';
 import { ensureNewsJob, registerNewsJobs } from '../modules/news/worker';
+import { registerQuizJobs } from '../modules/quiz/worker';
 
 /**
  * Worker proces (§6, M0) — spracúva pg_jobs queue mimo API procesu, nech
@@ -92,6 +93,7 @@ if (import.meta.main) {
   registerDiaryJobs(registerJobHandler);
   registerGamesJobs(registerJobHandler);
   registerNewsJobs(registerJobHandler);
+  registerQuizJobs(registerJobHandler);
   await waitForSchema();
   await ensureMemoriesJob();
   await ensureBirthdaysJob();

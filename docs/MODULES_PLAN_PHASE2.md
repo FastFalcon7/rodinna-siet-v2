@@ -60,6 +60,7 @@ Kontrakty K1–K3 vyžadujú tri malé rozšírenia jadra (detail v M0):
 | M5 ✅ | **LLM kernel + Denník** 📖 | prvý LLM modul podľa §15.2; najinovatívnejšia časť appky | worker, media, embeddings |
 | M6 ✅ | **Hry & Výzvy** 🎲 | zábava/retencia; piškvorky sú „chat s iným payloadom" | WS, LLM (kvízy), media (výzvy) |
 | M7 ✅ | **Svet okolo** 🌍 | rozšírenie Denníka podľa §15.3; opt-in | worker, Denník |
+| M8 ✅ | **Kvízy** 🧠 | LLM kvíz na tému od užívateľa; nahrádza odložený „kvíz z denníkov" bez privacy otáznikov | LLM kernel (M5), mechaniky M6, K1–K4 |
 
 Poradie je zvolené tak, aby **každý modul znovu použil niečo z predchádzajúceho**
 a rodina dostávala novú hodnotu každé ~2 týždne, nie jeden big-bang po pol roku.
@@ -235,7 +236,8 @@ game_moves    (id, session_id, user_id, payload_json, created_at)
 ```
 
 **Akceptácia:** partia piškvoriek medzi 2 telefónmi v chate; denná otázka vo Feede
-s vyhodnotením; LLM kvíz vygenerovaný z reálnych rodinných dát (ak M5 hotové).
+s vyhodnotením. *Pôvodne plánovaný „LLM kvíz z denníkov" sa nerealizoval — vyžadoval
+opt-in dizajn nad súkromnými dátami; nahradil ho lepší koncept témových kvízov (M8).*
 
 ### M7 — Svet okolo 🌍 (≈ 1 týždeň)
 
@@ -244,12 +246,49 @@ per user, opt-in. Zobrazuje sa ako vizuálne odlíšený záverečný odsek denn
 voliteľná ranná karta vo Feede („3 titulky pre teba"). Jediný modul s výstupným
 internetom — firewall pravidlo explicitne len na RSS zdroje.
 
+### M8 — Kvízy 🧠 (≈ 1 týždeň)
+
+Koncept od užívateľa: **kvíz na ľubovoľnú tému** — Harry Potter, hlavné mestá
+Európy, staroveký Rím, rodinné jubileá… — pre seba, vybranú miestnosť alebo celú
+rodinu. Nahrádza pôvodne odložený „kvíz z denníkov": téma je verejná, žiadne
+súkromné dáta v prompte, žiadny opt-in problém.
+
+- **Flow:** téma + počet otázok (3–10) + publikum → worker job `quiz.generate`
+  (sériový semafór, §15) → LLM vráti otázky ako **striktný JSON** (4 možnosti,
+  1 správna) → kvíz vznikne ako **DRAFT** → push `quiz.ready` autorovi.
+- **Human-in-the-loop (rovnaký vzor ako denník):** malý CPU model občas
+  halucinuje — autor otázky skontroluje, upraví/zmaže/pregeneruje a až potom
+  **publikuje**. Nevalidný JSON po internom retry = status `failed` s tlačidlom
+  Skúsiť znova (job sa nevyhadzuje do retry fronty).
+- **Podklady (nepovinné):** voľný text (max 2000 znakov), z ktorého má LLM
+  čerpať VÝHRADNE — kľúč k témam ako „rodinné jubileá" (LLM nehalucinuje,
+  len formuluje otázky z dodaných faktov).
+- **Publikum a integrácia:** private = len autor (samotestovanie);
+  room = správa `app://quiz/<id>` v miestnosti (K2, vidia len členovia);
+  family = karta vo Feede (K1). Notifikácia `quiz.ready` (K3), modul
+  „Kvízy" vo Viac (K4).
+- **Hranie:** stepper priamo v karte (Feed aj chat bublina), odpovede sa
+  odosielajú naraz, **skóre počíta server**; pred odpoveďou hráč nikdy nevidí
+  správne možnosti (`playQuestions` bez `correct`). Jeden pokus na hráča;
+  výsledky ostatných + rozbor vlastných chýb až po dohraní (icebreaker
+  mechanika z M6). Live cez WS `quiz:update`.
+
+```
+quizzes      (id, topic, title, facts, question_count, questions_json, status ENUM('generating','draft','published','failed'), audience ENUM('private','room','family'), room_id, created_by, created_at, published_at)
+quiz_answers (quiz_id, user_id, answers_json, score, created_at, PK(quiz_id,user_id))
+```
+
+**Akceptácia:** kvíz vytvorený v module → draft cez worker+WS live → review →
+publish → karta vo Feede → dohranie so skóre a rebríčkom. **Overené: 43/43 E2E
+(mock LLM: generovanie, failed+regenerate, práva, publiká, skóre, jeden pokus)
++ browser smoke celej slučky (draft za ~1,3 s).**
+
 ---
 
 ## 4. Nápady do zásobníka (zámerne mimo plánu, nech sa scope neroztečie)
 
 - **Rodokmeň** — vizuálny strom rodiny (kto je koho), pekné empty-states už s motívom
-  stromu počítajú (§10). Kandidát na M8.
+  stromu počítajú (§10). Kandidát na M9.
 - **Recepty** — špecializované poznámky s fotkou a porciami; dá sa začať šablónou v M3.
 - **Detské kontá** — rola `child` s obmedzeniami; auth to už umožňuje.
 - **Rodinná poloha** („zdieľaj kde som na 1 hodinu") — chat už má polohu ako prílohu,
@@ -270,12 +309,13 @@ internetom — firewall pravidlo explicitne len na RSS zdroje.
 | T18–T21 | **M5** LLM kernel + Denník | najdlhší; Ollama + Whisper na NAS treba odladiť |
 | T22–T24 | **M6** Hry & Výzvy | piškvorky skôr (bez LLM), kvízy po M5 |
 | T25 | **M7** Svet okolo | malý, závisí na M5 (denník) |
+| T26 | **M8** Kvízy | témové LLM kvízy; stavia na M5 (LLM) a mechanikách M6 |
 
 ```
 M0 ──► M1 ──► M4 (RSVP)
  ├───► M2 ──► M6 (foto výzvy)
  ├───► M3 ──► (llmTools pre @asistent)
- └───► M5 ──► M6 (kvízy), M7
+ └───► M5 ──► M6, M7, M8 (kvízy)
 ```
 
 Každý milestone končí nasadením na NAS a týždňom reálneho používania rodinou pred

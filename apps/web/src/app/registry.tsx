@@ -6,6 +6,7 @@ import { Albums } from '../albums/Albums';
 import { Notes } from '../notes/Notes';
 import { Calendar } from '../events/Calendar';
 import { Diary } from '../diary/Diary';
+import { Quizzes } from '../quiz/Quizzes';
 import { Practice } from '../games/Practice';
 import { consumeRoomParam } from '../shared/deepLink';
 import { consumePendingNav } from './navigate';
@@ -106,6 +107,14 @@ export const webModules: WebModule[] = [
     Component: Diary,
   },
   {
+    name: 'quiz',
+    label: 'Kvízy',
+    icon: BulbIcon,
+    slot: 'more',
+    layout: 'scroll',
+    Component: Quizzes,
+  },
+  {
     name: 'games-practice',
     label: 'Piškvorky proti počítaču',
     icon: GameIcon,
@@ -168,6 +177,15 @@ export function PhotoIcon({ className }: { className?: string }) {
       <rect x="3" y="5" width="18" height="14" rx="2.5" />
       <circle cx="9" cy="10" r="1.7" />
       <path d="m5 18 5-5 3 3 3.5-3.5L21 17" />
+    </svg>
+  );
+}
+
+export function BulbIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden>
+      <path d="M9 18h6M10 21h4" />
+      <path d="M12 3a6.5 6.5 0 0 1 3.6 11.9c-.7.5-1.1 1.2-1.1 2v.6h-5v-.6c0-.8-.4-1.5-1.1-2A6.5 6.5 0 0 1 12 3Z" />
     </svg>
   );
 }
