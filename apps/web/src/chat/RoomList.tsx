@@ -40,7 +40,8 @@ export function RoomList({ rooms, activeRoomId, meId, onSelect, onNewChat }: Roo
     // Živá karta (app:// link) — surová URL v preview nič nehovorí.
     const appLink = parseAppLink(lm.bodyMd);
     if (appLink) {
-      const label = appLink.module === 'polls' ? '📊 Anketa' : '🧩 Karta';
+      const label =
+        appLink.module === 'polls' ? '📊 Anketa' : appLink.module === 'events' ? '📅 Udalosť' : '🧩 Karta';
       const rest = stripAppLink(lm.bodyMd, appLink);
       return `${prefix}${label}${rest ? ` · ${rest}` : ''}`;
     }

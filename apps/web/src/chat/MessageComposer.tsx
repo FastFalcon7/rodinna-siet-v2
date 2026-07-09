@@ -7,6 +7,7 @@ import { UploadPreviews } from '../shared/UploadPreviews';
 import { useMediaUpload } from '../shared/useMediaUpload';
 import { buildAppLink } from '../shared/appLink';
 import { PollComposerDialog } from '../polls/PollComposerDialog';
+import { EventComposerDialog } from '../events/EventComposerDialog';
 
 interface MessageComposerProps {
   roomId: string;
@@ -30,6 +31,7 @@ export function MessageComposer({
   const uploads = useMediaUpload(10);
   const [sheet, setSheet] = useState(false);
   const [pollDialog, setPollDialog] = useState(false);
+  const [eventDialog, setEventDialog] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const taRef = useRef<HTMLTextAreaElement>(null);
@@ -190,6 +192,7 @@ export function MessageComposer({
           onFiles={uploads.addFiles}
           onLocation={insertLocation}
           onPoll={() => setPollDialog(true)}
+          onEvent={() => setEventDialog(true)}
           onClose={() => setSheet(false)}
         />
       )}
@@ -205,6 +208,20 @@ export function MessageComposer({
               .catch(() => setError('Anketu sa nepodarilo poslať do chatu'));
           }}
           onClose={() => setPollDialog(false)}
+        />
+      )}
+      {eventDialog && (
+        <EventComposerDialog
+          onCreated={(event) => {
+            setEventDialog(false);
+            // Udalosť sa do miestnosti pošle ako app:// správa → RSVP karta (K2),
+            // bez toFeed karty vo Feede (tam ju vidí len táto miestnosť).
+            void chatApi
+              .sendMessage(roomId, { bodyMd: buildAppLink('events', event.id), mediaIds: [] })
+              .then(onSent)
+              .catch(() => setError('Udalosť sa nepodarilo poslať do chatu'));
+          }}
+          onClose={() => setEventDialog(false)}
         />
       )}
     </div>
