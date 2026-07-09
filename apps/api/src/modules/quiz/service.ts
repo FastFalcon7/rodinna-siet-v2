@@ -289,12 +289,35 @@ function buildPrompt(quiz: QuizRow): { system: string; user: string } {
   return { system, user };
 }
 
-/** Vytiahne prvé JSON pole z odpovede (modely radi pridajú okolo text). */
+/**
+ * Vytiahne prvé JSON pole z odpovede (modely radi pridajú okolo text —
+ * markdown ```json bloky, aj vysvetľujúcu vetu ZA poľom). Naivné
+ * `lastIndexOf(']')` na celom texte sa pokazí, keď táto veta obsahuje
+ * vlastnú zátvorku (bežné pri „ukecanejších" modeloch); preto sa hľadá
+ * skutočná párová zátvorka počítaním hĺbky a ignorovaním obsahu reťazcov.
+ */
 function extractJsonArray(text: string): unknown {
   const start = text.indexOf('[');
-  const end = text.lastIndexOf(']');
-  if (start === -1 || end === -1 || end <= start) throw new Error('Odpoveď neobsahuje JSON pole');
-  return JSON.parse(text.slice(start, end + 1));
+  if (start === -1) throw new Error('Odpoveď neobsahuje JSON pole');
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+  for (let i = start; i < text.length; i++) {
+    const ch = text[i];
+    if (inString) {
+      if (escaped) escaped = false;
+      else if (ch === '\\') escaped = true;
+      else if (ch === '"') inString = false;
+      continue;
+    }
+    if (ch === '"') inString = true;
+    else if (ch === '[') depth++;
+    else if (ch === ']') {
+      depth--;
+      if (depth === 0) return JSON.parse(text.slice(start, i + 1));
+    }
+  }
+  throw new Error('JSON pole v odpovedi nie je uzavreté');
 }
 
 /**
@@ -310,6 +333,7 @@ export async function generateQuiz(quizId: string): Promise<void> {
   const { system, user } = buildPrompt(quiz);
   let questions: QuizQuestion[] | null = null;
   let lastError = '';
+  let lastRaw = '';
 
   for (let attempt = 0; attempt < 2 && !questions; attempt++) {
     try {
@@ -320,6 +344,7 @@ export async function generateQuiz(quizId: string): Promise<void> {
         ],
         { temperature: 0.8, maxTokens: 2048 },
       );
+      lastRaw = raw;
       const parsed = LlmQuestionsSchema.parse(extractJsonArray(raw));
       questions = parsed.slice(0, quiz.questionCount).map((p) => QuizQuestionSchema.parse({
         q: p.q.slice(0, 500),
@@ -333,7 +358,9 @@ export async function generateQuiz(quizId: string): Promise<void> {
 
   const { notifyUsers } = await import('../notifications/service');
   if (!questions) {
-    console.error(`quiz.generate ${quizId} zlyhal: ${lastError}`);
+    console.error(
+      `quiz.generate ${quizId} zlyhal: ${lastError} | posledná odpoveď LLM (prvých 500 znakov): ${lastRaw.slice(0, 500)}`,
+    );
     await db.update(quizzes).set({ status: 'failed' }).where(eq(quizzes.id, quizId));
     await notifyUsers([quiz.createdBy], 'quiz.ready', {
       title: 'Kvíz sa nepodaril 😕',
