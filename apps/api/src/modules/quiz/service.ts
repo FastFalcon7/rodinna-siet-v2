@@ -290,15 +290,11 @@ function buildPrompt(quiz: QuizRow): { system: string; user: string } {
 }
 
 /**
- * Vytiahne prvé JSON pole z odpovede (modely radi pridajú okolo text —
- * markdown ```json bloky, aj vysvetľujúcu vetu ZA poľom). Naivné
- * `lastIndexOf(']')` na celom texte sa pokazí, keď táto veta obsahuje
- * vlastnú zátvorku (bežné pri „ukecanejších" modeloch); preto sa hľadá
- * skutočná párová zátvorka počítaním hĺbky a ignorovaním obsahu reťazcov.
+ * Vráti index prvého znaku ZA párovým uzatváracím `close` pre `open` na
+ * pozícii `start` (počíta hĺbku, ignoruje obsah string literálov vrátane
+ * escapovaných úvodzoviek). Vráti -1, ak sa do konca textu nenájde.
  */
-function extractJsonArray(text: string): unknown {
-  const start = text.indexOf('[');
-  if (start === -1) throw new Error('Odpoveď neobsahuje JSON pole');
+function matchBracket(text: string, start: number, open: string, close: string): number {
   let depth = 0;
   let inString = false;
   let escaped = false;
@@ -311,13 +307,68 @@ function extractJsonArray(text: string): unknown {
       continue;
     }
     if (ch === '"') inString = true;
-    else if (ch === '[') depth++;
-    else if (ch === ']') {
+    else if (ch === open) depth++;
+    else if (ch === close) {
       depth--;
-      if (depth === 0) return JSON.parse(text.slice(start, i + 1));
+      if (depth === 0) return i + 1;
     }
   }
-  throw new Error('JSON pole v odpovedi nie je uzavreté');
+  return -1;
+}
+
+/**
+ * Vytiahne prvé JSON pole z odpovede (modely radi pridajú okolo text —
+ * markdown ```json bloky, aj vysvetľujúcu vetu ZA poľom). Naivné
+ * `lastIndexOf(']')` na celom texte sa pokazí, keď táto veta obsahuje
+ * vlastnú zátvorku (bežné pri „ukecanejších" modeloch); preto sa hľadá
+ * skutočná párová zátvorka počítaním hĺbky.
+ */
+function extractJsonArray(text: string): unknown[] | null {
+  const start = text.indexOf('[');
+  if (start === -1) return null;
+  const end = matchBracket(text, start, '[', ']');
+  if (end === -1) return null;
+  try {
+    const parsed = JSON.parse(text.slice(start, end));
+    return Array.isArray(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Záložný spôsob: niektoré (najmä väčšie, „ukecanejšie") modely namiesto
+ * JSON poľa vrátia JSON Lines — jeden holý objekt na riadok bez vonkajších
+ * `[...]`. `extractJsonArray` v tom prípade omylom nájde `options` pole
+ * PRVÉHO objektu (má tiež `[...]`) namiesto celého zoznamu otázok. Tu sa
+ * preto skenuje celý text a vyzbierajú všetky top-level `{...}` objekty —
+ * funguje pre JSONL aj pre poškodený/orezaný chvost odpovede (posledný
+ * neúplný objekt sa jednoducho preskočí).
+ */
+function extractJsonObjects(text: string): unknown[] {
+  const results: unknown[] = [];
+  let i = text.indexOf('{');
+  while (i !== -1 && i < text.length) {
+    const end = matchBracket(text, i, '{', '}');
+    if (end === -1) break; // orezaný/neuzavretý chvost — koniec skenovania
+    try {
+      results.push(JSON.parse(text.slice(i, end)));
+    } catch {
+      // preskoč nevalidný fragment, skús ďalej
+    }
+    i = text.indexOf('{', end);
+  }
+  return results;
+}
+
+/** Skúsi JSON pole otázok, pri zlyhaní/nesprávnom tvare padne na JSON Lines. */
+function extractQuestions(text: string): unknown[] {
+  const arr = extractJsonArray(text);
+  if (arr && arr.length > 0 && arr.every((x) => typeof x === 'object' && x !== null)) return arr;
+  const objs = extractJsonObjects(text);
+  if (objs.length > 0) return objs;
+  if (arr) return arr; // necháme zod nahlásiť presnú chybu tvaru
+  throw new Error('Odpoveď neobsahuje rozpoznateľné otázky (ani JSON pole, ani JSON Lines)');
 }
 
 /**
@@ -342,10 +393,10 @@ export async function generateQuiz(quizId: string): Promise<void> {
           { role: 'system', content: system },
           { role: 'user', content: user },
         ],
-        { temperature: 0.8, maxTokens: 2048 },
+        { temperature: 0.8, maxTokens: 3072 },
       );
       lastRaw = raw;
-      const parsed = LlmQuestionsSchema.parse(extractJsonArray(raw));
+      const parsed = LlmQuestionsSchema.parse(extractQuestions(raw));
       questions = parsed.slice(0, quiz.questionCount).map((p) => QuizQuestionSchema.parse({
         q: p.q.slice(0, 500),
         options: p.options.map((o) => o.slice(0, 200)) as [string, string, string, string],

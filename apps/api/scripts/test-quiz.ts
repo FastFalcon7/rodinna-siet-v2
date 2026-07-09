@@ -43,7 +43,7 @@ function check(name: string, cond: boolean, detail?: unknown): void {
 
 // ── Mock LLM: prepínateľný medzi validným kvízom a haluzou ──────────────────
 
-let llmMode: 'good' | 'garbage' = 'good';
+let llmMode: 'good' | 'garbage' | 'jsonl' = 'good';
 const GOOD_QUESTIONS = [
   { q: 'Hlavné mesto Slovenska?', options: ['Bratislava', 'Praha', 'Viedeň', 'Budapešť'], correct: 0 },
   { q: 'Hlavné mesto Francúzska?', options: ['Lyon', 'Paríž', 'Marseille', 'Nice'], correct: 1 },
@@ -65,7 +65,13 @@ const llmServer = Bun.serve({
         // prežiť (regresia na bug: naivné lastIndexOf(']') si zobralo túto
         // neskoršiu zátvorku namiesto skutočného konca poľa).
         ? `Tu je kvíz:\n${JSON.stringify(GOOD_QUESTIONS)}\nDobrú zábavu! [Bonus otázka nabudúce?]`
-        : 'Ako veľký jazykový model ti bohužiaľ neviem pomôcť s JSON.';
+        : llmMode === 'jsonl'
+          // Reálny bug: qwen2.5:7b namiesto JSON poľa vrátil JSON Lines —
+          // holé objekty oddelené novým riadkom, bez vonkajších [...].
+          // extractJsonArray by si omylom vzal "options" pole PRVÉHO
+          // objektu; extractQuestions musí padnúť na JSON Lines fallback.
+          ? GOOD_QUESTIONS.map((q) => JSON.stringify(q)).join('\n')
+          : 'Ako veľký jazykový model ti bohužiaľ neviem pomôcť s JSON.';
     return Response.json({ choices: [{ message: { role: 'assistant', content } }] });
   },
 });
@@ -260,11 +266,29 @@ async function main() {
   r = await http(alica.token, 'GET', `/api/quiz/${failId}`);
   check('po regenerate draft s otázkami', r.body.status === 'draft' && r.body.questions.length === 3, r.body.status);
 
+  console.log('\n— JSON Lines namiesto poľa (reálny bug) —');
+  llmMode = 'jsonl';
+  r = await http(alica.token, 'POST', '/api/quiz', { topic: 'Hlavné mestá', count: 5, audience: 'private' });
+  const jsonlId = r.body.id;
+  await generateQuiz(jsonlId);
+  r = await http(alica.token, 'GET', `/api/quiz/${jsonlId}`);
+  check(
+    'JSON Lines odpoveď sa spracuje ako draft (nie failed)',
+    r.body.status === 'draft' && r.body.questions.length === 5,
+    r.body,
+  );
+  check(
+    'otázky z JSON Lines majú správny obsah',
+    r.body.questions?.[0]?.q === GOOD_QUESTIONS[0]!.q,
+    r.body.questions?.[0],
+  );
+  llmMode = 'good';
+
   console.log('\n— Zoznam a mazanie —');
   r = await http(cyril.token, 'GET', '/api/quiz');
   check('cyril vidí len family kvíz (nie private/room)', r.body.quizzes.length === 1 && r.body.quizzes[0].id === famId, r.body.quizzes?.map((q: any) => q.topic));
   r = await http(alica.token, 'GET', '/api/quiz');
-  check('alica vidí svoje + family', r.body.quizzes.length === 4, r.body.quizzes?.length);
+  check('alica vidí svoje + family', r.body.quizzes.length === 5, r.body.quizzes?.length);
   r = await http(cyril.token, 'DELETE', `/api/quiz/${famId}`);
   check('zmaže len autor/admin → 403', r.status === 403, r.status);
   r = await http(bob.token, 'DELETE', `/api/quiz/${famId}`);
