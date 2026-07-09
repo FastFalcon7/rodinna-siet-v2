@@ -16,11 +16,11 @@ import { env } from '../../config/env';
 
 /** Kurátorované feedy per kategória — uprav podľa chuti rodiny. */
 export const NEWS_FEEDS: Record<NewsCategory, string[]> = {
-  spravy: ['https://www.aktuality.sk/rss/', 'https://dennikn.sk/feed/'],
-  sport: ['https://sport.aktuality.sk/rss/'],
-  technologie: ['https://zive.aktuality.sk/rss/', 'https://touchit.sk/feed/'],
-  kultura: ['https://dennikn.sk/kultura/feed/'],
-  veda: ['https://dennikn.sk/veda/feed/'],
+  spravy: ['https://www.irozhlas.cz/rss/irozhlas', 'https://denikn.cz/feed/'],
+  sport: ['https://www.irozhlas.cz/rss/irozhlas/sport'],
+  technologie: ['https://www.lupa.cz/rss/clanky/'],
+  kultura: ['https://denikn.cz/kultura/feed/'],
+  veda: ['https://denikn.cz/veda/feed/'],
 };
 
 const FETCH_TIMEOUT_MS = 10_000;
