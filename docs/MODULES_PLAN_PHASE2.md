@@ -1,6 +1,11 @@
 # Plán modulov Phase 2 — nadväznosť na Feed a Chat
 
-> **Stav dokumentu:** návrh na diskusiu (júl 2026).
+> **Stav dokumentu:** implementované a nasadené (júl 2026) — všetky moduly M0–M8
+> nižšie sú hotové, zlúčené a overené na produkčnom NAS-e reálnym používaním rodiny.
+> Dokument slúži ako referencia pôvodného návrhu a datového modelu; §4 (zásobník) a
+> §6 (riziká) ostávajú aktuálne. Známe otvorené témy z reálneho používania sú
+> poznačené priamo pri danom module (M5, M6, M8) a v `ARCHITECTURE_V2.md` §13
+> „Odchýlky implementácie".
 > **Východisko:** Feed a Chat sú hotové a overené na NAS-e (T4–T6 + design review priority 1–3:
 > OG preview, prílohy foto/video/súbor/poloha, reakcie, zoskupovanie bublín, swipe-to-reply).
 > **Súvisí s:** `ARCHITECTURE_V2.md` §5 (plugin kontrakt), §7 (dátový model), §13 (roadmap), §15 (LLM use cases);
@@ -192,7 +197,8 @@ udalosť viditeľná v Apple Calendar cez ICS subscribe; pripomienka na lock scr
 
 Prvé nasadenie Ollamy podľa §6 a §15.2 — **najosobnejší a najinovatívnejší modul**.
 
-1. **LLM kernel:** Ollama kontajner (`llama3.2:3b-instruct-q4_K_M` + `nomic-embed-text`),
+1. **LLM kernel:** Ollama kontajner (`llama3.2:3b-instruct-q4_K_M` + `nomic-embed-text`,
+   voliteľne vymeniteľné za väčší model cez `LLM_MODEL` v `.env`, napr. `qwen2.5:7b-instruct-q4_K_M`),
    `/api/llm/*` adaptér, semafór (nikdy paralelné inferencie), `pg_jobs` integrácia.
 2. **Quick capture:** jednoriadkový vstup „Ako bolo dnes?" (text/foto/nálada emoji/
    hlasovka) — dostupný z „Viac" aj z Cmd+K; zapisuje `diary_fragments`.
@@ -216,12 +222,25 @@ note_embeddings (id, entry_id, chunk, embedding vector(768))
 **Akceptácia:** deň s 3 fragmentmi + 2 postami → ráno draft, ktorý neobsahuje nič,
 čo sa nestalo; potvrdený zápis nájditeľný sémantickým dopytom („keď sme boli pri vode").
 
+> **Známe otvorené témy (z reálneho používania, júl 2026):** (1) tlačidlo
+> „Vygenerovať dnešný zápis" (manuálne vyvolanie) **nepošle** push notifikáciu —
+> pošle ju len automatický nočný beh (`diary.daily`→`diary.notify`); (2) kvalita
+> generovaného textu s `llama3.2:3b` je nekoherentná/nezmyselná — pozri
+> `ARCHITECTURE_V2.md` §13 Odchýlky.
+
 ### M6 — Hry & Výzvy 🎲 (≈ 2–3 týždne, dá sa krájať)
 
 Zábava ako sociálne lepidlo — všetko sa hrá **v chate a vo Feede**, nie v izolovanej „herni".
 
 - **Piškvorky v chate:** výzva = živá karta v konverzácii, ťahy real-time cez WS
   (technicky trivialita — je to správa s iným payloadom). Push „si na ťahu".
+  **Realita po testovaní:** pôvodné 3×3 s 3 v rade nedávalo zmysel pre slovenský
+  názov „piškvorky" (tradične väčšia mriežka) — hracie pole je **10×10, výhra
+  5 v rade** (4-smerový skener namiesto pevných `WIN_LINES`). Pridaný aj **AI
+  súper** (heuristika, žiadny LLM — víťazný/blokujúci ťah + skórovanie voľných
+  polí, jedna obtiažnosť). Hra proti botovi je **súkromná praktika**
+  (`roomId: null`, vidí len autor — server to vynucuje aj v `requireAccess`),
+  nikdy sa neposiela do chatu, má vlastnú obrazovku vo „Viac".
 - **Denná rodinná otázka:** ráno karta vo Feede — striedavo kvíz („Hlavné mesto
   Austrálie?"), anketa-ice-breaker („Najlepší film večera?") a **rodinný kvíz z LLM**
   (M5+): otázky vygenerované z potvrdených denníkov/albumov — *„Kto v júni chytil
@@ -231,8 +250,10 @@ Zábava ako sociálne lepidlo — všetko sa hrá **v chate a vo Feede**, nie v 
 - Jemné skóre/rebríček za mesiac (bez gamifikačného spamu — jedna karta mesačne).
 
 ```
-game_sessions (id, kind ENUM('tictactoe','quiz','photo_challenge'), room_id, state_json, status, created_by, created_at, updated_at)
+game_sessions (id, kind ENUM('tictactoe','daily','photo'), room_id, state_json, status, created_by, created_at, updated_at)
 game_moves    (id, session_id, user_id, payload_json, created_at)
+-- Realita: 'quiz'/'photo_challenge' sa nepoužili — témové kvízy dostali vlastné
+-- tabuľky quizzes/quiz_answers (M8); denná otázka a foto výzva sú kind 'daily'/'photo'.
 ```
 
 **Akceptácia:** partia piškvoriek medzi 2 telefónmi v chate; denná otázka vo Feede
@@ -282,6 +303,13 @@ quiz_answers (quiz_id, user_id, answers_json, score, created_at, PK(quiz_id,user
 publish → karta vo Feede → dohranie so skóre a rebríčkom. **Overené: 43/43 E2E
 (mock LLM: generovanie, failed+regenerate, práva, publiká, skóre, jeden pokus)
 + browser smoke celej slučky (draft za ~1,3 s).**
+
+> **Známa otvorená téma (z reálneho používania, júl 2026):** parsovanie LLM
+> odpovede opravené v dvoch kolách (JSON pole s textom navyše → bracket-matching;
+> JSON Lines namiesto poľa → `extractQuestions` fallback na skenovanie objektov),
+> takže generovanie **spoľahlivo prebehne**. Samotný **obsah** otázok je ale
+> s dostupnými lokálnymi modelmi (3B aj 7B) stále slabý — faktické chyby,
+> mätúce negatívne formulácie, preklepy. Pozri `ARCHITECTURE_V2.md` §13.
 
 ---
 

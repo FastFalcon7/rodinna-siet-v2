@@ -11,14 +11,15 @@ a [`docs/SYNOLOGY_DOMAIN_ACTIVATION.md`](./SYNOLOGY_DOMAIN_ACTIVATION.md)
 
 ---
 
-## 0. Prehľad — čo Phase 2 pridáva k bežiacemu T6
+## 0. Prehľad — čo Phase 2 pridáva k jadru (T1–T9)
 
-Phase 2 (moduly M0–M7) beží v tých istých compose službách ako doteraz —
-**žiadna nová infra služba nie je povinná** okrem voliteľného `ollama` (LLM).
-Pribudol proces **`worker`** (už je v compose od M0) na pg_jobs frontu:
-push fan-out, denné joby (spomienky, narodeniny, denník, hry, RSS).
+Phase 2 (moduly M0–M8, `docs/MODULES_PLAN_PHASE2.md`) beží v tých istých
+compose službách ako jadro appky — **žiadna nová infra služba nie je povinná**
+okrem voliteľného `ollama` (LLM). Pribudol proces **`worker`** (v compose od
+M0) na pg_jobs frontu: push fan-out, denné joby (spomienky, narodeniny,
+denník, hry, RSS).
 
-Nové tajomstvá/nastavenia oproti T6:
+Nové tajomstvá/nastavenia oproti holému jadru appky:
 
 | Premenná | Povinné? | Načo | Ako získať |
 |---|---|---|---|
@@ -27,6 +28,7 @@ Nové tajomstvá/nastavenia oproti T6:
 | `VAPID_SUBJECT` | pre push | kontakt (mailto:) | tvoj email |
 | `ICS_SECRET` | pre ICS feed | token kalendárového odberu | `openssl rand -hex 32` |
 | `LLM_BASE_URL` | pre denník/LLM | adresa Ollama | `http://ollama:11434` (s `--profile llm`) |
+| `LLM_MODEL` | voliteľné | ktorý model Ollama volá | default `llama3.2:3b-instruct-q4_K_M`; na NAS-e s dosť RAM ide vymeniť za väčší, viď §3 |
 | `DOMAIN`, `PUBLIC_WEB_ORIGIN` | **áno** | doména appky | podľa Synology DDNS |
 
 > **Fail-closed:** bez `VAPID_*` sa push ticho nevykonáva, bez `LLM_BASE_URL`
@@ -35,32 +37,36 @@ Nové tajomstvá/nastavenia oproti T6:
 
 ---
 
-## 1. Poradie mergovania PR
+## 1. Poradie mergovania PR (historické — všetko už zmergované)
 
-Phase 2 je 8 stacknutých PR + bezpečnostná oprava. Merguj **v poradí**, každý
-až po tom, čo predchádzajúci je v cieľovej vetve (inak diffy nesadnú):
+> **Stav:** všetkých 8 stacknutých PR Phase 2 + bezpečnostná oprava + T8/T9 +
+> M8 + priebežné opravy z reálneho testovania (news entity decoding, RSS
+> zdroje, piškvorky 10×10 + AI súper, kvíz JSON parsing) sú **zmergované do
+> `main`**. Sekcia nižšie je ponechaná ako historický záznam poradia pre
+> prípad ďalšieho podobného stackovaného vývoja (napr. budúci M9).
+
+Pôvodné poradie (stacknuté vetvy, každá na predchádzajúcej — treba retargetovať
+`base` na `main` pred mergom, ak medzitým pribudli iné merge):
 
 ```
-#16  M0  jadro (worker + pg_jobs, notifications kernel, app shell)
-#17  M0-4 živé karty — základ (app:// linky, registry kariet)
-#18  M1  Ankety
-#19  M2  Albumy + Spomienky
-#20  M3  Zoznamy & Poznámky
-#21  M4  Kalendár & Udalosti           ← ICS feed
-#22  M5  LLM kernel + Denník            ← pgvector, Ollama
-#23  M6  Hry & Výzvy
-#23+ M7  Svet okolo (RSS) + fix(security) ICS token   ← na tej istej vetve
-#24  docs deploy runbook + backup/restore skripty
-#25  T8  PWA polish (offline shell, install, Cmd+K)
-#26  T9  rate-limiting sken
-#27  M8  Kvízy (témové LLM kvízy)
+M0  jadro (worker + pg_jobs, notifications kernel, app shell)
+M0-4 živé karty — základ (app:// linky, registry kariet)
+M1  Ankety
+M2  Albumy + Spomienky
+M3  Zoznamy & Poznámky
+M4  Kalendár & Udalosti           ← ICS feed
+M5  LLM kernel + Denník            ← pgvector, Ollama
+M6  Hry & Výzvy
+M7  Svet okolo (RSS) + fix(security) ICS token
+docs deploy runbook + backup/restore skripty
+T8  PWA polish (offline shell, install, Cmd+K)
+T9  rate-limiting sken
+M8  Kvízy (témové LLM kvízy)
 ```
 
-> Čísla PR over v GitHube (`gh pr list` / web) — poradie podľa vetiev
-> `claude/m1-ankety … claude/m7-svet` je záväzné, čísla sú orientačné.
-> Bezpečnostná oprava ICS tokenu je posledný commit na `claude/m7-svet`.
-
-Po zmergovaní všetkého do hlavnej vetvy nasleduje jeden `up -d --build`.
+Nové stackované PR merguj rovnakým princípom: **v poradí**, každý až po tom,
+čo predchádzajúci je v cieľovej vetve, s retargetovaním `base` na `main` tesne
+pred mergom (inak diffy nesadnú a vznikne konflikt zo squash-merge histórie).
 
 ---
 
@@ -139,6 +145,19 @@ docker compose exec ollama ollama pull nomic-embed-text
 > Ollama beží na CPU (DS925+ nemá GPU). Worker spracúva LLM joby **sériovo**
 > (jeden semafór) — nočný denník je pomalý, ale nezahltí NAS.
 
+**Väčší model** (odporúčané, ak má NAS dosť RAM — 32 GB stačí s rezervou):
+
+```bash
+docker compose exec ollama ollama pull qwen2.5:7b-instruct-q4_K_M
+# v .env: LLM_MODEL=qwen2.5:7b-instruct-q4_K_M
+docker compose --profile edge --profile llm up -d api worker
+```
+
+3B model je pre kvízy/denník fakticky nespoľahlivý (halucinuje). 7B je o niečo
+lepší, ale stále nie bezchybný, a generovanie trvá výrazne dlhšie (rádovo
+minúty na CPU) — to je v poriadku, joby bežia na pozadí a notifikujú push-om.
+Kvalita obsahu zostáva otvorená téma, viď `ARCHITECTURE_V2.md` §13.
+
 ---
 
 ## 4. Smoke checklist po nasadení
@@ -159,7 +178,9 @@ Rýchly prechod, že Phase 2 žije (5 min):
       pridaj do telefónového kalendára → udalosti sa zobrazia.
 - [ ] **Denník (M5)** *(ak LLM zapnuté)* — quick capture, „Vygenerovať" →
       draft; potvrď; „Spomínaš si?" hľadanie vráti zápis.
-- [ ] **Hry (M6)** — piškvorky v chate, dvaja hráči odohrajú ťah naživo.
+- [ ] **Hry (M6)** — piškvorky v chate (10×10, 5 v rade), dvaja hráči odohrajú
+      ťah naživo; „Viac → Piškvorky proti počítaču" (súkromná praktika) funguje
+      a je viditeľná len autorovi.
 - [ ] **Svet okolo (M7)** — v Denníku zapni kategóriu → o pár hodín (job 2×
       denne) sa objavia titulky; alebo vynúť job (viď nižšie).
 - [ ] **Kvízy (M8)** *(ak LLM zapnuté)* — Viac → Kvízy → nová téma → počkaj na
@@ -282,3 +303,26 @@ docker compose exec postgres psql -U rodinna -d rodinna \
 # staré subscribe URL prestanú platiť, členovia si vytiahnu novú z UI:
 docker compose up -d api
 ```
+
+---
+
+## 9. Known issues / budúca práca (živý zoznam z reálnej prevádzky)
+
+Zistené reálnym používaním rodinou na NAS-e (júl 2026), zatiaľ neopravené —
+podrobnosti a kontext v `ARCHITECTURE_V2.md` §13 „Odchýlky implementácie":
+
+- **Denník — chýba push po manuálnom zápise.** Tlačidlo „Vygenerovať dnešný
+  zápis" zápis vytvorí, ale nepošle notifikáciu (len automatický nočný beh
+  `diary.daily`→`diary.notify` to robí). Odložené, netriviálna priorita.
+- **Kvalita LLM obsahu (Denník, Kvízy).** `llama3.2:3b-instruct-q4_K_M`
+  halucinuje (nezmyselný text, faktické chyby v kvízoch). `qwen2.5:7b-instruct-q4_K_M`
+  (§3 vyššie) je o niečo lepší, ale stále nie spoľahlivý — preklepy, zlé
+  faktické možnosti, miešanie jazykov/diakritiky. Otvorené smery: väčší
+  lokálny model (14B+, pomalšie na CPU) alebo cloud LLM API len pre tieto dve
+  funkcie (zásadná zmena privacy modelu pre denník — osobné dáta by opúšťali
+  NAS; menej citlivé pre kvízy, ktoré majú verejnú tému).
+- **RSS zdroje sú momentálne české** (`irozhlas.cz`, `denikn.cz`, `lupa.cz`) —
+  zámerná zmena podľa preferencie rodiny, pôvodne slovenské (`aktuality.sk`,
+  `dennikn.sk`). Zoznam feedov per kategória je `NEWS_FEEDS` v
+  `apps/api/src/modules/news/service.ts` — zmena zdroja je úprava kódu (PR),
+  nie config/env.

@@ -1,6 +1,9 @@
 # Rodinná Sieť v2 — Architektonický návrh
 
-> **Stav dokumentu:** návrh schválený, implementácia zatiaľ nezačatá.
+> **Stav dokumentu:** referenčný architektonický návrh — **implementované a nasadené**
+> (júl 2026). Phase 1 (T1–T9) aj celá Phase 2 (moduly M0–M8, `docs/MODULES_PLAN_PHASE2.md`)
+> bežia na produkčnom NAS-e. §13 a §15 nižšie odzrkadľujú aktuálny stav vrátane
+> odchýlok od pôvodného návrhu.
 > **Cieľová kódová báza:** nové repo `rodinna-siet-v2` (tento dokument je referencia z prototypu v1).
 
 ---
@@ -34,7 +37,7 @@ Detailný implementačný plán Phase 2 (poradie modulov, integračný kontrakt 
 | Doména | na začiatok **`*.synology.me`**, vlastná možná neskôr | zmena domény = 1 riadok v Caddyfile + DNS, bez refactoru |
 | Frontend | **PWA** (Add-to-Home-Screen), Capacitor-ready fallback | jeden codebase pre PC/iPhone/iPad/Android |
 | Push notifikácie | **kritické**, ako WhatsApp na lock screen iPhone | Web Push / VAPID (iOS 16.4+ cez nainštalovanú PWA) |
-| LLM | Phase 1 neimplementuje, API vrstva pripravená | OpenAI-kompatibilný adaptér, prepínateľný cez env var |
+| LLM | Phase 1 neimplementovala, API vrstva bola pripravená vopred | implementované v Phase 2 (M5 Denník, M8 Kvízy); OpenAI-kompatibilný adaptér, prepínateľný cez `LLM_BASE_URL`/`LLM_MODEL` |
 | Repo | úplne **nové repo `rodinna-siet-v2`** | starý prototyp ostáva len ako referencia |
 
 ---
@@ -192,7 +195,15 @@ Phase 2 moduly sa pridávajú cez `register(module)` v `app.ts` — **bez zásah
 - **Endpoint:** `/api/llm/chat/completions` mirror OpenAI spec → zameniteľný backend cez `LLM_BASE_URL`.
 - **Streaming:** SSE (kompatibilné s `EventSource` v PWA, jednoduchšie debugovanie než WS).
 - **Async jobs:** dlhé úlohy (generovanie kvízu, súhrn denníka) → Postgres tabuľka `pg_jobs`; worker spracuje, notifikuje cez WS event + Web Push.
-- **Modely:** bind-mount `/volume1/rodinna/ollama/models`. Štart: `llama3.2:3b-instruct-q4_K_M` (~2 GB, CPU-friendly) + `nomic-embed-text`.
+- **Modely:** bind-mount `/volume1/rodinna/ollama/models`. Štart: `llama3.2:3b-instruct-q4_K_M`
+  (~2 GB, CPU-friendly) + `nomic-embed-text`. **Prevádzková skúsenosť:** 3B model je pre
+  faktické úlohy (kvízy, súvislý denníkový text) príliš slabý (halucinácie, nezmyselné
+  otázky). Na NAS-e s 32 GB RAM sa dá vymeniť za `qwen2.5:7b-instruct-q4_K_M`
+  (nastavením `LLM_MODEL` v `.env`, bez zásahu do kódu) — kvalita o niečo lepšia, ale
+  stále nie spoľahlivá; navyše tento model vracia otázky ako **JSON Lines** namiesto
+  JSON poľa, na čo si parser v `apps/api/src/modules/quiz/service.ts` (`extractQuestions`)
+  musel dať pozor. Otvorená téma: buď väčší lokálny model (14B+, pomalšie na CPU), alebo
+  cloud LLM API pre kvízy/denník — pozri Odchýlky nižšie.
 - **Vector DB:** `pgvector` v tej istej Postgres (žiadny Qdrant kontajner navyše).
 
 ---
@@ -338,9 +349,9 @@ rodinna.tvojadomena.synology.me {
 | **T4–5** | Feed (posty, reakcie, komentáre, ~~infinite scroll~~). **Jadro ✅ overené na NAS-e.** Zostáva: virtualizácia (react-virtuoso + TanStack `useInfiniteQuery`) — viď Odchýlky nižšie a §14.5 |
 | **T6** ✅ | Chat — **real-time jadro**: natívne Bun WebSockets (pub/sub), DM + skupiny + „Rodina", typing, online presence, read receipts, reakcie + odpovede na správach, foto prílohy, cursor pagination. **Overené E2E (36/36) + browser smoke (2 prehliadače, real-time).** |
 | **T7** ✅ | Chat — push notifikácie (web-push/VAPID + worker + pg_jobs queue, `docs/MODULES_PLAN_PHASE2.md` M0-1/M0-2), notifications kernel (in-app + per-druh preferencie), registry-driven app shell (M0-3). *Hlasovky presunuté do M5 (prepis Whisperom); živé karty (M0-4) nasledujú.* |
-| **T8** | PWA polish, install prompts, offline shell, command palette |
-| **T9** | Security audit, rate limiting, **restore drill** |
-| **T10+** | Phase 2 moduly + LLM integrácia — **detailný plán: `docs/MODULES_PLAN_PHASE2.md`** (poradie M0–M7, integračný kontrakt, harmonogram T7–T25) |
+| **T8** ✅ | PWA polish — offline app shell (service worker network-first navigácie, cache-first hashované assety), install prompt, command palette |
+| **T9** ✅ | Security audit, rate limiting (sken všetkých mutačných endpointov Phase 2 modulov), **restore drill** |
+| **T10+** ✅ | Phase 2 moduly + LLM integrácia — **kompletne implementované, moduly M0–M8:** `docs/MODULES_PLAN_PHASE2.md`. Kvalita LLM obsahu (kvízy, denník) ostáva otvorená téma — viď Odchýlky nižšie. |
 
 ### Odchýlky implementácie oproti návrhu (živý zoznam)
 
@@ -356,6 +367,8 @@ rodinna.tvojadomena.synology.me {
 | Chat prílohy | foto **aj video** | zatiaľ **len foto** (cez existujúci `media` pipeline) | video = samostatný slice (T7): upload path + HTTP range serving + prehrávač/poster |
 | Chat push | web-push/VAPID v T6 | **odložené na T7** | push na lock screen sa reálne overí až s PWA (T8); WS protokol je forward-compatible |
 | Read receipts | — | `room_members.last_read_at` nastavený priamo v SQL z `messages.created_at` | round-trip cez JS `Date` orezáva µs → vlastná správa by vyšla ako neprečítaná |
+| Denník — push po manuálnom zápise | notifikácia pri každom novom zápise | tlačidlo „Vygenerovať dnešný zápis" **nepošle** push; pošle ho len automatický nočný beh (`diary.daily`→`diary.notify`) | zistené pri reálnom testovaní na NAS-e (júl 2026), zatiaľ neopravené — odložené |
+| Kvalita LLM obsahu (M5 Denník, M8 Kvízy) | koherentný text / fakticky správne kvízy | `llama3.2:3b-instruct-q4_K_M` halucinuje (nezmyselný text, faktické chyby); `qwen2.5:7b-instruct-q4_K_M` o niečo lepší, ale stále chybný obsah (preklepy, zlé možnosti, miešanie jazykov) | limit malého kvantovaného modelu na CPU-only NAS-e bez GPU; otvorené — buď väčší lokálny model (14B+, pomalší), alebo cloud LLM API len pre tieto dve funkcie (mení privacy-model pre denník, kvíz je menej citlivý) |
 
 ---
 
