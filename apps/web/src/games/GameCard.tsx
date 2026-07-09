@@ -14,8 +14,19 @@ function firstName(author: PostAuthor): string {
 /**
  * Živá karta hry (M6): piškvorky v chate (join, ťahy real-time, odveta),
  * denná rodinná otázka a foto výzva vo Feede. Stav live cez WS game:update.
+ *
+ * `onRematch` (voliteľné, používa len súkromná praktika proti botovi z
+ * Practice.tsx): karta si nemôže sama "prepnúť" entitu na novú hru, lebo
+ * WS podpisku má naviazanú na pôvodný `entityId` (pozri komentár pri
+ * `rematch` nižšie) — zavolanie tohto callbacku necháva rodiča zmeniť
+ * `entityId` prop, čím sa karta korektne odhlási zo starej hry a
+ * prihlási na novú.
  */
-export function GameCard({ entityId, compact }: EntityCardProps) {
+export function GameCard({
+  entityId,
+  compact,
+  onRematch,
+}: EntityCardProps & { onRematch?: (newEntityId: string) => void }) {
   const { user } = useAuth();
   const { subscribe } = useChat();
   const [game, setGame] = useState<GamePublic | null>(null);
@@ -66,12 +77,18 @@ export function GameCard({ entityId, compact }: EntityCardProps) {
 
   /**
    * Odveta je INÁ entita než táto karta (nová hra, nový id) — na rozdiel
-   * od `act` ju preto nemôžeme len tak nastaviť ako `game`, lebo táto karta
-   * počúva WS len na svoj pôvodný `entityId` a najbližší update by ju
-   * prepísal späť na starú dohratú partiu. Pri hre proti človeku treba
-   * novú hru poslať ako novú chat správu (živú kartu); pri súkromnej
-   * praktike proti botovi (roomId null) niet kam posielať, len prepneme
-   * zobrazenie priamo na novú hru.
+   * od `act` ju preto nemôžeme len tak nastaviť ako `game`. Táto karta
+   * počúva WS len na svoj pôvodný `entityId`; server po založení odvety
+   * ešte pošle `game:update` pre STARÚ hru (kvôli nastavenému `rematchId`
+   * na nej), a keby sme si tu len lokálne nastavili `game` na novú hru,
+   * ten neskorší broadcast by ju cez `load()` prepísal späť na starú
+   * dohratú partiu (race condition — presne toto sa dialo predtým).
+   * Pri hre proti človeku treba novú hru poslať ako novú chat správu
+   * (živú kartu) — táto karta ostáva zobrazovať starú, dohratú partiu.
+   * Pri súkromnej praktike proti botovi (roomId null) niet kam posielať —
+   * namiesto lokálneho prepnutia zavoláme `onRematch`, nech rodič
+   * (Practice.tsx) zmení `entityId` prop a karta sa korektne prepojí na
+   * novú entitu (odhlási starú WS podpisku, prihlási novú).
    */
   const rematch = async () => {
     if (busy || !game) return;
@@ -82,6 +99,8 @@ export function GameCard({ entityId, compact }: EntityCardProps) {
       if (game.roomId) {
         await chatApi.sendMessage(game.roomId, { bodyMd: buildAppLink('games', fresh.id), mediaIds: [] });
         setGame((g) => (g ? { ...g, rematchId: fresh.id } : g));
+      } else if (onRematch) {
+        onRematch(fresh.id);
       } else {
         setGame(fresh);
       }

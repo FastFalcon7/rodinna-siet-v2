@@ -46,7 +46,16 @@ export function Practice() {
           {loading ? 'Zakladám…' : 'Nová hra'}
         </button>
       ) : (
-        <GameCard entityId={gameId} />
+        <div className="space-y-2">
+          <GameCard entityId={gameId} onRematch={setGameId} />
+          <button
+            onClick={() => void startNew()}
+            disabled={loading}
+            className="text-xs text-neutral-500 underline decoration-dotted hover:text-neutral-700 disabled:opacity-40 dark:hover:text-neutral-300"
+          >
+            {loading ? 'Zakladám…' : 'Začať úplne odznova'}
+          </button>
+        </div>
       )}
     </div>
   );
