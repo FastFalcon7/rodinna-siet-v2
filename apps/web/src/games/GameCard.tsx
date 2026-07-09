@@ -1,9 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
-import type { GamePublic } from '@rodinna/shared-types';
+import { BOT_USER_ID, type GamePublic, type PostAuthor } from '@rodinna/shared-types';
 import { ApiError, gamesApi, mediaApi } from '../lib/api';
 import { useAuth } from '../auth/AuthContext';
 import { useChat } from '../chat/ChatProvider';
 import type { EntityCardProps } from '../app/cards';
+
+/** Krstné meno pre kompaktnú hlavičku — bot label sa neskracuje (nemá priezvisko). */
+function firstName(author: PostAuthor): string {
+  return author.id === BOT_USER_ID ? author.displayName : (author.displayName.split(' ')[0] ?? author.displayName);
+}
 
 /**
  * Živá karta hry (M6): piškvorky v chate (join, ťahy real-time, odveta),
@@ -93,25 +98,27 @@ export function GameCard({ entityId, compact }: EntityCardProps) {
     return shell(
       <>
         <p className="text-sm font-semibold text-neutral-900 dark:text-neutral-100">
-          ⭕ Piškvorky · {game.players.x.displayName.split(' ')[0]} (✕)
-          {game.players.o ? ` vs ${game.players.o.displayName.split(' ')[0]} (◯)` : ''}
+          ⭕ Piškvorky · {firstName(game.players.x)} (✕)
+          {game.players.o ? ` vs ${firstName(game.players.o)} (◯)` : ''}
         </p>
-        <div className="mx-auto mt-2 grid w-fit grid-cols-3 gap-1">
-          {game.board.map((cell, i) => (
-            <button
-              key={i}
-              onClick={() => myTurn && cell === null && void act(() => gamesApi.move(game.id, i))}
-              disabled={busy || !myTurn || cell !== null}
-              aria-label={`Políčko ${i + 1}`}
-              className={`grid h-11 w-11 place-items-center rounded-lg border text-xl font-bold transition ${
-                cell === null && myTurn
-                  ? 'border-accent/40 hover:bg-accent/10'
-                  : 'border-neutral-200 dark:border-neutral-700'
-              } ${cell === 'x' ? 'text-accent' : 'text-neutral-600 dark:text-neutral-300'}`}
-            >
-              {cell === 'x' ? '✕' : cell === 'o' ? '◯' : ''}
-            </button>
-          ))}
+        <div className="mt-2 overflow-x-auto">
+          <div className="mx-auto grid w-fit grid-cols-10 gap-0.5">
+            {game.board.map((cell, i) => (
+              <button
+                key={i}
+                onClick={() => myTurn && cell === null && void act(() => gamesApi.move(game.id, i))}
+                disabled={busy || !myTurn || cell !== null}
+                aria-label={`Políčko ${i + 1}`}
+                className={`grid h-6 w-6 shrink-0 place-items-center rounded border text-xs font-bold transition ${
+                  cell === null && myTurn
+                    ? 'border-accent/40 hover:bg-accent/10'
+                    : 'border-neutral-200 dark:border-neutral-700'
+                } ${cell === 'x' ? 'text-accent' : 'text-neutral-600 dark:text-neutral-300'}`}
+              >
+                {cell === 'x' ? '✕' : cell === 'o' ? '◯' : ''}
+              </button>
+            ))}
+          </div>
         </div>
         <p className="mt-2 text-center text-xs text-neutral-500">{statusText}</p>
         <div className="mt-1.5 flex justify-center gap-2">
