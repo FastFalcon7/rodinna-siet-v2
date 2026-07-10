@@ -162,7 +162,7 @@ function NewEventForm({ onDone, onCancel }: { onDone: () => void; onCancel: () =
         allDay,
         location: location.trim(),
         bodyMd: '',
-        toFeed: true,
+        toFeed: false,
       });
       onDone();
     } catch (err) {

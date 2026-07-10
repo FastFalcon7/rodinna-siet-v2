@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { CommentPublic, PostPublic } from '@rodinna/shared-types';
-import { ApiError, feedApi } from '../lib/api';
+import { feedApi } from '../lib/api';
 import { useAuth } from '../auth/AuthContext';
 import { Avatar } from '../shared/Avatar';
 import { MediaItem } from '../shared/MediaItem';
@@ -11,6 +11,8 @@ import { EntityCard } from '../app/cards';
 import { fullDateTime, relativeTime } from '../shared/time';
 import { ReactionBar } from './ReactionBar';
 import { CommentThread } from './CommentThread';
+import { CommentComposer } from './CommentComposer';
+import { PostGallery } from './PostGallery';
 
 interface PostCardProps {
   post: PostPublic;
@@ -26,10 +28,7 @@ export function PostCard({ post, onChange, onDeleted }: PostCardProps) {
   const { user } = useAuth();
   const [comments, setComments] = useState<CommentPublic[] | null>(null);
   const [commentsOpen, setCommentsOpen] = useState(false);
-  const [commentText, setCommentText] = useState('');
   const [menuOpen, setMenuOpen] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   if (!user) return null;
 
   const canManage = post.author.id === user.id || user.role === 'admin';
@@ -42,22 +41,10 @@ export function PostCard({ post, onChange, onDeleted }: PostCardProps) {
     }
   };
 
-  const submitComment = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const trimmed = commentText.trim();
-    if (!trimmed || busy) return;
-    setBusy(true);
-    setError(null);
-    try {
-      const created = await feedApi.createComment(post.id, { bodyMd: trimmed });
-      setComments((prev) => [...(prev ?? []), created]);
-      onChange({ ...post, commentCount: post.commentCount + 1 });
-      setCommentText('');
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Komentár sa nepodarilo uložiť');
-    } finally {
-      setBusy(false);
-    }
+  const submitComment = async (input: { bodyMd: string; mediaIds: string[] }) => {
+    const created = await feedApi.createComment(post.id, input);
+    setComments((prev) => [...(prev ?? []), created]);
+    onChange({ ...post, commentCount: post.commentCount + 1 });
   };
 
   const remove = async () => {
@@ -140,17 +127,7 @@ export function PostCard({ post, onChange, onDeleted }: PostCardProps) {
 
           {post.media.length > 0 && (
             <div className="mt-2 space-y-2">
-              {images.length > 0 && (
-                <div
-                  className={`grid gap-0.5 overflow-hidden rounded-xl border border-neutral-200 dark:border-neutral-800 ${
-                    images.length === 1 ? 'grid-cols-1' : 'grid-cols-2'
-                  }`}
-                >
-                  {images.map((m) => (
-                    <MediaItem key={m.id} media={m} className="rounded-none" />
-                  ))}
-                </div>
-              )}
+              <PostGallery images={images} />
               {rest.map((m) => (
                 <MediaItem key={m.id} media={m} />
               ))}
@@ -188,24 +165,10 @@ export function PostCard({ post, onChange, onDeleted }: PostCardProps) {
                   }}
                 />
               )}
-              <form onSubmit={submitComment} className="mt-3 flex gap-2">
+              <div className="mt-3 flex gap-2">
                 <Avatar user={user} size={28} />
-                <input
-                  value={commentText}
-                  onChange={(e) => setCommentText(e.target.value)}
-                  maxLength={2000}
-                  placeholder="Napíš komentár…"
-                  className="min-w-0 flex-1 rounded-lg border border-neutral-300 bg-transparent px-3 py-1.5 text-sm outline-none focus:border-accent dark:border-neutral-700"
-                />
-                <button
-                  type="submit"
-                  disabled={busy || !commentText.trim()}
-                  className="rounded-lg bg-accent px-3 py-1.5 text-sm font-medium text-white disabled:opacity-40"
-                >
-                  Odoslať
-                </button>
-              </form>
-              {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
+                <CommentComposer placeholder="Napíš komentár…" onSubmit={submitComment} />
+              </div>
             </div>
           )}
         </div>

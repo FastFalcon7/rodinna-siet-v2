@@ -1,10 +1,13 @@
 import { useState } from 'react';
 import type { CommentPublic } from '@rodinna/shared-types';
 import { MAX_COMMENT_DEPTH } from '@rodinna/shared-types';
-import { ApiError, feedApi } from '../lib/api';
+import { feedApi } from '../lib/api';
 import { useAuth } from '../auth/AuthContext';
 import { Avatar } from '../shared/Avatar';
+import { MediaItem } from '../shared/MediaItem';
 import { ReactionBar } from './ReactionBar';
+import { CommentComposer } from './CommentComposer';
+import { PostGallery } from './PostGallery';
 
 interface CommentThreadProps {
   postId: string;
@@ -27,30 +30,18 @@ function CommentNode({
 }) {
   const { user } = useAuth();
   const [replying, setReplying] = useState(false);
-  const [text, setText] = useState('');
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   if (!user) return null;
 
   const canDelete = comment.author.id === user.id || user.role === 'admin';
   const canReply = comment.depth < MAX_COMMENT_DEPTH;
 
-  const submitReply = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const trimmed = text.trim();
-    if (!trimmed || busy) return;
-    setBusy(true);
-    setError(null);
-    try {
-      const created = await feedApi.createComment(postId, { bodyMd: trimmed, parentCommentId: comment.id });
-      onChange([...comments, created]);
-      setText('');
-      setReplying(false);
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Odpoveď sa nepodarilo uložiť');
-    } finally {
-      setBusy(false);
-    }
+  const images = comment.media.filter((m) => m.kind === 'image');
+  const rest = comment.media.filter((m) => m.kind !== 'image');
+
+  const submitReply = async (input: { bodyMd: string; mediaIds: string[] }) => {
+    const created = await feedApi.createComment(postId, { ...input, parentCommentId: comment.id });
+    onChange([...comments, created]);
+    setReplying(false);
   };
 
   const remove = async () => {
@@ -66,8 +57,16 @@ function CommentNode({
         <div className="flex-1">
           <div className="rounded-2xl bg-neutral-100 dark:bg-neutral-800 px-3 py-2">
             <p className="text-sm font-medium">{comment.author.displayName}</p>
-            <p className="text-sm whitespace-pre-wrap">{comment.bodyMd}</p>
+            {comment.bodyMd && <p className="text-sm whitespace-pre-wrap">{comment.bodyMd}</p>}
           </div>
+          {comment.media.length > 0 && (
+            <div className="mt-1.5 max-w-xs space-y-1.5">
+              <PostGallery images={images} />
+              {rest.map((m) => (
+                <MediaItem key={m.id} media={m} />
+              ))}
+            </div>
+          )}
           <div className="mt-1 flex items-center gap-3 px-1">
             <ReactionBar
               targetType="comment"
@@ -88,25 +87,10 @@ function CommentNode({
               </button>
             )}
           </div>
-          {error && <p className="mt-1 px-1 text-xs text-red-600">{error}</p>}
           {replying && (
-            <form onSubmit={submitReply} className="mt-2 flex gap-2">
-              <input
-                value={text}
-                onChange={(e) => setText(e.target.value)}
-                maxLength={2000}
-                autoFocus
-                placeholder="Tvoja odpoveď…"
-                className="flex-1 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-transparent px-3 py-1.5 text-sm outline-none focus:border-accent"
-              />
-              <button
-                type="submit"
-                disabled={busy || !text.trim()}
-                className="rounded-lg bg-accent px-3 py-1.5 text-sm font-medium text-white disabled:opacity-40"
-              >
-                Odoslať
-              </button>
-            </form>
+            <div className="mt-2">
+              <CommentComposer placeholder="Tvoja odpoveď…" autoFocus onSubmit={submitReply} />
+            </div>
           )}
           {childComments.length > 0 && (
             <ul className="mt-2 space-y-2.5 border-l border-neutral-200 dark:border-neutral-700 pl-3">

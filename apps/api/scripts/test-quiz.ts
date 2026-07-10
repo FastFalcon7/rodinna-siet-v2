@@ -215,10 +215,11 @@ async function main() {
   await generateQuiz(famId);
   r = await http(bob.token, 'POST', `/api/quiz/${famId}/publish`);
   check('family publish → published', r.body.status === 'published', r.body.status);
+  // Ladenie 07/2026 (bod 6): kvízy do Feedu nejdú — žijú v časti Kvízy.
   const cards = await db.select().from(feedCards).where(and(eq(feedCards.module, 'quiz'), eq(feedCards.entityId, famId)));
-  check('feed karta existuje (K1)', cards.length === 1, cards.length);
+  check('family publish BEZ feed karty (bod 6)', cards.length === 0, cards.length);
   r = await http(cyril.token, 'GET', '/api/feed');
-  check('karta vo feed union', r.body.items?.some((i: any) => i.type === 'card' && i.card?.module === 'quiz' && i.card?.entityId === famId), false);
+  check('karta nie je vo feed union', !r.body.items?.some((i: any) => i.type === 'card' && i.card?.module === 'quiz' && i.card?.entityId === famId), false);
 
   r = await http(cyril.token, 'GET', `/api/quiz/${famId}`);
   check('pred hraním: playQuestions bez correct', r.body.playQuestions?.length === 5 && r.body.playQuestions[0].correct === undefined && r.body.questions === null, r.body.playQuestions?.[0]);
