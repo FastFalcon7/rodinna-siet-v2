@@ -69,6 +69,43 @@ async function fetchReactionSummaries(
   return map;
 }
 
+/**
+ * Agregát reakcií CELÉHO vlákna (post + jeho komentáre) — ladenie 07/2026,
+ * bod 2: počítadlo pod hlavným príspevkom zahŕňa aj emotikony z komentárov
+ * (ako bublina komentárov počíta celé vlákno). `reactedByMe` je zámerne len
+ * z reakcií priamo na poste — riadi zvýraznenie mojej reakcie v palete.
+ */
+async function fetchThreadReactionSummaries(
+  postIds: string[],
+  viewerId: string,
+): Promise<Map<string, ReactionSummary[]>> {
+  if (postIds.length === 0) return new Map();
+  const idList = sql.join(
+    postIds.map((id) => sql`${id}::uuid`),
+    sql`, `,
+  );
+  const rows = await db.execute<{ post_id: string; emoji: string; count: number; reacted_by_me: boolean }>(sql`
+    SELECT COALESCE(c.post_id, r.target_id) AS post_id,
+           r.emoji,
+           count(*)::int AS count,
+           bool_or(r.user_id = ${viewerId} AND r.target_type = 'post') AS reacted_by_me
+    FROM reactions r
+    LEFT JOIN comments c
+      ON r.target_type = 'comment' AND c.id = r.target_id AND c.deleted_at IS NULL
+    WHERE (r.target_type = 'post' AND r.target_id IN (${idList}))
+       OR (r.target_type = 'comment' AND c.post_id IN (${idList}))
+    GROUP BY 1, r.emoji
+  `);
+
+  const map = new Map<string, ReactionSummary[]>();
+  for (const r of rows) {
+    const list = map.get(r.post_id) ?? [];
+    list.push({ emoji: r.emoji, count: r.count, reactedByMe: r.reacted_by_me });
+    map.set(r.post_id, list);
+  }
+  return map;
+}
+
 async function fetchCommentCounts(postIds: string[]): Promise<Map<string, number>> {
   if (postIds.length === 0) return new Map();
   const rows = await db
@@ -105,7 +142,7 @@ async function hydratePosts(rows: PostRow[], viewerId: string): Promise<PostPubl
     fetchAuthors(authorIds),
     fetchMediaForPosts(postIds),
     fetchCommentCounts(postIds),
-    fetchReactionSummaries('post', postIds, viewerId),
+    fetchThreadReactionSummaries(postIds, viewerId),
   ]);
   return rows.map((row) => ({
     id: row.id,
@@ -380,28 +417,43 @@ export async function deleteComment(commentId: string, userId: string, isAdmin: 
   await db.update(comments).set({ deletedAt: new Date() }).where(eq(comments.id, commentId));
 }
 
-/** Overí, že target (post/comment) existuje a nie je zmazaný. */
-async function targetExists(targetType: ReactionTargetType, targetId: string): Promise<boolean> {
-  if (targetType === 'post') {
-    return (await getOwnPost(targetId)) !== null;
-  }
-  const rows = await db
-    .select({ id: comments.id })
-    .from(comments)
-    .where(and(eq(comments.id, targetId), isNull(comments.deletedAt)))
-    .limit(1);
-  return rows.length > 0;
+export interface ReactionResult {
+  /** Súhrn cieľa reakcie — post: agregát vlákna, komentár: len jeho reakcie. */
+  reactions: ReactionSummary[];
+  /** Agregát vlákna príspevku (počítadlo pod hlavným postom) — vždy. */
+  postReactions: ReactionSummary[];
 }
 
-/** Toggle reakcia: nová emoji nahradí starú, rovnaká emoji = unreact. Vráti aktuálny súhrn na targete. */
+/**
+ * Toggle reakcia: nová emoji nahradí starú, rovnaká emoji = unreact.
+ * Na vlastný obsah sa nereaguje (ladenie 07/2026, bod 2) → ForbiddenError.
+ */
 export async function setReaction(
   targetType: ReactionTargetType,
   targetId: string,
   userId: string,
   emoji: string,
-): Promise<ReactionSummary[]> {
-  if (!(await targetExists(targetType, targetId))) {
-    throw new NotFoundError('Cieľ reakcie nenájdený');
+): Promise<ReactionResult> {
+  // Cieľ + jeho autor a post vlákna jedným lookupom.
+  let authorId: string;
+  let postId: string;
+  if (targetType === 'post') {
+    const post = await getOwnPost(targetId);
+    if (!post) throw new NotFoundError('Cieľ reakcie nenájdený');
+    authorId = post.authorId;
+    postId = post.id;
+  } else {
+    const rows = await db
+      .select({ authorId: comments.authorId, postId: comments.postId })
+      .from(comments)
+      .where(and(eq(comments.id, targetId), isNull(comments.deletedAt)))
+      .limit(1);
+    if (!rows[0]) throw new NotFoundError('Cieľ reakcie nenájdený');
+    authorId = rows[0].authorId;
+    postId = rows[0].postId;
+  }
+  if (authorId === userId) {
+    throw new ForbiddenError('Na vlastný príspevok či komentár sa nereaguje 🙂');
   }
 
   const existingRows = await db
@@ -419,6 +471,11 @@ export async function setReaction(
     await db.insert(reactions).values({ targetType, targetId, userId, emoji });
   }
 
-  const map = await fetchReactionSummaries(targetType, [targetId], userId);
-  return map.get(targetId) ?? [];
+  const threadMap = await fetchThreadReactionSummaries([postId], userId);
+  const postReactions = threadMap.get(postId) ?? [];
+  if (targetType === 'post') {
+    return { reactions: postReactions, postReactions };
+  }
+  const map = await fetchReactionSummaries('comment', [targetId], userId);
+  return { reactions: map.get(targetId) ?? [], postReactions };
 }

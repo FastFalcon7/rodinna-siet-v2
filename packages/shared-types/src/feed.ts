@@ -32,6 +32,17 @@ export const SetReactionInputSchema = z.object({
 });
 export type SetReactionInput = z.infer<typeof SetReactionInputSchema>;
 
+/**
+ * Odpoveď na PUT /feed/reactions: `reactions` = súhrn cieľa (post: agregát
+ * vlákna, komentár: len jeho reakcie), `postReactions` = agregát vlákna pre
+ * počítadlo pod hlavným príspevkom.
+ */
+export const SetReactionResponseSchema = z.object({
+  reactions: z.array(ReactionSummarySchema),
+  postReactions: z.array(ReactionSummarySchema),
+});
+export type SetReactionResponse = z.infer<typeof SetReactionResponseSchema>;
+
 /** Vnorené komentáre max do hĺbky 3 (depth 0,1,2) — §11. */
 export const MAX_COMMENT_DEPTH = 2;
 

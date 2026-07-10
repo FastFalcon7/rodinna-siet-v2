@@ -1,8 +1,9 @@
 /**
  * E2E test modulu Feed — posty, komentáre (vrátane príloh, ladenie 07/2026
- * bod 3) a reakcie (1 reakcia/user: replace + unreact).
+ * bod 3), reakcie (1 reakcia/user, žiadny self-react, agregát vlákna) a
+ * video pipeline (upload → ffmpeg transkód na H.264 + poster → serve).
  *
- * Spustenie:
+ * Spustenie (vyžaduje ffmpeg/ffprobe v PATH):
  *   DATABASE_URL=postgres://rodinna:rodinna@127.0.0.1:5432/rodinna \
  *   MEDIA_PATH=/tmp/rodinna-test-media bun scripts/test-feed.ts
  */
@@ -17,6 +18,7 @@ import { app } from '../src/core/rpc/app';
 import { chatWebSocket, handleChatUpgrade, setServer } from '../src/modules/chat/realtime';
 import { startWsBridge } from '../src/core/events';
 import { writeMedia } from '../src/modules/media/storage';
+import { transcodeVideo } from '../src/modules/media/worker';
 
 const PORT = 31991;
 const BASE = `http://127.0.0.1:${PORT}`;
@@ -107,6 +109,7 @@ async function main() {
 
   const alica = await seedUser('alica@rodina.sk', 'Alica', 'admin');
   const bob = await seedUser('bob@rodina.sk', 'Bob', 'member');
+  const cyril = await seedUser('cyril@rodina.sk', 'Cyril', 'member');
 
   console.log('\n— Posty —');
   let r = await http(alica.token, 'POST', '/api/feed', { bodyMd: '', mediaIds: [] });
@@ -147,7 +150,12 @@ async function main() {
   const withMedia = r.body.comments?.filter((c: any) => c.media?.length === 1);
   check('listComments hydratuje media', r.body.comments?.length === 2 && withMedia?.length === 2, r.body.comments);
 
-  console.log('\n— Reakcie: 1 na osobu (bod 2) —');
+  console.log('\n— Reakcie: 1 na osobu, žiadny self-react, agregát vlákna (bod 2) —');
+  r = await http(alica.token, 'PUT', '/api/feed/reactions', { targetType: 'post', targetId: postId, emoji: '❤️' });
+  check('autor na vlastný post → 403', r.status === 403, r.status);
+  r = await http(bob.token, 'PUT', '/api/feed/reactions', { targetType: 'comment', targetId: commentId, emoji: '👍' });
+  check('autor na vlastný komentár → 403', r.status === 403, r.status);
+
   r = await http(bob.token, 'PUT', '/api/feed/reactions', { targetType: 'post', targetId: postId, emoji: '❤️' });
   check('❤️ → count 1, reactedByMe', r.body.reactions?.[0]?.emoji === '❤️' && r.body.reactions[0].reactedByMe, r.body.reactions);
   r = await http(bob.token, 'PUT', '/api/feed/reactions', { targetType: 'post', targetId: postId, emoji: '😂' });
@@ -156,10 +164,67 @@ async function main() {
     r.body.reactions?.length === 1 && r.body.reactions[0].emoji === '😂',
     r.body.reactions,
   );
-  r = await http(alica.token, 'PUT', '/api/feed/reactions', { targetType: 'post', targetId: postId, emoji: '😂' });
+  r = await http(cyril.token, 'PUT', '/api/feed/reactions', { targetType: 'post', targetId: postId, emoji: '😂' });
   check('druhý user rovnaká emoji → count 2', r.body.reactions?.[0]?.count === 2, r.body.reactions);
   r = await http(bob.token, 'PUT', '/api/feed/reactions', { targetType: 'post', targetId: postId, emoji: '😂' });
   check('rovnaká emoji = unreact → count 1', r.body.reactions?.[0]?.count === 1, r.body.reactions);
+
+  // Agregát vlákna: reakcia na komentár sa počíta do počítadla pod postom.
+  r = await http(alica.token, 'PUT', '/api/feed/reactions', { targetType: 'comment', targetId: commentId, emoji: '❤️' });
+  check('reakcia na komentár → 200', r.status === 200, r.status);
+  check('response nesie reakcie komentára', r.body.reactions?.[0]?.emoji === '❤️', r.body.reactions);
+  const agg = r.body.postReactions as { emoji: string; count: number }[];
+  check(
+    'postReactions = agregát vlákna (😂 z postu + ❤️ z komentára)',
+    agg?.some((x) => x.emoji === '😂' && x.count === 1) && agg?.some((x) => x.emoji === '❤️' && x.count === 1),
+    agg,
+  );
+  r = await http(cyril.token, 'GET', '/api/feed');
+  const fed = r.body.items?.find((it: any) => it.type === 'post' && it.post.id === postId)?.post;
+  check(
+    'GET /feed: reactions postu agregujú aj komentáre',
+    fed?.reactions?.some((x: any) => x.emoji === '❤️' && x.count === 1),
+    fed?.reactions,
+  );
+
+  console.log('\n— Video pipeline (upload → transkód → serve) —');
+  // Vygeneruj malé "iPhone-like" video v ne-h264 kodeku (mpeg4 = transkód vetva).
+  const srcVideo = '/tmp/rodinna-test-media/testsrc.mp4';
+  const gen = Bun.spawn(
+    ['ffmpeg', '-y', '-f', 'lavfi', '-i', 'testsrc=duration=1:size=320x240:rate=10', '-c:v', 'mpeg4', srcVideo],
+    { stdout: 'ignore', stderr: 'ignore' },
+  );
+  if ((await gen.exited) !== 0) throw new Error('ffmpeg generovanie test videa zlyhalo');
+
+  const form = new FormData();
+  form.set('file', new File([await Bun.file(srcVideo).arrayBuffer()], 'video.mp4', { type: 'video/mp4' }));
+  const upRes = await fetch(`${BASE}/api/media`, {
+    method: 'POST',
+    headers: { cookie: `rs_session=${alica.token}` },
+    body: form,
+  });
+  const uploaded = (await upRes.json()) as any;
+  check('upload videa → 201 kind=video', upRes.status === 201 && uploaded.kind === 'video', uploaded);
+  check('po uploade processing=true (čaká na transkód)', uploaded.processing === true, uploaded.processing);
+
+  await transcodeVideo(uploaded.id);
+  const vidRows = await db.select().from(media).where(dsql`${media.id} = ${uploaded.id}` as any);
+  const vid = (vidRows as any[])[0];
+  check('transkód done + playback/poster path', vid.transcodeStatus === 'done' && !!vid.playbackPath && !!vid.posterPath, vid.transcodeStatus);
+
+  let mr = await fetch(`${BASE}/api/media/${uploaded.id}`, { headers: { cookie: `rs_session=${bob.token}` } });
+  check('serve videa → 200 video/mp4 (normalizované)', mr.status === 200 && mr.headers.get('content-type') === 'video/mp4', mr.headers.get('content-type'));
+  const full = (await mr.arrayBuffer()).byteLength;
+  mr = await fetch(`${BASE}/api/media/${uploaded.id}`, {
+    headers: { cookie: `rs_session=${bob.token}`, range: 'bytes=0-1' },
+  });
+  check(
+    'range request (iOS) → 206, správna dĺžka',
+    mr.status === 206 && mr.headers.get('content-range') === `bytes 0-1/${full}`,
+    `${mr.status} ${mr.headers.get('content-range')}`,
+  );
+  mr = await fetch(`${BASE}/api/media/${uploaded.id}/poster`, { headers: { cookie: `rs_session=${bob.token}` } });
+  check('poster → 200 image/jpeg', mr.status === 200 && mr.headers.get('content-type') === 'image/jpeg', mr.status);
 
   console.log('\n— Mazanie —');
   r = await http(bob.token, 'DELETE', `/api/feed/${postId}`);

@@ -136,10 +136,11 @@ router.put('/reactions', requireAuth, zValidator('json', SetReactionInputSchema)
   const me = c.get('user')!;
   const input = c.req.valid('json');
   try {
-    const summary = await setReaction(input.targetType, input.targetId, me.id, input.emoji);
-    return c.json({ reactions: summary });
+    const result = await setReaction(input.targetType, input.targetId, me.id, input.emoji);
+    return c.json(result);
   } catch (err) {
     if (err instanceof NotFoundError) return c.json({ error: err.message }, 404);
+    if (err instanceof ForbiddenError) return c.json({ error: err.message }, 403);
     throw err;
   }
 });

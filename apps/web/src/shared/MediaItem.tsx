@@ -9,14 +9,22 @@ import { formatBytes } from './time';
 export function MediaItem({ media, className = '' }: { media: MediaPublic; className?: string }) {
   if (media.kind === 'video') {
     return (
-      // eslint-disable-next-line jsx-a11y/media-has-caption
-      <video
-        src={media.url}
-        controls
-        playsInline
-        preload="metadata"
-        className={`max-h-96 w-full max-w-full rounded-lg bg-black ${className}`}
-      />
+      <div className={`relative overflow-hidden rounded-lg ${className}`}>
+        {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
+        <video
+          src={media.url}
+          controls
+          playsInline
+          preload="metadata"
+          poster={media.posterUrl ?? undefined}
+          className="max-h-96 w-full max-w-full bg-black"
+        />
+        {media.processing && (
+          <span className="pointer-events-none absolute left-2 top-2 rounded-full bg-black/60 px-2.5 py-1 text-xs text-white">
+            ⏳ Video sa pripravuje…
+          </span>
+        )}
+      </div>
     );
   }
 

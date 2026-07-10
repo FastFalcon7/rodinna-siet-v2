@@ -20,6 +20,10 @@ export const MediaPublicSchema = z.object({
   blurhash: z.string().nullable(),
   /** Pôvodný názov súboru — zobrazuje sa pri kind='file' (download karta). */
   fileName: z.string().nullable(),
+  /** Poster frame videa (`/api/media/:id/poster`) — null kým transkód nedobehne. */
+  posterUrl: z.string().nullable(),
+  /** true = video sa ešte normalizuje (H.264 transkód beží na pozadí). */
+  processing: z.boolean(),
   createdAt: z.string(),
 });
 export type MediaPublic = z.infer<typeof MediaPublicSchema>;

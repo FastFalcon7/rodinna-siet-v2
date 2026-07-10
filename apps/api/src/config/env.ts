@@ -21,6 +21,11 @@ const EnvSchema = z.object({
   MAX_VIDEO_MB: z.coerce.number().int().positive().default(200),
   // Max veľkosť iného súboru (dokument, PDF…) v MB.
   MAX_FILE_MB: z.coerce.number().int().positive().default(50),
+  // Video normalizácia (ladenie 07/2026): ffmpeg/ffprobe binárky pre worker
+  // job media.transcode (HEVC z iPhonu → H.264 MP4 + poster). Ak binárka
+  // chýba, job zlyhá a servíruje sa originál (fail-open).
+  FFMPEG_PATH: z.string().default('ffmpeg'),
+  FFPROBE_PATH: z.string().default('ffprobe'),
   // Web Push (M0): pár vygeneruj `bun run vapid` a ulož do .env. Bez kľúčov
   // beží appka normálne, len sa push notifikácie neodosielajú (log warning).
   VAPID_PUBLIC_KEY: z.string().optional(),
