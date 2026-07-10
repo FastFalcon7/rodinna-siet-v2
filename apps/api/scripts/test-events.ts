@@ -144,6 +144,7 @@ async function main() {
     title: 'Grilovačka u nás',
     startsAt: tomorrow5pm.toISOString(),
     location: 'záhrada',
+    toFeed: true,
   });
   check('vytvorenie → 201', r.status === 201 && r.body.title === 'Grilovačka u nás', r.body);
   const eventId = r.body.id;
@@ -151,11 +152,27 @@ async function main() {
 
   r = await http(bob.token, 'GET', '/api/feed');
   check(
-    'RSVP karta vo feede (K1)',
+    'RSVP karta vo feede (explicitné toFeed=true)',
     r.body.items?.some((it: any) => it.type === 'card' && it.card.module === 'events' && it.card.entityId === eventId),
     r.body.items?.length,
   );
-  const remindJobs = await db.select().from(jobs).where(eq(jobs.kind, 'events.remind'));
+
+  // Ladenie 07/2026 (bod 4): default je BEZ feed karty — udalosti žijú v Kalendári.
+  r = await http(alica.token, 'POST', '/api/events', {
+    title: 'Len v kalendári',
+    startsAt: tomorrow5pm.toISOString(),
+  });
+  check('default vytvorenie → 201', r.status === 201, r.status);
+  const quietEventId = r.body.id;
+  r = await http(bob.token, 'GET', '/api/feed');
+  check(
+    'default BEZ karty vo feede (bod 4)',
+    !r.body.items?.some((it: any) => it.type === 'card' && it.card.entityId === quietEventId),
+    r.body.items?.length,
+  );
+  const remindJobs = (await db.select().from(jobs).where(eq(jobs.kind, 'events.remind'))).filter(
+    (j) => (j.payload as any).eventId === eventId,
+  );
   check('2 reminder joby (deň + hodina vopred)', remindJobs.length === 2, remindJobs.length);
 
   console.log('\n— RSVP —');
@@ -193,7 +210,9 @@ async function main() {
   check('upraviť môže len autor/admin → 403', r.status === 403, r.status);
   r = await http(alica.token, 'PATCH', `/api/events/${eventId}`, { startsAt: newStart.toISOString() });
   check('autor presunul čas', r.status === 200 && r.body.startsAt === newStart.toISOString(), r.body.startsAt);
-  const remindJobs2 = await db.select().from(jobs).where(eq(jobs.kind, 'events.remind'));
+  const remindJobs2 = (await db.select().from(jobs).where(eq(jobs.kind, 'events.remind'))).filter(
+    (j) => (j.payload as any).eventId === eventId,
+  );
   check('nové reminder joby po presune (4 spolu)', remindJobs2.length === 4, remindJobs2.length);
   await db.execute(dsql`truncate table notifications`);
   await sendReminder(eventId, startsAtIso, 'deň'); // starý čas

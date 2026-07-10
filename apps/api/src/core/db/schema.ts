@@ -166,6 +166,22 @@ export const comments = pgTable(
   (t) => [index('comments_post_id_idx').on(t.postId), index('comments_parent_idx').on(t.parentCommentId)],
 );
 
+/** Médiá pripojené ku komentáru (ladenie 07/2026, bod 3) — ako postMedia. */
+export const commentMedia = pgTable(
+  'comment_media',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    commentId: uuid('comment_id')
+      .notNull()
+      .references(() => comments.id, { onDelete: 'cascade' }),
+    mediaId: uuid('media_id')
+      .notNull()
+      .references(() => media.id, { onDelete: 'cascade' }),
+    order: integer('order').notNull().default(0),
+  },
+  (t) => [index('comment_media_comment_id_idx').on(t.commentId)],
+);
+
 /**
  * Reakcie — spoločná tabuľka pre posty, komentáre aj správy v chate (T6).
  * Jedna reakcia na (target, user): nová emoji prepíše starú, rovnaká emoji = unreact.
@@ -288,6 +304,7 @@ export type MediaRow = typeof media.$inferSelect;
 export type PostRow = typeof posts.$inferSelect;
 export type PostMediaRow = typeof postMedia.$inferSelect;
 export type CommentRow = typeof comments.$inferSelect;
+export type CommentMediaRow = typeof commentMedia.$inferSelect;
 export type ReactionRow = typeof reactions.$inferSelect;
 export type ChatRoomRow = typeof chatRooms.$inferSelect;
 export type RoomMemberRow = typeof roomMembers.$inferSelect;

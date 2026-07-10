@@ -124,10 +124,11 @@ async function main() {
   check('vytvorenie albumu → 201', r.status === 201 && r.body.title === 'Leto 2026', r.body);
   const albumId = r.body.id;
 
+  // Ladenie 07/2026 (bod 7): albumy do Feedu nejdú — prístup len cez časť Albumy.
   r = await http(bob.token, 'GET', '/api/feed');
   check(
-    'feed karta albumu (K1)',
-    r.body.items?.some((it: any) => it.type === 'card' && it.card.module === 'albums' && it.card.entityId === albumId),
+    'album BEZ feed karty (bod 7)',
+    !r.body.items?.some((it: any) => it.type === 'card' && it.card.module === 'albums' && it.card.entityId === albumId),
     r.body.items?.length,
   );
 

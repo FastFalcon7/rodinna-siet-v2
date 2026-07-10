@@ -112,6 +112,7 @@ router.post('/:id/comments', requireAuth, zValidator('json', CreateCommentInputS
     return c.json(comment, 201);
   } catch (err) {
     if (err instanceof NotFoundError) return c.json({ error: err.message }, 404);
+    if (err instanceof ForbiddenError) return c.json({ error: err.message }, 403);
     if (err instanceof DepthExceededError) return c.json({ error: err.message }, 400);
     throw err;
   }

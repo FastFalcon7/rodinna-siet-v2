@@ -90,10 +90,17 @@ export const FeedPageSchema = z.object({
 });
 export type FeedPage = z.infer<typeof FeedPageSchema>;
 
-export const CreateCommentInputSchema = z.object({
-  bodyMd: z.string().trim().min(1, 'Komentár nemôže byť prázdny').max(2000),
-  parentCommentId: z.string().uuid().nullable().optional(),
-});
+export const CreateCommentInputSchema = z
+  .object({
+    // Prázdny text je OK, ak má komentár aspoň jednu prílohu (ako post).
+    bodyMd: z.string().trim().max(2000).default(''),
+    parentCommentId: z.string().uuid().nullable().optional(),
+    mediaIds: z.array(z.string().uuid()).max(4).default([]),
+  })
+  .refine((v) => v.bodyMd.length > 0 || v.mediaIds.length > 0, {
+    message: 'Komentár nemôže byť prázdny',
+    path: ['bodyMd'],
+  });
 export type CreateCommentInput = z.infer<typeof CreateCommentInputSchema>;
 
 export const CommentPublicSchema = z.object({
@@ -105,6 +112,7 @@ export const CommentPublicSchema = z.object({
   depth: z.number().int(),
   createdAt: z.string(),
   editedAt: z.string().nullable(),
+  media: z.array(MediaPublicSchema),
   reactions: z.array(ReactionSummarySchema),
 });
 export type CommentPublic = z.infer<typeof CommentPublicSchema>;

@@ -26,8 +26,8 @@ export const CreateEventInputSchema = z
     allDay: z.boolean().default(false),
     location: z.string().trim().max(MAX_EVENT_LOCATION).default(''),
     bodyMd: z.string().max(MAX_EVENT_BODY).default(''),
-    /** Vložiť RSVP kartu do Feedu (K1) — default áno, o to ide. */
-    toFeed: z.boolean().default(true),
+    /** Vložiť RSVP kartu do Feedu (K1). Udalosti žijú v Kalendári/chate — default nie. */
+    toFeed: z.boolean().default(false),
   })
   .refine((v) => !v.endsAt || new Date(v.endsAt) >= new Date(v.startsAt), {
     message: 'Koniec nemôže byť pred začiatkom',

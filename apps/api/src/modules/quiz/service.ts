@@ -212,11 +212,8 @@ export async function publishQuiz(quizId: string, userId: string): Promise<QuizP
 
   await db.update(quizzes).set({ status: 'published', publishedAt: new Date() }).where(eq(quizzes.id, quizId));
 
-  if (quiz.audience === 'family') {
-    // K1: karta vo Feede pre celú rodinu.
-    await db.insert(feedCards).values({ module: 'quiz', entityId: quizId, authorId: userId });
-    await publishCrossProcess(APP_TOPIC, { t: 'feed:card', module: 'quiz', entityId: quizId });
-  } else if (quiz.audience === 'room' && quiz.roomId) {
+  // Kvízy do Feedu nejdú (ladenie 07/2026) — rodinné kvízy žijú v časti Kvízy.
+  if (quiz.audience === 'room' && quiz.roomId) {
     // K2: živá karta v chate — správa app://quiz/<id> v mene autora.
     const { sendMessage } = await import('../chat/service');
     const authors = await fetchAuthors([userId]);

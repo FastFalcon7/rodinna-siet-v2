@@ -156,10 +156,7 @@ export async function createAlbum(creatorId: string, input: CreateAlbumInput): P
       .values(mediaIds.map((mediaId, order) => ({ albumId: album.id, mediaId, addedBy: creatorId, order })));
   }
 
-  // Karta do Feedu (K1): „X založil album Y" — živá, ukazuje aktuálnu obálku/počet.
-  await db.insert(feedCards).values({ module: 'albums', entityId: album.id, authorId: creatorId });
-  await publishCrossProcess(APP_TOPIC, { t: 'feed:card', module: 'albums', entityId: album.id });
-
+  // Albumy do Feedu nejdú (ladenie 07/2026) — prístup k nim je v časti Albumy.
   return getAlbum(album.id);
 }
 
@@ -171,7 +168,6 @@ export async function addPhotos(albumId: string, userId: string, mediaIds: strin
     .insert(albumPhotos)
     .values(unique.map((mediaId, order) => ({ albumId, mediaId, addedBy: userId, order })))
     .onConflictDoNothing();
-  await publishCrossProcess(APP_TOPIC, { t: 'feed:card', module: 'albums', entityId: albumId });
   return getAlbum(albumId);
 }
 

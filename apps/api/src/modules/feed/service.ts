@@ -12,6 +12,7 @@ import {
 } from '@rodinna/shared-types';
 import { db } from '../../core/db/client';
 import {
+  commentMedia,
   comments,
   feedCards,
   media,
@@ -118,12 +119,31 @@ async function hydratePosts(rows: PostRow[], viewerId: string): Promise<PostPubl
   }));
 }
 
+async function fetchMediaForComments(commentIds: string[]) {
+  if (commentIds.length === 0) return new Map<string, ReturnType<typeof toMediaPublic>[]>();
+  const rows = await db
+    .select({ commentId: commentMedia.commentId, media })
+    .from(commentMedia)
+    .innerJoin(media, eq(commentMedia.mediaId, media.id))
+    .where(inArray(commentMedia.commentId, commentIds))
+    .orderBy(asc(commentMedia.commentId), asc(commentMedia.order));
+
+  const map = new Map<string, ReturnType<typeof toMediaPublic>[]>();
+  for (const r of rows) {
+    const list = map.get(r.commentId) ?? [];
+    list.push(toMediaPublic(r.media));
+    map.set(r.commentId, list);
+  }
+  return map;
+}
+
 async function hydrateComments(rows: CommentRow[], viewerId: string): Promise<CommentPublic[]> {
   if (rows.length === 0) return [];
   const authorIds = [...new Set(rows.map((r) => r.authorId))];
   const commentIds = rows.map((r) => r.id);
-  const [authors, reactionMap] = await Promise.all([
+  const [authors, mediaMap, reactionMap] = await Promise.all([
     fetchAuthors(authorIds),
+    fetchMediaForComments(commentIds),
     fetchReactionSummaries('comment', commentIds, viewerId),
   ]);
   return rows.map((row) => ({
@@ -135,6 +155,7 @@ async function hydrateComments(rows: CommentRow[], viewerId: string): Promise<Co
     depth: row.depth,
     createdAt: row.createdAt.toISOString(),
     editedAt: row.editedAt?.toISOString() ?? null,
+    media: mediaMap.get(row.id) ?? [],
     reactions: reactionMap.get(row.id) ?? [],
   }));
 }
@@ -299,6 +320,17 @@ export async function createComment(
   const post = await getOwnPost(postId);
   if (!post) throw new NotFoundError('Príspevok nenájdený');
 
+  // Rovnaké pravidlo ako pri poste: prílohy musia existovať a patriť autorovi.
+  if (input.mediaIds.length > 0) {
+    const owned = await db
+      .select({ id: media.id })
+      .from(media)
+      .where(and(inArray(media.id, input.mediaIds), eq(media.ownerId, author.id)));
+    if (owned.length !== input.mediaIds.length) {
+      throw new ForbiddenError('Niektoré médiá neexistujú alebo nie sú tvoje');
+    }
+  }
+
   let depth = 0;
   if (input.parentCommentId) {
     const parentRows = await db
@@ -324,8 +356,15 @@ export async function createComment(
       depth,
     })
     .returning();
+  const comment = inserted[0]!;
 
-  const [hydrated] = await hydrateComments([inserted[0]!], viewerId);
+  if (input.mediaIds.length > 0) {
+    await db
+      .insert(commentMedia)
+      .values(input.mediaIds.map((mediaId, order) => ({ commentId: comment.id, mediaId, order })));
+  }
+
+  const [hydrated] = await hydrateComments([comment], viewerId);
   return hydrated!;
 }
 
