@@ -2,6 +2,7 @@ import { eq } from 'drizzle-orm';
 import type { MediaPublic } from '@rodinna/shared-types';
 import { db } from '../../core/db/client';
 import { media, type MediaRow } from '../../core/db/schema';
+import { enqueueJob } from '../../core/jobs/queue';
 import { sha256HexBytes } from '../auth/crypto';
 import { processImage, type ProcessOptions } from './processing';
 import { buildStoragePath, writeMedia } from './storage';
@@ -12,12 +13,15 @@ export function toMediaPublic(row: MediaRow): MediaPublic {
     id: row.id,
     url: `/api/media/${row.id}`,
     kind: row.kind,
-    mime: row.mime,
+    // Po transkóde sa servíruje normalizovaný H.264 MP4, nie originál.
+    mime: row.playbackPath ? 'video/mp4' : row.mime,
     bytes: row.bytes,
     width: row.width,
     height: row.height,
     blurhash: row.blurhash,
     fileName: row.fileName,
+    posterUrl: row.posterPath ? `/api/media/${row.id}/poster` : null,
+    processing: row.transcodeStatus === 'pending',
     createdAt: row.createdAt.toISOString(),
   };
 }
@@ -86,10 +90,16 @@ export async function createRawMedia(
       blurhash: null,
       fileName: info.fileName,
       sha256: sha256HexBytes(buf),
+      // Video sa normalizuje na pozadí (H.264 + poster) — viď media/worker.ts.
+      transcodeStatus: info.kind === 'video' ? 'pending' : null,
     })
     .returning();
 
-  return inserted[0]!;
+  const row = inserted[0]!;
+  if (info.kind === 'video') {
+    await enqueueJob('media.transcode', { mediaId: row.id });
+  }
+  return row;
 }
 
 export function getMediaById(id: string): Promise<MediaRow | undefined> {

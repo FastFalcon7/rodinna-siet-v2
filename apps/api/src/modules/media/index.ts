@@ -96,18 +96,39 @@ function parseRange(header: string, size: number): [number, number] | null {
 }
 
 /**
+ * GET /api/media/:id/poster — poster frame videa (JPEG z transkód jobu).
+ * Pred /:id, nech ho parameter route nezhltne.
+ */
+router.get('/:id/poster', requireAuth, async (c) => {
+  const row = await getMediaById(c.req.param('id'));
+  if (!row?.posterPath) return c.json({ error: 'Poster nenájdený' }, 404);
+  const file = readMedia(row.posterPath);
+  if (!(await file.exists())) return c.json({ error: 'Súbor chýba' }, 404);
+  c.header('Content-Type', 'image/jpeg');
+  c.header('X-Content-Type-Options', 'nosniff');
+  c.header('Cache-Control', 'private, max-age=31536000, immutable');
+  c.header('Content-Length', String(file.size));
+  return c.body(file.stream());
+});
+
+/**
  * GET /api/media/:id — streamuje súbor z disku (auth-gated, privátna sieť).
  * Podporuje Range requesty — iOS Safari bez nich odmietne prehrať <video>.
  * kind='file' sa servíruje ako attachment (žiadne inline HTML/SVG → XSS).
+ * Video s hotovým transkódom sa servíruje ako normalizovaný H.264 MP4
+ * (playbackPath) — originál ostáva na disku ako archív.
  */
 router.get('/:id', requireAuth, async (c) => {
   const row = await getMediaById(c.req.param('id'));
   if (!row) return c.json({ error: 'Médium nenájdené' }, 404);
 
-  const file = readMedia(row.storagePath);
+  const usePlayback = row.playbackPath !== null;
+  const file = readMedia(usePlayback ? row.playbackPath! : row.storagePath);
   if (!(await file.exists())) return c.json({ error: 'Súbor chýba' }, 404);
+  // Skutočná veľkosť z disku — playback súbor má inú veľkosť než originál v DB.
+  const size = file.size;
 
-  c.header('Content-Type', row.mime);
+  c.header('Content-Type', usePlayback ? 'video/mp4' : row.mime);
   c.header('Accept-Ranges', 'bytes');
   c.header('X-Content-Type-Options', 'nosniff');
   // Obsah je nemenný (nikdy neprepisujeme existujúce id) → dlhý cache.
@@ -120,18 +141,18 @@ router.get('/:id', requireAuth, async (c) => {
 
   const rangeHeader = c.req.header('range');
   if (rangeHeader) {
-    const range = parseRange(rangeHeader, row.bytes);
+    const range = parseRange(rangeHeader, size);
     if (!range) {
-      c.header('Content-Range', `bytes */${row.bytes}`);
+      c.header('Content-Range', `bytes */${size}`);
       return c.body(null, 416);
     }
     const [start, end] = range;
-    c.header('Content-Range', `bytes ${start}-${end}/${row.bytes}`);
+    c.header('Content-Range', `bytes ${start}-${end}/${size}`);
     c.header('Content-Length', String(end - start + 1));
     return c.body(file.slice(start, end + 1).stream(), 206);
   }
 
-  c.header('Content-Length', String(row.bytes));
+  c.header('Content-Length', String(size));
   return c.body(file.stream());
 });
 

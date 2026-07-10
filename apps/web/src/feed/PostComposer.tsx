@@ -6,24 +6,23 @@ import { Avatar } from '../shared/Avatar';
 import { AttachmentSheet } from '../shared/AttachmentSheet';
 import { UploadPreviews } from '../shared/UploadPreviews';
 import { useMediaUpload } from '../shared/useMediaUpload';
-import { PollComposerDialog } from '../polls/PollComposerDialog';
 
 interface PostComposerProps {
   onCreated: (post: PostPublic) => void;
-  /** Zavolá sa po vytvorení ankety do Feedu (M1) — feed si refetchne prvú stránku. */
-  onPollCreated?: () => void;
   /** 'card' = inline karta (desktop feed), 'sheet' = obsah compose sheetu (mobil FAB). */
   variant?: 'card' | 'sheet';
   autoFocus?: boolean;
 }
 
-/** Nový príspevok — text + prílohy (foto/video/súbor/poloha cez AttachmentSheet). */
-export function PostComposer({ onCreated, onPollCreated, variant = 'card', autoFocus = false }: PostComposerProps) {
+/**
+ * Nový príspevok — text + prílohy. Trigger je „+" ako v chate (ladenie
+ * 07/2026: jednotné menu príloh; chat má navyše Anketu/Piškvorky/Udalosť).
+ */
+export function PostComposer({ onCreated, variant = 'card', autoFocus = false }: PostComposerProps) {
   const { user } = useAuth();
   const [body, setBody] = useState('');
   const uploads = useMediaUpload(10);
   const [sheet, setSheet] = useState(false);
-  const [pollDialog, setPollDialog] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const taRef = useRef<HTMLTextAreaElement>(null);
@@ -74,9 +73,11 @@ export function PostComposer({ onCreated, onPollCreated, variant = 'card', autoF
             type="button"
             onClick={() => setSheet(true)}
             disabled={busy || uploads.items.length >= 10}
-            className="rounded-lg border border-neutral-300 px-3 py-1.5 text-sm transition hover:bg-neutral-100 disabled:opacity-40 dark:border-neutral-700 dark:hover:bg-neutral-800"
+            className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-2xl leading-none text-neutral-500 transition hover:bg-neutral-100 disabled:opacity-40 dark:hover:bg-neutral-800"
+            title="Pridať prílohu"
+            aria-label="Pridať prílohu"
           >
-            📎 Príloha
+            +
           </button>
           <button
             type="submit"
@@ -93,18 +94,7 @@ export function PostComposer({ onCreated, onPollCreated, variant = 'card', autoF
         <AttachmentSheet
           onFiles={uploads.addFiles}
           onLocation={insertLocation}
-          onPoll={onPollCreated ? () => setPollDialog(true) : undefined}
           onClose={() => setSheet(false)}
-        />
-      )}
-      {pollDialog && onPollCreated && (
-        <PollComposerDialog
-          toFeed
-          onCreated={() => {
-            setPollDialog(false);
-            onPollCreated();
-          }}
-          onClose={() => setPollDialog(false)}
         />
       )}
     </form>

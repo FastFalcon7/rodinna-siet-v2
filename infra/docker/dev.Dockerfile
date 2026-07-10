@@ -11,7 +11,7 @@ WORKDIR /app
 # ktoré Vite-ov bundlovaný http-proxy volá pri ukončení proxovanej odpovede — bez
 # reálneho Node-u to zhodí celý dev server (SIGILL) pri prvom requeste cez /api alebo
 # /ws. `api` ostáva na Bune (touto cestou kódu neprechádza).
-RUN apt-get update && apt-get install -y --no-install-recommends curl ca-certificates gnupg \
+RUN apt-get update && apt-get install -y --no-install-recommends curl ca-certificates gnupg ffmpeg \
   && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
   && apt-get install -y --no-install-recommends nodejs \
   && rm -rf /var/lib/apt/lists/*

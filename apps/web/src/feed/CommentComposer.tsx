@@ -57,10 +57,11 @@ export function CommentComposer({ placeholder, autoFocus, onSubmit }: CommentCom
           type="button"
           onClick={() => setSheet(true)}
           disabled={busy || uploads.items.length >= 4}
+          title="Pridať prílohu"
           aria-label="Pridať prílohu"
-          className="grid h-8 w-8 shrink-0 place-items-center self-center rounded-full text-neutral-500 transition hover:bg-neutral-100 disabled:opacity-40 dark:hover:bg-neutral-800"
+          className="grid h-8 w-8 shrink-0 place-items-center self-center rounded-full text-xl leading-none text-neutral-500 transition hover:bg-neutral-100 disabled:opacity-40 dark:hover:bg-neutral-800"
         >
-          📎
+          +
         </button>
         <button
           type="submit"

@@ -59,10 +59,6 @@ export function Feed() {
     setItems((prev) => [{ type: 'post', post }, ...(prev ?? [])]);
     setCompose(false);
   };
-  const onPollCreated = () => {
-    setCompose(false);
-    void loadFirst();
-  };
   const updatePost = (next: PostPublic) =>
     setItems((prev) =>
       prev?.map((it) => (it.type === 'post' && it.post.id === next.id ? { type: 'post', post: next } : it)) ?? null,
@@ -74,7 +70,7 @@ export function Feed() {
     <div>
       {/* Desktop: inline composer nad feedom. Mobil má FAB nižšie. */}
       <div className="hidden px-4 pt-4 md:block">
-        <PostComposer onCreated={prepend} onPollCreated={onPollCreated} />
+        <PostComposer onCreated={prepend} />
       </div>
 
       {error && <p className="px-4 py-3 text-sm text-red-600">{error}</p>}
@@ -127,7 +123,7 @@ export function Feed() {
             onClick={(e) => e.stopPropagation()}
           >
             <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-neutral-300 dark:bg-neutral-700" />
-            <PostComposer variant="sheet" autoFocus onCreated={prepend} onPollCreated={onPollCreated} />
+            <PostComposer variant="sheet" autoFocus onCreated={prepend} />
           </div>
         </div>
       )}

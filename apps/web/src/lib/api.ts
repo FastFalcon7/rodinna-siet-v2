@@ -57,6 +57,7 @@ import type {
   PostPublic,
   RegisterInput,
   ReactionSummary,
+  SetReactionResponse,
   RoomsListResponse,
   SendMessageInput,
   SetReactionInput,
@@ -182,7 +183,7 @@ export const feedApi = {
     }),
   deleteComment: (id: string) => request<void>(`/feed/comments/${id}`, { method: 'DELETE' }),
   setReaction: (input: SetReactionInput) =>
-    request<{ reactions: ReactionSummary[] }>('/feed/reactions', {
+    request<SetReactionResponse>('/feed/reactions', {
       method: 'PUT',
       body: JSON.stringify(input),
     }),

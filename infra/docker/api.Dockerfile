@@ -19,6 +19,9 @@ RUN bun install --frozen-lockfile --production || bun install --production
 FROM oven/bun:1.2 AS runtime
 WORKDIR /app
 ENV NODE_ENV=production
+# ffmpeg pre worker job media.transcode (video normalizácia na H.264 + poster).
+RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg \
+  && rm -rf /var/lib/apt/lists/*
 COPY --from=deps /app/node_modules ./node_modules
 COPY package.json tsconfig.base.json ./
 COPY packages ./packages

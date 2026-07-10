@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { CommentPublic } from '@rodinna/shared-types';
+import type { CommentPublic, ReactionSummary } from '@rodinna/shared-types';
 import { MAX_COMMENT_DEPTH } from '@rodinna/shared-types';
 import { feedApi } from '../lib/api';
 import { useAuth } from '../auth/AuthContext';
@@ -13,6 +13,8 @@ interface CommentThreadProps {
   postId: string;
   comments: CommentPublic[];
   onChange: (comments: CommentPublic[]) => void;
+  /** Reakcia na komentár mení aj agregované počítadlo pod hlavným postom. */
+  onPostReactions?: (reactions: ReactionSummary[]) => void;
 }
 
 function CommentNode({
@@ -21,12 +23,14 @@ function CommentNode({
   postId,
   comments,
   onChange,
+  onPostReactions,
 }: {
   comment: CommentPublic;
   childComments: CommentPublic[];
   postId: string;
   comments: CommentPublic[];
   onChange: (comments: CommentPublic[]) => void;
+  onPostReactions?: (reactions: ReactionSummary[]) => void;
 }) {
   const { user } = useAuth();
   const [replying, setReplying] = useState(false);
@@ -72,9 +76,11 @@ function CommentNode({
               targetType="comment"
               targetId={comment.id}
               reactions={comment.reactions}
-              onChange={(reactions) =>
-                onChange(comments.map((c) => (c.id === comment.id ? { ...c, reactions } : c)))
-              }
+              canReact={comment.author.id !== user.id}
+              onChange={(reactions, postReactions) => {
+                onChange(comments.map((c) => (c.id === comment.id ? { ...c, reactions } : c)));
+                onPostReactions?.(postReactions);
+              }}
             />
             {canReply && (
               <button type="button" onClick={() => setReplying((r) => !r)} className="text-xs text-neutral-500 hover:underline">
@@ -102,6 +108,7 @@ function CommentNode({
                   postId={postId}
                   comments={comments}
                   onChange={onChange}
+                  onPostReactions={onPostReactions}
                 />
               ))}
             </ul>
@@ -113,7 +120,7 @@ function CommentNode({
 }
 
 /** Vykreslí plochý zoznam komentárov ako strom (max hĺbka 3, depth 0-2). */
-export function CommentThread({ postId, comments, onChange }: CommentThreadProps) {
+export function CommentThread({ postId, comments, onChange, onPostReactions }: CommentThreadProps) {
   const roots = comments.filter((c) => c.parentCommentId === null);
   if (roots.length === 0) return null;
   return (
@@ -126,6 +133,7 @@ export function CommentThread({ postId, comments, onChange }: CommentThreadProps
           postId={postId}
           comments={comments}
           onChange={onChange}
+          onPostReactions={onPostReactions}
         />
       ))}
     </ul>

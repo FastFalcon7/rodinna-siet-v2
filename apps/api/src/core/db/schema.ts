@@ -96,6 +96,15 @@ export const media = pgTable(
     blurhash: text('blurhash'),
     fileName: text('file_name'),
     sha256: text('sha256').notNull(),
+    /**
+     * Video normalizácia (ladenie 07/2026): iPhone HEVC neprehrá PC bez HW
+     * dekodéra → worker job 'media.transcode' pripraví H.264/AAC MP4 +
+     * poster JPEG. `playbackPath` = súbor, ktorý sa reálne servíruje
+     * (null/failed → originál), status: pending → done | failed.
+     */
+    playbackPath: text('playback_path'),
+    posterPath: text('poster_path'),
+    transcodeStatus: text('transcode_status', { enum: ['pending', 'done', 'failed'] }),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index('media_owner_id_idx').on(t.ownerId)],

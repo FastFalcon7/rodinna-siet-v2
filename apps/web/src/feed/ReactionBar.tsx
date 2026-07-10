@@ -1,24 +1,28 @@
 import { useState } from 'react';
 import { ALLOWED_REACTION_EMOJIS, type ReactionSummary, type ReactionTargetType } from '@rodinna/shared-types';
-import { feedApi } from '../lib/api';
+import { ApiError, feedApi } from '../lib/api';
 
 interface ReactionBarProps {
   targetType: ReactionTargetType;
   targetId: string;
   reactions: ReactionSummary[];
-  onChange: (reactions: ReactionSummary[]) => void;
+  /** false = len počítadlá (vlastný obsah — naň sa nereaguje). */
+  canReact: boolean;
+  /** Nový súhrn cieľa + agregát vlákna postu (na počítadlo pod hlavným postom). */
+  onChange: (reactions: ReactionSummary[], postReactions: ReactionSummary[]) => void;
 }
 
 /**
- * Reakcie (ladenie 07/2026, bod 2): jeden užívateľ = jedna reakcia — nová
- * nahradí starú, rovnaká = zrušenie. UI je zjednotené do jednej palety:
- * žiadne samostatné srdiečko; chipy ukazujú súhrn, 😊+ otvorí paletu, kde
- * je moja aktuálna reakcia zvýraznená (takže výmena je viditeľná, nie
- * „záhadné zmiznutie" predošlej).
+ * Reakcie (ladenie 07/2026, bod 2): jeden užívateľ = jedna reakcia, na
+ * vlastný obsah sa nereaguje. Chipy sú ČISTÉ POČÍTADLÁ (ako bublina
+ * komentárov) — reaguje sa výhradne cez 😊+ paletu, kde je moja aktuálna
+ * reakcia zvýraznená (klik na ňu = zrušenie, iná = výmena). Pod hlavným
+ * príspevkom počítadlá agregujú reakcie celého vlákna.
  */
-export function ReactionBar({ targetType, targetId, reactions, onChange }: ReactionBarProps) {
+export function ReactionBar({ targetType, targetId, reactions, canReact, onChange }: ReactionBarProps) {
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const mine = reactions.find((r) => r.reactedByMe)?.emoji ?? null;
   // Chipy v stabilnom poradí palety, nech pri zmene reakcie neskáču.
@@ -30,9 +34,12 @@ export function ReactionBar({ targetType, targetId, reactions, onChange }: React
     if (busy) return;
     setBusy(true);
     setOpen(false);
+    setError(null);
     try {
-      const { reactions: next } = await feedApi.setReaction({ targetType, targetId, emoji: emoji as never });
-      onChange(next);
+      const res = await feedApi.setReaction({ targetType, targetId, emoji: emoji as never });
+      onChange(res.reactions, res.postReactions);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Reakcia zlyhala');
     } finally {
       setBusy(false);
     }
@@ -41,34 +48,34 @@ export function ReactionBar({ targetType, targetId, reactions, onChange }: React
   return (
     <div className="relative flex flex-wrap items-center gap-1.5">
       {chips.map((r) => (
-        <button
+        <span
           key={r.emoji}
-          type="button"
-          onClick={() => react(r.emoji)}
-          disabled={busy}
-          title={r.reactedByMe ? 'Zrušiť moju reakciu' : 'Reagovať rovnako (nahradí moju reakciu)'}
-          className={`rounded-full border px-2 py-0.5 text-xs transition ${
+          className={`rounded-full border px-2 py-0.5 text-xs ${
             r.reactedByMe
               ? 'border-accent bg-accent/10 text-accent'
-              : 'border-neutral-200 hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-800'
+              : 'border-neutral-200 text-neutral-600 dark:border-neutral-700 dark:text-neutral-300'
           }`}
         >
           {r.emoji} {r.count}
-        </button>
+        </span>
       ))}
 
-      <button
-        type="button"
-        onClick={() => setOpen((o) => !o)}
-        disabled={busy}
-        className={`grid min-h-8 place-items-center rounded-full px-2 text-sm transition hover:bg-neutral-100 dark:hover:bg-neutral-800 ${
-          mine ? 'text-accent' : 'text-neutral-500'
-        }`}
-        title="Pridať / zmeniť reakciu (jedna na osobu)"
-        aria-label="Pridať reakciu"
-      >
-        <SmileyPlusIcon />
-      </button>
+      {canReact && (
+        <button
+          type="button"
+          onClick={() => setOpen((o) => !o)}
+          disabled={busy}
+          className={`grid min-h-8 place-items-center rounded-full px-2 text-sm transition hover:bg-neutral-100 dark:hover:bg-neutral-800 ${
+            mine ? 'text-accent' : 'text-neutral-500'
+          }`}
+          title="Pridať / zmeniť reakciu (jedna na osobu)"
+          aria-label="Pridať reakciu"
+        >
+          <SmileyPlusIcon />
+        </button>
+      )}
+
+      {error && <span className="text-xs text-red-600">{error}</span>}
 
       {open && (
         <>

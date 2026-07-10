@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { CommentPublic, PostPublic } from '@rodinna/shared-types';
-import { feedApi } from '../lib/api';
+import { ApiError, feedApi } from '../lib/api';
 import { useAuth } from '../auth/AuthContext';
 import { Avatar } from '../shared/Avatar';
 import { MediaItem } from '../shared/MediaItem';
@@ -29,9 +29,14 @@ export function PostCard({ post, onChange, onDeleted }: PostCardProps) {
   const [comments, setComments] = useState<CommentPublic[] | null>(null);
   const [commentsOpen, setCommentsOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [editText, setEditText] = useState('');
+  const [editBusy, setEditBusy] = useState(false);
+  const [editError, setEditError] = useState<string | null>(null);
   if (!user) return null;
 
-  const canManage = post.author.id === user.id || user.role === 'admin';
+  const isAuthor = post.author.id === user.id;
+  const canManage = isAuthor || user.role === 'admin';
 
   const loadComments = async () => {
     setCommentsOpen((open) => !open);
@@ -52,6 +57,29 @@ export function PostCard({ post, onChange, onDeleted }: PostCardProps) {
     if (!confirm('Zmazať tento príspevok?')) return;
     await feedApi.deletePost(post.id);
     onDeleted(post.id);
+  };
+
+  const startEdit = () => {
+    setMenuOpen(false);
+    setEditText(post.bodyMd);
+    setEditError(null);
+    setEditing(true);
+  };
+
+  const saveEdit = async () => {
+    const trimmed = editText.trim();
+    if (!trimmed || editBusy) return;
+    setEditBusy(true);
+    setEditError(null);
+    try {
+      const updated = await feedApi.updatePost(post.id, { bodyMd: trimmed });
+      onChange(updated);
+      setEditing(false);
+    } catch (err) {
+      setEditError(err instanceof ApiError ? err.message : 'Úprava sa nepodarila');
+    } finally {
+      setEditBusy(false);
+    }
   };
 
   // Obrázky do mriežky, video a súbory pod nimi na plnú šírku.
@@ -91,6 +119,15 @@ export function PostCard({ post, onChange, onDeleted }: PostCardProps) {
                   <>
                     <div className="fixed inset-0 z-10" onClick={() => setMenuOpen(false)} />
                     <div className="absolute right-0 top-full z-20 mt-1 w-40 overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-lg dark:border-neutral-700 dark:bg-neutral-900">
+                      {isAuthor && (
+                        <button
+                          type="button"
+                          onClick={startEdit}
+                          className="w-full px-3 py-2 text-left text-sm transition hover:bg-neutral-100 dark:hover:bg-neutral-800"
+                        >
+                          ✏️ Upraviť
+                        </button>
+                      )}
                       <button
                         type="button"
                         onClick={remove}
@@ -105,12 +142,43 @@ export function PostCard({ post, onChange, onDeleted }: PostCardProps) {
             )}
           </div>
 
-          {bodyText && (
-            <RichBody
-              text={bodyText}
-              className="mt-1 whitespace-pre-wrap text-[15px] leading-[1.55] [overflow-wrap:anywhere]"
-              linkClassName="text-accent underline decoration-1 underline-offset-2 hover:opacity-80"
-            />
+          {editing ? (
+            <div className="mt-1 space-y-2">
+              <textarea
+                value={editText}
+                onChange={(e) => setEditText(e.target.value)}
+                maxLength={4000}
+                rows={3}
+                autoFocus
+                className="w-full resize-none rounded-lg border border-neutral-300 bg-transparent px-3 py-2 text-[15px] outline-none focus:border-accent dark:border-neutral-700"
+              />
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => void saveEdit()}
+                  disabled={editBusy || !editText.trim()}
+                  className="rounded-lg bg-accent px-3 py-1.5 text-sm font-medium text-white disabled:opacity-40"
+                >
+                  Uložiť
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setEditing(false)}
+                  className="rounded-lg px-3 py-1.5 text-sm text-neutral-500 hover:bg-neutral-100 dark:hover:bg-neutral-800"
+                >
+                  Zrušiť
+                </button>
+              </div>
+              {editError && <p className="text-sm text-red-600">{editError}</p>}
+            </div>
+          ) : (
+            bodyText && (
+              <RichBody
+                text={bodyText}
+                className="mt-1 whitespace-pre-wrap text-[15px] leading-[1.55] [overflow-wrap:anywhere]"
+                linkClassName="text-accent underline decoration-1 underline-offset-2 hover:opacity-80"
+              />
+            )
           )}
 
           {appLink && (
@@ -148,6 +216,7 @@ export function PostCard({ post, onChange, onDeleted }: PostCardProps) {
               targetType="post"
               targetId={post.id}
               reactions={post.reactions}
+              canReact={!isAuthor}
               onChange={(reactions) => onChange({ ...post, reactions })}
             />
           </div>
@@ -163,6 +232,7 @@ export function PostCard({ post, onChange, onDeleted }: PostCardProps) {
                     setComments(next);
                     onChange({ ...post, commentCount: next.length });
                   }}
+                  onPostReactions={(reactions) => onChange({ ...post, reactions })}
                 />
               )}
               <div className="mt-3 flex gap-2">
