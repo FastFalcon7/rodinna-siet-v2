@@ -1,7 +1,15 @@
 <!doctype html>
-<html lang="sk" data-theme="light">
+<html lang="sk">
   <head>
     <meta charset="UTF-8" />
+    <!-- Nočný režim pred prvým paint-om (žiadny flash) — voľba v časti Viac. -->
+    <script>
+      try {
+        var m = localStorage.getItem('rs-theme');
+        var dark = m === 'dark' || (m !== 'light' && matchMedia('(prefers-color-scheme: dark)').matches);
+        document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+      } catch (e) {}
+    </script>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="theme-color" content="#ffffff" />
     <!-- PWA/manifest: potrebné pre Add-to-Home-Screen; iOS ≥16.4 vyžaduje
