@@ -2,9 +2,12 @@ import { app, modules } from './core/rpc/app';
 import { env, isDev } from './config/env';
 import { runMigrations } from './core/db/migrate';
 import { chatWebSocket, handleChatUpgrade, setServer } from './modules/chat/realtime';
+import { initMediaUrlTokens } from './modules/media/urlToken';
 
 // Pred štartom servera aplikuj čakajúce migrácie (idempotentné).
 await runMigrations();
+// HMAC kľúč pre media URL tokeny (iOS video) — musí byť pred prvým requestom.
+await initMediaUrlTokens();
 
 const server = Bun.serve({
   port: env.API_PORT,

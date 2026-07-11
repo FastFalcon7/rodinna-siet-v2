@@ -1,6 +1,5 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { ApiError } from '../lib/api';
-import { AttachmentSheet } from '../shared/AttachmentSheet';
 import { UploadPreviews } from '../shared/UploadPreviews';
 import { useMediaUpload } from '../shared/useMediaUpload';
 
@@ -12,16 +11,16 @@ interface CommentComposerProps {
 }
 
 /**
- * Composer komentára/odpovede s prílohami (ladenie 07/2026, bod 3):
- * text + 📎 (foto/video/súbor cez AttachmentSheet, max 4). Spoločný pre
- * root komentár v PostCard aj odpovede v CommentThread.
+ * Composer komentára/odpovede s prílohami (ladenie 07/2026, bod 3): text +
+ * „+" ktoré otvára PRIAMO natívny výber súboru (max 4 prílohy). Spoločný
+ * pre root komentár v PostCard aj odpovede v CommentThread.
  */
 export function CommentComposer({ placeholder, autoFocus, onSubmit }: CommentComposerProps) {
   const [text, setText] = useState('');
   const uploads = useMediaUpload(4);
-  const [sheet, setSheet] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -55,7 +54,7 @@ export function CommentComposer({ placeholder, autoFocus, onSubmit }: CommentCom
         />
         <button
           type="button"
-          onClick={() => setSheet(true)}
+          onClick={() => fileRef.current?.click()}
           disabled={busy || uploads.items.length >= 4}
           title="Pridať prílohu"
           aria-label="Pridať prílohu"
@@ -63,6 +62,17 @@ export function CommentComposer({ placeholder, autoFocus, onSubmit }: CommentCom
         >
           +
         </button>
+        <input
+          ref={fileRef}
+          type="file"
+          multiple
+          hidden
+          onChange={(e) => {
+            const files = Array.from(e.target.files ?? []);
+            e.target.value = '';
+            if (files.length > 0) uploads.addFiles(files);
+          }}
+        />
         <button
           type="submit"
           disabled={busy || uploads.uploading || (!text.trim() && uploads.mediaIds.length === 0)}
@@ -72,7 +82,6 @@ export function CommentComposer({ placeholder, autoFocus, onSubmit }: CommentCom
         </button>
       </form>
       {error && <p className="text-sm text-red-600">{error}</p>}
-      {sheet && <AttachmentSheet onFiles={uploads.addFiles} onClose={() => setSheet(false)} />}
     </div>
   );
 }

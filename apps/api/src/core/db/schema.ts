@@ -18,6 +18,17 @@ import {
  * Ďalšie moduly (posts, messages, media…) pridajú vlastné tabuľky v svojich týždňoch.
  */
 
+/**
+ * Interné tajomstvá appky generované pri prvom boote (žiadny nový env var).
+ * Prvý konzument: 'media_url' — HMAC kľúč pre tokeny v media URL (iOS
+ * AVPlayer neposiela cookies pri prehrávaní videa, ladenie 07/2026).
+ */
+export const appSecrets = pgTable('app_secrets', {
+  name: text('name').primaryKey(),
+  value: text('value').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
 export const roleEnumValues = ['admin', 'member'] as const;
 
 export const users = pgTable('users', {

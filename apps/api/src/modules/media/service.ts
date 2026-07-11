@@ -6,12 +6,16 @@ import { enqueueJob } from '../../core/jobs/queue';
 import { sha256HexBytes } from '../auth/crypto';
 import { processImage, type ProcessOptions } from './processing';
 import { buildStoragePath, writeMedia } from './storage';
+import { mediaUrlToken } from './urlToken';
 
 /** DB záznam → verejný tvar (url smeruje na serve endpoint). */
 export function toMediaPublic(row: MediaRow): MediaPublic {
+  // Token v URL: iOS AVPlayer neposiela cookies pri <video> — viď urlToken.ts.
+  const mt = mediaUrlToken(row.id);
+  const q = mt ? `?mt=${mt}` : '';
   return {
     id: row.id,
-    url: `/api/media/${row.id}`,
+    url: `/api/media/${row.id}${q}`,
     kind: row.kind,
     // Po transkóde sa servíruje normalizovaný H.264 MP4, nie originál.
     mime: row.playbackPath ? 'video/mp4' : row.mime,
@@ -20,7 +24,7 @@ export function toMediaPublic(row: MediaRow): MediaPublic {
     height: row.height,
     blurhash: row.blurhash,
     fileName: row.fileName,
-    posterUrl: row.posterPath ? `/api/media/${row.id}/poster` : null,
+    posterUrl: row.posterPath ? `/api/media/${row.id}/poster${q}` : null,
     processing: row.transcodeStatus === 'pending',
     createdAt: row.createdAt.toISOString(),
   };

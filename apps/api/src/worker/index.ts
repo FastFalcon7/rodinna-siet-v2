@@ -10,6 +10,7 @@ import { ensureGamesJob, registerGamesJobs } from '../modules/games/worker';
 import { ensureNewsJob, registerNewsJobs } from '../modules/news/worker';
 import { registerQuizJobs } from '../modules/quiz/worker';
 import { ensureTranscodeBackfill, registerMediaJobs } from '../modules/media/worker';
+import { initMediaUrlTokens } from '../modules/media/urlToken';
 
 /**
  * Worker proces (§6, M0) — spracúva pg_jobs queue mimo API procesu, nech
@@ -97,6 +98,7 @@ if (import.meta.main) {
   registerQuizJobs(registerJobHandler);
   registerMediaJobs(registerJobHandler);
   await waitForSchema();
+  await initMediaUrlTokens();
   await ensureTranscodeBackfill();
   await ensureMemoriesJob();
   await ensureBirthdaysJob();

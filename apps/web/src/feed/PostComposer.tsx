@@ -3,7 +3,6 @@ import type { PostPublic } from '@rodinna/shared-types';
 import { ApiError, feedApi } from '../lib/api';
 import { useAuth } from '../auth/AuthContext';
 import { Avatar } from '../shared/Avatar';
-import { AttachmentSheet } from '../shared/AttachmentSheet';
 import { UploadPreviews } from '../shared/UploadPreviews';
 import { useMediaUpload } from '../shared/useMediaUpload';
 
@@ -15,24 +14,20 @@ interface PostComposerProps {
 }
 
 /**
- * Nový príspevok — text + prílohy. Trigger je „+" ako v chate (ladenie
- * 07/2026: jednotné menu príloh; chat má navyše Anketu/Piškvorky/Udalosť).
+ * Nový príspevok — text + prílohy. „+" otvára PRIAMO natívny výber súboru
+ * (ladenie 07/2026: na iOS je to systémové menu Knihovna fotek / Pořídit
+ * snímek / Vybrat soubory — žiadne vlastné medzimenu navyše).
  */
 export function PostComposer({ onCreated, variant = 'card', autoFocus = false }: PostComposerProps) {
   const { user } = useAuth();
   const [body, setBody] = useState('');
   const uploads = useMediaUpload(10);
-  const [sheet, setSheet] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const taRef = useRef<HTMLTextAreaElement>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
 
   if (!user) return null;
-
-  const insertLocation = (locText: string) => {
-    setBody((cur) => (cur.trim() ? `${cur}\n${locText}` : locText));
-    taRef.current?.focus();
-  };
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -71,7 +66,7 @@ export function PostComposer({ onCreated, variant = 'card', autoFocus = false }:
         <div className="flex items-center gap-3">
           <button
             type="button"
-            onClick={() => setSheet(true)}
+            onClick={() => fileRef.current?.click()}
             disabled={busy || uploads.items.length >= 10}
             className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-2xl leading-none text-neutral-500 transition hover:bg-neutral-100 disabled:opacity-40 dark:hover:bg-neutral-800"
             title="Pridať prílohu"
@@ -79,6 +74,17 @@ export function PostComposer({ onCreated, variant = 'card', autoFocus = false }:
           >
             +
           </button>
+          <input
+            ref={fileRef}
+            type="file"
+            multiple
+            hidden
+            onChange={(e) => {
+              const files = Array.from(e.target.files ?? []);
+              e.target.value = '';
+              if (files.length > 0) uploads.addFiles(files);
+            }}
+          />
           <button
             type="submit"
             disabled={busy || uploads.uploading || (!body.trim() && uploads.mediaIds.length === 0)}
@@ -89,14 +95,6 @@ export function PostComposer({ onCreated, variant = 'card', autoFocus = false }:
         </div>
         {error && <p className="text-sm text-red-600">{error}</p>}
       </div>
-
-      {sheet && (
-        <AttachmentSheet
-          onFiles={uploads.addFiles}
-          onLocation={insertLocation}
-          onClose={() => setSheet(false)}
-        />
-      )}
     </form>
   );
 

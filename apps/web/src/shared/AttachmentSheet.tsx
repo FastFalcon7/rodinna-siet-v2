@@ -14,8 +14,10 @@ interface AttachmentSheetProps {
 }
 
 /**
- * Bottom sheet výberu prílohy (DESIGN_REVIEW_FEED_CHAT.md §4.2):
- * fotoaparát / galéria (foto + video) / súbor / poloha.
+ * Bottom sheet výberu prílohy (chat). Ladenie 07/2026: jedna dlaždica
+ * „Príloha" otvára PRIAMO natívny výber (na iOS systémové menu Knihovna
+ * fotek / Pořídit snímek / Vybrat soubory) — žiadne tri duplicitné ikony.
+ * Zvyšok sú akcie modulov: Poloha, Anketa, Piškvorky, Udalosť.
  */
 export function AttachmentSheet({
   onFiles,
@@ -25,8 +27,6 @@ export function AttachmentSheet({
   onEvent,
   onClose,
 }: AttachmentSheetProps) {
-  const cameraRef = useRef<HTMLInputElement>(null);
-  const galleryRef = useRef<HTMLInputElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const [locating, setLocating] = useState(false);
   const [locError, setLocError] = useState<string | null>(null);
@@ -63,9 +63,7 @@ export function AttachmentSheet({
   };
 
   const tiles: { icon: string; label: string; onClick: () => void; disabled?: boolean }[] = [
-    { icon: '📷', label: 'Fotoaparát', onClick: () => cameraRef.current?.click() },
-    { icon: '🖼️', label: 'Foto a video', onClick: () => galleryRef.current?.click() },
-    { icon: '📄', label: 'Súbor', onClick: () => fileRef.current?.click() },
+    { icon: '📎', label: 'Príloha', onClick: () => fileRef.current?.click() },
     ...(onLocation
       ? [{ icon: '📍', label: locating ? 'Zisťujem…' : 'Poloha', onClick: shareLocation, disabled: locating }]
       : []),
@@ -133,8 +131,6 @@ export function AttachmentSheet({
         </div>
         {locError && <p className="mt-2 text-center text-xs text-red-500">{locError}</p>}
 
-        <input ref={cameraRef} type="file" accept="image/*" capture="environment" hidden onChange={pick} />
-        <input ref={galleryRef} type="file" accept="image/*,video/*" multiple hidden onChange={pick} />
         <input ref={fileRef} type="file" multiple hidden onChange={pick} />
       </div>
     </div>

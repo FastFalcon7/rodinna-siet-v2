@@ -99,7 +99,13 @@ function SuggestionBanner({
   const create = async () => {
     setBusy(true);
     try {
-      const album = await albumsApi.create({ title: `Výlet ${dateText}`, mediaIds: suggestion.mediaIds });
+      // Názov = len dátum dd.mm.rr (ladenie 07/2026) — premenovať sa dá v detaile.
+      const title = new Date(`${suggestion.date}T12:00:00Z`).toLocaleDateString('sk-SK', {
+        day: '2-digit',
+        month: '2-digit',
+        year: '2-digit',
+      });
+      const album = await albumsApi.create({ title, mediaIds: suggestion.mediaIds });
       onCreated(album.id);
     } finally {
       setBusy(false);
@@ -193,6 +199,8 @@ function AlbumDetailView({ albumId, onBack }: { albumId: string; onBack: () => v
   const [error, setError] = useState<string | null>(null);
   const [lightbox, setLightbox] = useState<number | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [renaming, setRenaming] = useState(false);
+  const [newTitle, setNewTitle] = useState('');
   const fileRef = useRef<HTMLInputElement>(null);
 
   const load = () =>
@@ -238,6 +246,20 @@ function AlbumDetailView({ albumId, onBack }: { albumId: string; onBack: () => v
 
   const isOwner = album && user ? album.createdBy.id === user.id || user.role === 'admin' : false;
 
+  const saveTitle = async () => {
+    const title = newTitle.trim();
+    if (!title || title === album?.title) {
+      setRenaming(false);
+      return;
+    }
+    try {
+      setAlbum(await albumsApi.update(albumId, { title }));
+      setRenaming(false);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Premenovanie zlyhalo');
+    }
+  };
+
   if (error) {
     return (
       <div className="px-4 py-4">
@@ -255,7 +277,45 @@ function AlbumDetailView({ albumId, onBack }: { albumId: string; onBack: () => v
           ←
         </button>
         <div className="min-w-0 flex-1">
-          <h2 className="truncate font-semibold">{album.title}</h2>
+          {renaming ? (
+            <div className="flex gap-2">
+              <input
+                value={newTitle}
+                onChange={(e) => setNewTitle(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') void saveTitle();
+                  if (e.key === 'Escape') setRenaming(false);
+                }}
+                autoFocus
+                maxLength={120}
+                className="min-w-0 flex-1 rounded-lg border border-neutral-300 bg-transparent px-2 py-1 text-sm font-semibold outline-none focus:border-accent dark:border-neutral-700"
+              />
+              <button
+                onClick={() => void saveTitle()}
+                disabled={!newTitle.trim()}
+                className="shrink-0 rounded-lg bg-accent px-2.5 py-1 text-sm font-medium text-white disabled:opacity-40"
+              >
+                Uložiť
+              </button>
+            </div>
+          ) : (
+            <h2 className="flex min-w-0 items-center gap-1.5 font-semibold">
+              <span className="truncate">{album.title}</span>
+              {isOwner && (
+                <button
+                  onClick={() => {
+                    setNewTitle(album.title);
+                    setRenaming(true);
+                  }}
+                  aria-label="Premenovať album"
+                  title="Premenovať album"
+                  className="shrink-0 rounded-full px-1 text-sm text-neutral-400 transition hover:text-neutral-600 dark:hover:text-neutral-200"
+                >
+                  ✏️
+                </button>
+              )}
+            </h2>
+          )}
           <p className="text-xs text-neutral-500">
             {album.photoCount} fotiek · založil {album.createdBy.displayName}
           </p>

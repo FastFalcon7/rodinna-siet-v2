@@ -19,6 +19,7 @@ import { chatWebSocket, handleChatUpgrade, setServer } from '../src/modules/chat
 import { startWsBridge } from '../src/core/events';
 import { writeMedia } from '../src/modules/media/storage';
 import { transcodeVideo } from '../src/modules/media/worker';
+import { initMediaUrlTokens } from '../src/modules/media/urlToken';
 
 const PORT = 31991;
 const BASE = `http://127.0.0.1:${PORT}`;
@@ -88,6 +89,7 @@ async function seedImage(ownerId: string): Promise<string> {
 
 async function main() {
   await runMigrations();
+  await initMediaUrlTokens();
   await db.execute(
     dsql`truncate table comment_media, memory_marks, album_photos, albums, poll_votes, poll_options, polls, feed_cards, jobs, push_subs, notifications, reactions, message_media, messages, room_members, chat_rooms, post_media, comments, posts, media, sessions, users restart identity cascade`,
   );
@@ -225,6 +227,15 @@ async function main() {
   );
   mr = await fetch(`${BASE}/api/media/${uploaded.id}/poster`, { headers: { cookie: `rs_session=${bob.token}` } });
   check('poster → 200 image/jpeg', mr.status === 200 && mr.headers.get('content-type') === 'image/jpeg', mr.status);
+
+  // iOS AVPlayer neposiela cookies → media URL nesie ?mt= token (urlToken.ts).
+  check('media url nesie ?mt= token', /\?mt=[0-9a-f]{32}$/.test(uploaded.url), uploaded.url);
+  mr = await fetch(`${BASE}${uploaded.url}`);
+  check('video bez cookie s tokenom → 200 (iOS)', mr.status === 200, mr.status);
+  mr = await fetch(`${BASE}/api/media/${uploaded.id}`);
+  check('bez cookie a bez tokenu → 401', mr.status === 401, mr.status);
+  mr = await fetch(`${BASE}/api/media/${uploaded.id}?mt=${'0'.repeat(32)}`);
+  check('nesprávny token → 401', mr.status === 401, mr.status);
 
   console.log('\n— Mazanie —');
   r = await http(bob.token, 'DELETE', `/api/feed/${postId}`);

@@ -40,6 +40,7 @@ export function Conversation({ room, meId, onBack }: ConversationProps) {
   const [editing, setEditing] = useState<MessagePublic | null>(null);
 
   const scrollRef = useRef<HTMLDivElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
   const nearBottom = useRef(true);
   const prevHeight = useRef(0);
 
@@ -130,6 +131,22 @@ export function Conversation({ room, meId, onBack }: ConversationProps) {
     }
   }, [messages, loading, loadingMore]);
 
+  // Fotky/videá sa donačítajú až PO prvom scrolle a obsah narastie — držme
+  // pohľad prilepený na poslednej správe, kým je užívateľ pri spodku
+  // (ladenie 07/2026: „po otvorení chatu nech sa zobrazí posledná správa").
+  useEffect(() => {
+    const el = scrollRef.current;
+    const content = contentRef.current;
+    if (!el || !content) return;
+    // Pri načítavaní starších je užívateľ pri vrchu → nearBottom=false, guard netreba.
+    const ro = new ResizeObserver(() => {
+      if (nearBottom.current) el.scrollTop = el.scrollHeight;
+    });
+    ro.observe(content);
+    return () => ro.disconnect();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [room.id, loading]);
+
   const onScroll = () => {
     const el = scrollRef.current;
     if (!el) return;
@@ -192,11 +209,12 @@ export function Conversation({ room, meId, onBack }: ConversationProps) {
 
       {/* Správy */}
       <div ref={scrollRef} onScroll={onScroll} className="flex-1 overflow-y-auto px-3 py-3">
+        <div ref={contentRef} className="min-h-full">
         {loadingMore && <p className="py-1 text-center text-xs text-neutral-400">Načítavam staršie…</p>}
         {loading ? (
           <p className="py-10 text-center text-sm text-neutral-400">Načítavam…</p>
         ) : messages.length === 0 ? (
-          <div className="grid h-full place-items-center text-center text-sm text-neutral-400">
+          <div className="grid min-h-[60vh] place-items-center text-center text-sm text-neutral-400">
             <div>
               <div className="mb-2 text-4xl">💬</div>
               Zatiaľ žiadne správy.<br />Napíš prvú!
@@ -243,6 +261,7 @@ export function Conversation({ room, meId, onBack }: ConversationProps) {
             </span>
           </div>
         )}
+        </div>
       </div>
 
       <MessageComposer

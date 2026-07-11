@@ -1,4 +1,4 @@
-import { Hono, type Context } from 'hono';
+import { Hono, type Context, type MiddlewareHandler } from 'hono';
 import type { AppEnv } from '../../core/types';
 import type { AppModule } from '../../core/module';
 import { env } from '../../config/env';
@@ -7,6 +7,7 @@ import { rateLimit } from '../auth/ratelimit';
 import { detectUpload, UnsupportedMediaError } from './processing';
 import { createImageMedia, createRawMedia, getMediaById, toMediaPublic } from './service';
 import { readMedia } from './storage';
+import { verifyMediaUrlToken } from './urlToken';
 
 const router = new Hono<AppEnv>();
 
@@ -96,10 +97,21 @@ function parseRange(header: string, size: number): [number, number] | null {
 }
 
 /**
+ * Prístup k médiu: session cookie ALEBO `?mt=` token z media URL.
+ * Token je nutný pre iOS — AVPlayer pri prehrávaní <video> cookies neposiela.
+ */
+const requireAuthOrMediaToken: MiddlewareHandler<AppEnv> = async (c, next) => {
+  if (c.get('user')) return next();
+  const id = c.req.param('id');
+  if (id && verifyMediaUrlToken(id, c.req.query('mt'))) return next();
+  return c.json({ error: 'Neautorizované' }, 401);
+};
+
+/**
  * GET /api/media/:id/poster — poster frame videa (JPEG z transkód jobu).
  * Pred /:id, nech ho parameter route nezhltne.
  */
-router.get('/:id/poster', requireAuth, async (c) => {
+router.get('/:id/poster', requireAuthOrMediaToken, async (c) => {
   const row = await getMediaById(c.req.param('id'));
   if (!row?.posterPath) return c.json({ error: 'Poster nenájdený' }, 404);
   const file = readMedia(row.posterPath);
@@ -118,7 +130,7 @@ router.get('/:id/poster', requireAuth, async (c) => {
  * Video s hotovým transkódom sa servíruje ako normalizovaný H.264 MP4
  * (playbackPath) — originál ostáva na disku ako archív.
  */
-router.get('/:id', requireAuth, async (c) => {
+router.get('/:id', requireAuthOrMediaToken, async (c) => {
   const row = await getMediaById(c.req.param('id'));
   if (!row) return c.json({ error: 'Médium nenájdené' }, 404);
 

@@ -134,6 +134,13 @@
       "when": 1783712634289,
       "tag": "0018_fuzzy_taskmaster",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1783744327998,
+      "tag": "0019_glorious_giant_girl",
+      "breakpoints": true
     }
   ]
 }
