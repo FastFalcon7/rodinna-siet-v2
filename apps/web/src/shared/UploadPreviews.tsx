@@ -1,17 +1,25 @@
 import type { UploadItem } from './useMediaUpload';
 
-/** Náhľady príloh v composeri: thumb / video / file chip + progress overlay. */
+/**
+ * Náhľady príloh v composeri: thumb / video / file chip + progress overlay.
+ * Pri viacerých prílohách je prvá fotka „Úvodná" (zobrazí sa ako obálka
+ * príspevku) — ★ na inej fotke ju presunie na začiatok (ladenie 07/2026).
+ */
 export function UploadPreviews({
   items,
   onRemove,
+  onMakeCover,
 }: {
   items: UploadItem[];
   onRemove: (key: string) => void;
+  /** Ak je zadané, umožní vybrať úvodnú fotku (presun na začiatok). */
+  onMakeCover?: (key: string) => void;
 }) {
   if (items.length === 0) return null;
+  const withCover = !!onMakeCover && items.length > 1;
   return (
     <div className="flex flex-wrap gap-2">
-      {items.map((item) => (
+      {items.map((item, index) => (
         <div key={item.key} className="relative">
           {item.previewKind === 'image' && item.localUrl ? (
             <img src={item.localUrl} alt="" className="h-16 w-16 rounded-lg object-cover" />
@@ -22,6 +30,23 @@ export function UploadPreviews({
               <span className="text-lg">📄</span>
               <span className="w-full truncate text-center text-[10px] text-neutral-500">{item.name}</span>
             </div>
+          )}
+
+          {withCover && index === 0 && (
+            <span className="absolute bottom-0 left-0 rounded-tr-lg rounded-bl-lg bg-black/65 px-1.5 py-0.5 text-[9px] font-semibold text-white">
+              Úvodná
+            </span>
+          )}
+          {withCover && index > 0 && item.previewKind === 'image' && (
+            <button
+              type="button"
+              onClick={() => onMakeCover(item.key)}
+              title="Nastaviť ako úvodnú fotku"
+              aria-label="Nastaviť ako úvodnú fotku"
+              className="absolute bottom-0 left-0 rounded-tr-lg rounded-bl-lg bg-black/65 px-1.5 py-0.5 text-[10px] text-white transition hover:bg-black/80"
+            >
+              ★
+            </button>
           )}
 
           {!item.media && !item.error && (

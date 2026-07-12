@@ -42,7 +42,7 @@ export function CommentComposer({ placeholder, autoFocus, onSubmit }: CommentCom
 
   return (
     <div className="min-w-0 flex-1 space-y-2">
-      <UploadPreviews items={uploads.items} onRemove={uploads.remove} />
+      <UploadPreviews items={uploads.items} onRemove={uploads.remove} onMakeCover={uploads.makeFirst} />
       <form onSubmit={submit} className="flex gap-2">
         <input
           value={text}

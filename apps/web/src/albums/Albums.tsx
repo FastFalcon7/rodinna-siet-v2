@@ -3,6 +3,8 @@ import type { AlbumDetail, AlbumSuggestion, AlbumSummary } from '@rodinna/shared
 import { ApiError, albumsApi, mediaApi } from '../lib/api';
 import { useAuth } from '../auth/AuthContext';
 import { consumePendingNav } from '../app/navigate';
+import { useSwipeBack } from '../shared/useSwipeBack';
+import { AlbumPickerDialog } from './AlbumPickerDialog';
 
 /**
  * Modul Albumy (M2): zoznam albumov + Zberač banner, detail s fotkami,
@@ -201,7 +203,15 @@ function AlbumDetailView({ albumId, onBack }: { albumId: string; onBack: () => v
   const [uploading, setUploading] = useState(false);
   const [renaming, setRenaming] = useState(false);
   const [newTitle, setNewTitle] = useState('');
+  // Hromadný výber fotiek (ladenie 07/2026): kopírovanie do albumu / odstránenie.
+  const [selecting, setSelecting] = useState(false);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [bulkBusy, setBulkBusy] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  // Swipe doprava = späť na zoznam albumov; lightbox si gestá rieši sám.
+  const swipeBack = useSwipeBack(onBack);
+  const lightboxTouch = useRef<{ x: number; y: number } | null>(null);
 
   const load = () =>
     albumsApi
@@ -244,6 +254,33 @@ function AlbumDetailView({ albumId, onBack }: { albumId: string; onBack: () => v
     onBack();
   };
 
+  const toggleSelected = (mediaId: string) =>
+    setSelected((cur) => {
+      const next = new Set(cur);
+      if (next.has(mediaId)) next.delete(mediaId);
+      else next.add(mediaId);
+      return next;
+    });
+
+  const exitSelecting = () => {
+    setSelecting(false);
+    setSelected(new Set());
+  };
+
+  const bulkRemove = async () => {
+    if (selected.size === 0 || bulkBusy) return;
+    if (!confirm(`Odstrániť ${selected.size} fotiek z albumu? (Zo systému nezmiznú.)`)) return;
+    setBulkBusy(true);
+    let failed = 0;
+    for (const id of selected) {
+      await albumsApi.removePhoto(albumId, id).catch(() => failed++);
+    }
+    setBulkBusy(false);
+    exitSelecting();
+    void load();
+    if (failed > 0) setError(`${failed} fotiek sa nepodarilo odstrániť (cudzie fotky odstráni len autor albumu/admin)`);
+  };
+
   const isOwner = album && user ? album.createdBy.id === user.id || user.role === 'admin' : false;
 
   const saveTitle = async () => {
@@ -271,7 +308,7 @@ function AlbumDetailView({ albumId, onBack }: { albumId: string; onBack: () => v
   if (!album) return <p className="px-4 py-6 text-sm text-neutral-500">Načítavam album…</p>;
 
   return (
-    <div className="px-4 py-4">
+    <div className="px-4 py-4" {...swipeBack}>
       <div className="mb-3 flex items-center gap-2">
         <button onClick={onBack} aria-label="Späť na albumy" className="grid h-8 w-8 place-items-center rounded-full text-lg hover:bg-neutral-100 dark:hover:bg-neutral-800">
           ←
@@ -340,13 +377,27 @@ function AlbumDetailView({ albumId, onBack }: { albumId: string; onBack: () => v
         )}
       </div>
 
-      <button
-        onClick={() => fileRef.current?.click()}
-        disabled={uploading}
-        className="mb-3 w-full rounded-xl border border-dashed border-neutral-300 px-4 py-2.5 text-sm text-neutral-500 transition hover:border-accent hover:text-accent disabled:opacity-50 dark:border-neutral-700"
-      >
-        {uploading ? 'Nahrávam…' : '+ Pridať fotky'}
-      </button>
+      <div className="mb-3 flex gap-2">
+        <button
+          onClick={() => fileRef.current?.click()}
+          disabled={uploading || selecting}
+          className="min-w-0 flex-1 rounded-xl border border-dashed border-neutral-300 px-4 py-2.5 text-sm text-neutral-500 transition hover:border-accent hover:text-accent disabled:opacity-50 dark:border-neutral-700"
+        >
+          {uploading ? 'Nahrávam…' : '+ Pridať fotky'}
+        </button>
+        {album.photos.length > 0 && (
+          <button
+            onClick={() => (selecting ? exitSelecting() : setSelecting(true))}
+            className={`shrink-0 rounded-xl border px-4 py-2.5 text-sm transition ${
+              selecting
+                ? 'border-accent bg-accent/10 text-accent'
+                : 'border-neutral-300 text-neutral-500 hover:border-accent hover:text-accent dark:border-neutral-700'
+            }`}
+          >
+            {selecting ? 'Zrušiť výber' : 'Vybrať'}
+          </button>
+        )}
+      </div>
       <input
         ref={fileRef}
         type="file"
@@ -365,15 +416,92 @@ function AlbumDetailView({ albumId, onBack }: { albumId: string; onBack: () => v
       ) : (
         <div className="grid grid-cols-3 gap-0.5 overflow-hidden rounded-xl sm:grid-cols-4">
           {album.photos.map((p, i) => (
-            <button key={p.media.id} onClick={() => setLightbox(i)} className="relative aspect-square">
+            <button
+              key={p.media.id}
+              onClick={() => (selecting ? toggleSelected(p.media.id) : setLightbox(i))}
+              className="relative aspect-square"
+            >
               <img src={p.media.url} alt="" loading="lazy" className="h-full w-full object-cover" />
+              {selecting && (
+                <span
+                  className={`absolute right-1.5 top-1.5 grid h-6 w-6 place-items-center rounded-full text-xs font-bold ${
+                    selected.has(p.media.id)
+                      ? 'bg-accent text-white'
+                      : 'border-2 border-white/90 bg-black/25 text-transparent'
+                  }`}
+                >
+                  ✓
+                </span>
+              )}
             </button>
           ))}
         </div>
       )}
 
+      {/* Akčná lišta hromadného výberu */}
+      {selecting && (
+        <div
+          className="fixed inset-x-0 bottom-0 z-40 flex items-center gap-2 border-t border-neutral-200 bg-white/95 px-4 py-3 backdrop-blur-xl dark:border-neutral-800 dark:bg-neutral-900/95"
+          style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}
+        >
+          <span className="min-w-0 flex-1 truncate text-sm text-neutral-500">
+            Vybraté: {selected.size}
+          </span>
+          <button
+            onClick={() => setPickerOpen(true)}
+            disabled={selected.size === 0 || bulkBusy}
+            className="rounded-lg bg-accent px-3 py-1.5 text-sm font-medium text-white disabled:opacity-40"
+          >
+            💾 Do albumu
+          </button>
+          <button
+            onClick={() => void bulkRemove()}
+            disabled={selected.size === 0 || bulkBusy}
+            className="rounded-lg border border-red-300 px-3 py-1.5 text-sm text-red-600 disabled:opacity-40 dark:border-red-900"
+          >
+            {bulkBusy ? 'Pracujem…' : '🗑 Odstrániť'}
+          </button>
+        </div>
+      )}
+
+      {pickerOpen && selected.size > 0 && (
+        <AlbumPickerDialog
+          mediaIds={[...selected]}
+          onClose={() => {
+            setPickerOpen(false);
+            exitSelecting();
+          }}
+        />
+      )}
+
       {lightbox !== null && album.photos[lightbox] && (
-        <div className="fixed inset-0 z-50 flex flex-col bg-black/95" onClick={() => setLightbox(null)}>
+        <div
+          className="fixed inset-0 z-50 flex touch-none flex-col bg-black/95"
+          onClick={() => setLightbox(null)}
+          onTouchStart={(e) => {
+            e.stopPropagation(); // neprepúšťaj gesto do swipe-back detailu
+            const t = e.touches[0]!;
+            lightboxTouch.current = { x: t.clientX, y: t.clientY };
+          }}
+          onTouchEnd={(e) => {
+            e.stopPropagation();
+            const s = lightboxTouch.current;
+            lightboxTouch.current = null;
+            if (!s) return;
+            const t = e.changedTouches[0]!;
+            const dx = t.clientX - s.x;
+            const dy = t.clientY - s.y;
+            // Swipe hore/dole = ďalšia/predchádzajúca fotka.
+            if (Math.abs(dy) > 60 && Math.abs(dy) > Math.abs(dx) * 1.5) {
+              setLightbox((i) =>
+                i === null ? null : dy < 0 ? Math.min(album.photos.length - 1, i + 1) : Math.max(0, i - 1),
+              );
+              return;
+            }
+            // Swipe doprava = späť do mriežky albumu.
+            if (dx > 70 && Math.abs(dx) > Math.abs(dy) * 1.5) setLightbox(null);
+          }}
+        >
           <div className="flex items-center justify-between p-3 text-white" onClick={(e) => e.stopPropagation()}>
             <span className="text-sm text-white/70">
               {lightbox + 1} / {album.photos.length}

@@ -12,7 +12,7 @@ import { fullDateTime, relativeTime } from '../shared/time';
 import { ReactionBar } from './ReactionBar';
 import { CommentThread } from './CommentThread';
 import { CommentComposer } from './CommentComposer';
-import { PostGallery } from './PostGallery';
+import { PhotoGallery } from '../shared/PhotoGallery';
 
 interface PostCardProps {
   post: PostPublic;
@@ -195,7 +195,7 @@ export function PostCard({ post, onChange, onDeleted }: PostCardProps) {
 
           {post.media.length > 0 && (
             <div className="mt-2 space-y-2">
-              <PostGallery images={images} />
+              <PhotoGallery images={images} />
               {rest.map((m) => (
                 <MediaItem key={m.id} media={m} />
               ))}

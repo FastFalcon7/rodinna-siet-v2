@@ -147,7 +147,7 @@ export function MessageComposer({
 
       {uploads.items.length > 0 && (
         <div className="mb-2">
-          <UploadPreviews items={uploads.items} onRemove={uploads.remove} />
+          <UploadPreviews items={uploads.items} onRemove={uploads.remove} onMakeCover={uploads.makeFirst} />
         </div>
       )}
 

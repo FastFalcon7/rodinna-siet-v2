@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState, type ComponentType } from 'react'
 import { useAuth } from '../auth/AuthContext';
 import { appNavigate, MORE_TAB } from './navigate';
 import { webModules, MoreIcon } from './registry';
+import { useLlmEnabled } from '../shared/llm';
 
 /**
  * Command palette (T8, PWA polish). Cmd/Ctrl+K otvorí rýchly skok medzi
@@ -21,13 +22,14 @@ interface Command {
 
 export function CommandPalette() {
   const { logout } = useAuth();
+  const llmEnabled = useLlmEnabled();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [index, setIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const commands = useMemo<Command[]>(() => {
-    const modCmds: Command[] = webModules.map((m) => ({
+    const modCmds: Command[] = webModules.filter((m) => !m.llm || llmEnabled).map((m) => ({
       id: `nav:${m.name}`,
       label: m.label,
       hint: 'Otvoriť',
@@ -50,7 +52,7 @@ export function CommandPalette() {
         run: () => void logout(),
       },
     ];
-  }, [logout]);
+  }, [logout, llmEnabled]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { ALLOWED_REACTION_EMOJIS, type MessagePublic } from '@rodinna/shared-types';
 import { chatApi } from '../lib/api';
 import { MediaItem } from '../shared/MediaItem';
+import { PhotoGallery } from '../shared/PhotoGallery';
 import { LinkPreviewCard } from '../shared/LinkPreviewCard';
 import { extractFirstUrl, RichBody } from '../shared/linkify';
 import { parseAppLink, stripAppLink } from '../shared/appLink';
@@ -39,19 +40,12 @@ function ReplyQuote({ message, mine }: { message: NonNullable<MessagePublic['rep
 
 function MediaGrid({ message }: { message: MessagePublic }) {
   if (message.media.length === 0) return null;
-  // Obrázky do mriežky; video a súbory pod nimi na plnú šírku bubliny.
+  // Úvodná fotka + „+N fotiek" badge (PhotoGallery); video a súbory na plnú šírku.
   const images = message.media.filter((m) => m.kind === 'image');
   const rest = message.media.filter((m) => m.kind !== 'image');
-  const cols = images.length === 1 ? 'grid-cols-1' : 'grid-cols-2';
   return (
     <div className="mt-1 space-y-1">
-      {images.length > 0 && (
-        <div className={`grid ${cols} gap-1 overflow-hidden rounded-lg`}>
-          {images.map((m) => (
-            <MediaItem key={m.id} media={m} className="max-h-72 rounded-none" />
-          ))}
-        </div>
-      )}
+      <PhotoGallery images={images} compact />
       {rest.map((m) => (
         <MediaItem key={m.id} media={m} className="max-h-72" />
       ))}

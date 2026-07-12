@@ -6,6 +6,7 @@ import { useChat } from './ChatProvider';
 import { MessageBubble } from './MessageBubble';
 import { MessageComposer } from './MessageComposer';
 import { formatDayLabel, formatLastSeen, sameDay } from './chatTime';
+import { useSwipeBack } from '../shared/useSwipeBack';
 
 interface ConversationProps {
   room: ChatRoomPublic;
@@ -32,6 +33,9 @@ function roomTitle(room: ChatRoomPublic, meId: string): string {
 
 export function Conversation({ room, meId, onBack }: ConversationProps) {
   const chat = useChat();
+  // Swipe doprava od ľavého okraja = späť na zoznam konverzácií
+  // (swipe-to-reply na bublinách edge zónu ignoruje — bez kolízie).
+  const swipeBack = useSwipeBack(onBack, { edgeOnly: true });
   const [messages, setMessages] = useState<MessagePublic[]>([]);
   const [cursor, setCursor] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -179,7 +183,7 @@ export function Conversation({ room, meId, onBack }: ConversationProps) {
   };
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex h-full flex-col" {...swipeBack}>
       {/* Header */}
       <header className="flex items-center gap-3 border-b border-neutral-200 bg-white/80 px-3 py-2 backdrop-blur-xl dark:border-neutral-800 dark:bg-neutral-900/80">
         <button

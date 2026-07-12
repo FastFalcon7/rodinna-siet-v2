@@ -7,7 +7,7 @@ import { Avatar } from '../shared/Avatar';
 import { MediaItem } from '../shared/MediaItem';
 import { ReactionBar } from './ReactionBar';
 import { CommentComposer } from './CommentComposer';
-import { PostGallery } from './PostGallery';
+import { PhotoGallery } from '../shared/PhotoGallery';
 
 interface CommentThreadProps {
   postId: string;
@@ -65,7 +65,7 @@ function CommentNode({
           </div>
           {comment.media.length > 0 && (
             <div className="mt-1.5 max-w-xs space-y-1.5">
-              <PostGallery images={images} />
+              <PhotoGallery images={images} compact />
               {rest.map((m) => (
                 <MediaItem key={m.id} media={m} />
               ))}

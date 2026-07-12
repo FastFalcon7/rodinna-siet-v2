@@ -3,8 +3,8 @@ import type { AlbumSummary } from '@rodinna/shared-types';
 import { ApiError, albumsApi } from '../lib/api';
 
 interface AlbumPickerDialogProps {
-  /** Fotka, ktorá sa má uložiť do albumu. */
-  mediaId: string;
+  /** Fotky, ktoré sa majú uložiť do albumu (jedna z lightboxu, viac z výberu). */
+  mediaIds: string[];
   onClose: () => void;
 }
 
@@ -13,7 +13,7 @@ interface AlbumPickerDialogProps {
  * alebo vytvorenie nového. Backend addPhotos je family-wide (§7), takže
  * do albumu ide aj fotka iného autora.
  */
-export function AlbumPickerDialog({ mediaId, onClose }: AlbumPickerDialogProps) {
+export function AlbumPickerDialog({ mediaIds, onClose }: AlbumPickerDialogProps) {
   const [albums, setAlbums] = useState<AlbumSummary[] | null>(null);
   const [newTitle, setNewTitle] = useState('');
   const [creating, setCreating] = useState(false);
@@ -38,7 +38,7 @@ export function AlbumPickerDialog({ mediaId, onClose }: AlbumPickerDialogProps) 
     setBusy(true);
     setError(null);
     try {
-      await albumsApi.addPhotos(album.id, [mediaId]);
+      await albumsApi.addPhotos(album.id, mediaIds);
       finish(album.title);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Uloženie zlyhalo');
@@ -52,7 +52,7 @@ export function AlbumPickerDialog({ mediaId, onClose }: AlbumPickerDialogProps) 
     setBusy(true);
     setError(null);
     try {
-      await albumsApi.create({ title, mediaIds: [mediaId] });
+      await albumsApi.create({ title, mediaIds });
       finish(title);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Album sa nepodarilo vytvoriť');

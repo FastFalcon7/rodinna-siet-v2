@@ -62,7 +62,7 @@ export function PostComposer({ onCreated, variant = 'card', autoFocus = false }:
           placeholder="Čo nové v rodine?"
           className="w-full resize-none rounded-lg border border-neutral-300 bg-transparent px-3 py-2 outline-none focus:border-accent dark:border-neutral-700"
         />
-        <UploadPreviews items={uploads.items} onRemove={uploads.remove} />
+        <UploadPreviews items={uploads.items} onRemove={uploads.remove} onMakeCover={uploads.makeFirst} />
         <div className="flex items-center gap-3">
           <button
             type="button"

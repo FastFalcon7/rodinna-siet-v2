@@ -7,6 +7,7 @@ import { ChatProvider } from './chat/ChatProvider';
 import { More } from './more/More';
 import { CommandPalette } from './app/CommandPalette';
 import { MoreIcon, webModules, type WebModule } from './app/registry';
+import { useSwipeBack } from './shared/useSwipeBack';
 
 /**
  * App shell (DESIGN_REVIEW_FEED_CHAT.md §2, plán M0-3): tenký app bar +
@@ -37,6 +38,9 @@ function HomeInner() {
 
   const barModules = webModules.filter((m) => m.slot === 'bar');
   const active = webModules.find((m) => m.name === tab) ?? null;
+  // Swipe doprava = späť do „Viac" pre moduly otvorené z neho (Kalendár,
+  // Zoznamy…). Root taby (Feed/Chat/Albumy) späť nemajú.
+  const swipeBackToMore = useSwipeBack(() => setTab(MORE_TAB));
 
   const navButton = (
     key: string,
@@ -87,7 +91,7 @@ function HomeInner() {
       <CommandPalette />
       {/* Sidebar (desktop) */}
       <aside className="hidden w-60 shrink-0 flex-col border-r border-neutral-200 bg-white md:flex dark:border-neutral-800 dark:bg-neutral-900">
-        <div className="px-5 py-4 text-lg font-semibold tracking-tight">Rodinná sieť</div>
+        <div className="px-5 py-4 text-lg font-semibold tracking-tight">Naša rodina</div>
         <nav className="flex flex-col gap-1 px-3">
           {barModules.map((m) => navButton(m.name, m.label, m.icon, m, 'side'))}
           {navButton(MORE_TAB, 'Viac', MoreIcon, null, 'side')}
@@ -111,7 +115,7 @@ function HomeInner() {
           style={{ paddingTop: 'env(safe-area-inset-top)' }}
         >
           <div className="flex h-12 w-full items-center justify-between">
-            <h1 className="text-base font-semibold tracking-tight">Rodinná sieť</h1>
+            <h1 className="text-base font-semibold tracking-tight">Naša rodina</h1>
             <button onClick={() => setTab(MORE_TAB)} aria-label="Viac">
               <Avatar user={user} size={28} />
             </button>
@@ -126,7 +130,7 @@ function HomeInner() {
             </div>
           ) : active ? (
             // 'scroll' moduly sú edge-to-edge (Bluesky) — bez horizontálneho paddingu na mobile.
-            <div className="h-full overflow-y-auto">
+            <div className="h-full overflow-y-auto" {...(active.slot === 'more' ? swipeBackToMore : {})}>
               <div className="mx-auto max-w-2xl pb-4 md:border-x md:border-neutral-200 dark:md:border-neutral-800">
                 <active.Component />
               </div>

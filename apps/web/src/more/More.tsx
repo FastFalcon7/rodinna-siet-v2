@@ -5,8 +5,10 @@ import { MembersList } from '../users/MembersList';
 import { InvitePanel } from '../users/InvitePanel';
 import { NotificationSettings } from './NotificationSettings';
 import { ThemeSettings } from './ThemeSettings';
+import { LlmSettings } from './LlmSettings';
 import { InstallCard } from './InstallCard';
 import { webModules, type WebModule } from '../app/registry';
+import { useLlmEnabled } from '../shared/llm';
 
 /**
  * „Viac" (DESIGN_REVIEW_FEED_CHAT.md §2.1): identita + profil + nastavenia
@@ -15,9 +17,10 @@ import { webModules, type WebModule } from '../app/registry';
  */
 export function More({ onOpenModule }: { onOpenModule: (name: string) => void }) {
   const { user, logout } = useAuth();
+  const llmEnabled = useLlmEnabled();
   if (!user) return null;
 
-  const extraModules = webModules.filter((m: WebModule) => m.slot === 'more');
+  const extraModules = webModules.filter((m: WebModule) => m.slot === 'more' && (!m.llm || llmEnabled));
 
   return (
     <>
@@ -57,6 +60,7 @@ export function More({ onOpenModule }: { onOpenModule: (name: string) => void })
 
       <InstallCard />
       <ThemeSettings />
+      <LlmSettings />
       <NotificationSettings />
       <ProfileCard />
       {user.role === 'admin' && <InvitePanel />}

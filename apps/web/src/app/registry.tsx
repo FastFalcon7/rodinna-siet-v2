@@ -35,6 +35,8 @@ export interface WebModule {
   /** Voliteľný badge na ikone (napr. neprečítané správy). Hook — navigácia
    *  ho volá pri renderi, poradie modulov je stabilné. */
   useBadge?: () => number;
+  /** Modul postavený na LLM — zobrazuje sa len keď je AI zapnutá (Viac → AI). */
+  llm?: boolean;
 }
 
 function FeedScreen() {
@@ -105,6 +107,7 @@ export const webModules: WebModule[] = [
     slot: 'more',
     layout: 'scroll',
     Component: Diary,
+    llm: true,
   },
   {
     name: 'quiz',
@@ -113,6 +116,7 @@ export const webModules: WebModule[] = [
     slot: 'more',
     layout: 'scroll',
     Component: Quizzes,
+    llm: true,
   },
   {
     name: 'games-practice',
