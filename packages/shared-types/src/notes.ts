@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { PostAuthorSchema } from './feed';
+import { MediaPublicSchema } from './media';
 
 /**
  * Zoznamy & Poznámky (plán §M3) — zdieľané celou rodinou (family-wide,
@@ -23,8 +24,16 @@ export const CreateNoteInputSchema = z.object({
   bodyMd: z.string().max(MAX_NOTE_BODY).default(''),
   /** Počiatočné položky zoznamu (napr. z duplikátu/šablóny). */
   items: z.array(z.string().trim().min(1).max(MAX_ITEM_LABEL)).max(MAX_NOTE_ITEMS).default([]),
+  /** Prílohy (ladenie 07/2026) — fotky z composera alebo výberu vo feede. */
+  mediaIds: z.array(z.string().uuid()).max(20).default([]),
 });
 export type CreateNoteInput = z.infer<typeof CreateNoteInputSchema>;
+
+/** Pridanie fotiek do existujúcej poznámky/zoznamu (z výberu vo feede/chate). */
+export const AddNoteMediaInputSchema = z.object({
+  mediaIds: z.array(z.string().uuid()).min(1).max(20),
+});
+export type AddNoteMediaInput = z.infer<typeof AddNoteMediaInputSchema>;
 
 export const UpdateNoteInputSchema = z.object({
   title: z.string().trim().min(1).max(MAX_NOTE_TITLE).optional(),
@@ -75,6 +84,7 @@ export type NoteSummary = z.infer<typeof NoteSummarySchema>;
 export const NoteDetailSchema = NoteSummarySchema.extend({
   bodyMd: z.string(),
   items: z.array(NoteItemPublicSchema),
+  media: z.array(MediaPublicSchema),
   revisionCount: z.number().int(),
 });
 export type NoteDetail = z.infer<typeof NoteDetailSchema>;

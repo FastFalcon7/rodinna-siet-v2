@@ -9,9 +9,10 @@ import type {
   UpdateNoteItemInput,
 } from '@rodinna/shared-types';
 import { db } from '../../core/db/client';
-import { noteItems, noteRevisions, notes, users, type NoteRow } from '../../core/db/schema';
+import { media, noteItems, noteMedia, noteRevisions, notes, users, type NoteRow } from '../../core/db/schema';
 import { APP_TOPIC } from '../../core/realtime';
 import { publishCrossProcess } from '../../core/events';
+import { toMediaPublic } from '../media/service';
 
 export class NotFoundError extends Error {}
 export class ForbiddenError extends Error {}
@@ -25,6 +26,28 @@ async function fetchAuthors(userIds: (string | null)[]): Promise<Map<string, Pos
     .from(users)
     .where(inArray(users.id, ids));
   return new Map(rows.map((r) => [r.id, r]));
+}
+
+/**
+ * Overí existenciu médií — zámerne bez vlastníckej kontroly (family-wide,
+ * ako albumy): do poznámky sa pridávajú aj fotky iných z feedu/chatu.
+ */
+async function verifyMediaExist(mediaIds: string[]): Promise<void> {
+  if (mediaIds.length === 0) return;
+  const found = await db.select({ id: media.id }).from(media).where(inArray(media.id, mediaIds));
+  if (found.length !== new Set(mediaIds).size) {
+    throw new BadRequestError('Niektoré fotky neexistujú');
+  }
+}
+
+async function fetchNoteMedia(noteId: string) {
+  const rows = await db
+    .select({ media })
+    .from(noteMedia)
+    .innerJoin(media, eq(noteMedia.mediaId, media.id))
+    .where(eq(noteMedia.noteId, noteId))
+    .orderBy(asc(noteMedia.order), asc(noteMedia.id));
+  return rows.map((r) => toMediaPublic(r.media));
 }
 
 async function getNoteRow(noteId: string): Promise<NoteRow> {
@@ -109,6 +132,7 @@ export async function getNote(noteId: string): Promise<NoteDetail> {
       assignedTo: i.assignedTo ? (authors.get(i.assignedTo) ?? null) : null,
       order: i.order,
     })),
+    media: await fetchNoteMedia(noteId),
     revisionCount: revCount[0]?.count ?? 0,
   };
 }
@@ -119,6 +143,9 @@ export async function createNote(creatorId: string, input: CreateNoteInput): Pro
   if (input.kind === 'note' && input.items.length > 0) {
     throw new BadRequestError('Poznámka nemá položky — použi zoznam');
   }
+  const mediaIds = [...new Set(input.mediaIds)];
+  await verifyMediaExist(mediaIds);
+
   const inserted = await db
     .insert(notes)
     .values({
@@ -136,8 +163,36 @@ export async function createNote(creatorId: string, input: CreateNoteInput): Pro
       .insert(noteItems)
       .values(input.items.map((label, order) => ({ noteId: note.id, label, order })));
   }
+  if (mediaIds.length > 0) {
+    await db.insert(noteMedia).values(mediaIds.map((mediaId, order) => ({ noteId: note.id, mediaId, order })));
+  }
   await publishCrossProcess(APP_TOPIC, { t: 'note:update', noteId: note.id });
   return getNote(note.id);
+}
+
+/** Pridá fotky do poznámky (z výberu vo feede/chate alebo composera). */
+export async function addNoteMedia(noteId: string, userId: string, mediaIds: string[]): Promise<NoteDetail> {
+  await getNoteRow(noteId);
+  const unique = [...new Set(mediaIds)];
+  await verifyMediaExist(unique);
+  const maxOrder = await db
+    .select({ max: sql<number>`coalesce(max("order"), 0)::int` })
+    .from(noteMedia)
+    .where(eq(noteMedia.noteId, noteId));
+  await db
+    .insert(noteMedia)
+    .values(unique.map((mediaId, i) => ({ noteId, mediaId, order: (maxOrder[0]?.max ?? 0) + 1 + i })))
+    .onConflictDoNothing();
+  await touch(noteId, userId);
+  return getNote(noteId);
+}
+
+/** Odstráni fotku z poznámky (family-wide, ako editácia textu). */
+export async function removeNoteMedia(noteId: string, userId: string, mediaId: string): Promise<NoteDetail> {
+  await getNoteRow(noteId);
+  await db.delete(noteMedia).where(and(eq(noteMedia.noteId, noteId), eq(noteMedia.mediaId, mediaId)));
+  await touch(noteId, userId);
+  return getNote(noteId);
 }
 
 export async function updateNote(noteId: string, userId: string, input: UpdateNoteInput): Promise<NoteDetail> {
@@ -238,6 +293,7 @@ export async function duplicateNote(noteId: string, userId: string, title?: stri
     title: title ?? `${note.title} (kópia)`,
     bodyMd: note.bodyMd,
     items: items.map((i) => i.label),
+    mediaIds: [],
   });
 }
 

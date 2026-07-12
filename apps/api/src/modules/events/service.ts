@@ -9,12 +9,13 @@ import type {
   UpdateEventInput,
 } from '@rodinna/shared-types';
 import { db } from '../../core/db/client';
-import { eventRsvps, events, feedCards, users, type EventRow } from '../../core/db/schema';
+import { eventMedia, eventRsvps, events, feedCards, media, users, type EventRow } from '../../core/db/schema';
 import { APP_TOPIC } from '../../core/realtime';
 import { publishCrossProcess } from '../../core/events';
 import { enqueueJob } from '../../core/jobs/queue';
 import { sha256Hex } from '../auth/crypto';
 import { env } from '../../config/env';
+import { toMediaPublic } from '../media/service';
 
 export class NotFoundError extends Error {}
 export class ForbiddenError extends Error {}
@@ -49,6 +50,18 @@ async function hydrateEvents(rows: EventRow[], viewerId: string): Promise<EventP
     .select()
     .from(eventRsvps)
     .where(inArray(eventRsvps.eventId, eventIds));
+  const mediaRows = await db
+    .select({ eventId: eventMedia.eventId, media })
+    .from(eventMedia)
+    .innerJoin(media, eq(eventMedia.mediaId, media.id))
+    .where(inArray(eventMedia.eventId, eventIds))
+    .orderBy(asc(eventMedia.eventId), asc(eventMedia.order));
+  const mediaMap = new Map<string, ReturnType<typeof toMediaPublic>[]>();
+  for (const r of mediaRows) {
+    const list = mediaMap.get(r.eventId) ?? [];
+    list.push(toMediaPublic(r.media));
+    mediaMap.set(r.eventId, list);
+  }
   const authors = await fetchAuthors([
     ...rows.map((r) => r.createdBy),
     ...rsvpRows.map((r) => r.userId),
@@ -73,9 +86,52 @@ async function hydrateEvents(rows: EventRow[], viewerId: string): Promise<EventP
       createdBy: authors.get(row.createdBy)!,
       rsvps: { yes: by('yes'), no: by('no'), maybe: by('maybe') },
       myRsvp: mine?.status ?? null,
+      media: mediaMap.get(row.id) ?? [],
       createdAt: row.createdAt.toISOString(),
     };
   });
+}
+
+/** Overí existenciu médií — family-wide, ako albumy (fotky iných z feedu). */
+async function verifyMediaExist(mediaIds: string[]): Promise<void> {
+  if (mediaIds.length === 0) return;
+  const found = await db.select({ id: media.id }).from(media).where(inArray(media.id, mediaIds));
+  if (found.length !== new Set(mediaIds).size) {
+    throw new BadRequestError('Niektoré fotky neexistujú');
+  }
+}
+
+/** Pridá fotky do udalosti (z výberu vo feede/chate alebo composera). */
+export async function addEventMedia(eventId: string, viewerId: string, mediaIds: string[]): Promise<EventPublic> {
+  await getEventRow(eventId);
+  const unique = [...new Set(mediaIds)];
+  await verifyMediaExist(unique);
+  const maxOrder = await db
+    .select({ max: sql<number>`coalesce(max("order"), 0)::int` })
+    .from(eventMedia)
+    .where(eq(eventMedia.eventId, eventId));
+  await db
+    .insert(eventMedia)
+    .values(unique.map((mediaId, i) => ({ eventId, mediaId, order: (maxOrder[0]?.max ?? 0) + 1 + i })))
+    .onConflictDoNothing();
+  await publishCrossProcess(APP_TOPIC, { t: 'event:update', eventId });
+  return getEvent(eventId, viewerId);
+}
+
+/** Odstráni fotku z udalosti (autor udalosti alebo admin). */
+export async function removeEventMedia(
+  eventId: string,
+  userId: string,
+  isAdmin: boolean,
+  mediaId: string,
+): Promise<EventPublic> {
+  const event = await getEventRow(eventId);
+  if (event.createdBy !== userId && !isAdmin) {
+    throw new ForbiddenError('Fotku z udalosti odstráni len jej autor alebo admin');
+  }
+  await db.delete(eventMedia).where(and(eq(eventMedia.eventId, eventId), eq(eventMedia.mediaId, mediaId)));
+  await publishCrossProcess(APP_TOPIC, { t: 'event:update', eventId });
+  return getEvent(eventId, userId);
 }
 
 export async function getEvent(eventId: string, viewerId: string): Promise<EventPublic> {
@@ -167,6 +223,12 @@ export async function createEvent(creatorId: string, input: CreateEventInput): P
 
   // Autor ide automaticky (usporadúva to on).
   await db.insert(eventRsvps).values({ eventId: event.id, userId: creatorId, status: 'yes' });
+
+  const mediaIds = [...new Set(input.mediaIds)];
+  if (mediaIds.length > 0) {
+    await verifyMediaExist(mediaIds);
+    await db.insert(eventMedia).values(mediaIds.map((mediaId, order) => ({ eventId: event.id, mediaId, order })));
+  }
 
   if (input.toFeed) {
     await db.insert(feedCards).values({ module: 'events', entityId: event.id, authorId: creatorId });

@@ -572,6 +572,22 @@ export const noteItems = pgTable(
   (t) => [index('note_items_note_idx').on(t.noteId)],
 );
 
+/** Fotky/prílohy poznámky (ladenie 07/2026) — ako postMedia, family-wide. */
+export const noteMedia = pgTable(
+  'note_media',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    noteId: uuid('note_id')
+      .notNull()
+      .references(() => notes.id, { onDelete: 'cascade' }),
+    mediaId: uuid('media_id')
+      .notNull()
+      .references(() => media.id, { onDelete: 'cascade' }),
+    order: integer('order').notNull().default(0),
+  },
+  (t) => [index('note_media_note_idx').on(t.noteId), unique('note_media_unique').on(t.noteId, t.mediaId)],
+);
+
 export const noteRevisions = pgTable(
   'note_revisions',
   {
@@ -614,6 +630,22 @@ export const events = pgTable(
     deletedAt: timestamp('deleted_at', { withTimezone: true }),
   },
   (t) => [index('events_starts_idx').on(t.startsAt)],
+);
+
+/** Fotky/prílohy udalosti (ladenie 07/2026) — ako postMedia, family-wide. */
+export const eventMedia = pgTable(
+  'event_media',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    eventId: uuid('event_id')
+      .notNull()
+      .references(() => events.id, { onDelete: 'cascade' }),
+    mediaId: uuid('media_id')
+      .notNull()
+      .references(() => media.id, { onDelete: 'cascade' }),
+    order: integer('order').notNull().default(0),
+  },
+  (t) => [index('event_media_event_idx').on(t.eventId), unique('event_media_unique').on(t.eventId, t.mediaId)],
 );
 
 export const eventRsvps = pgTable(

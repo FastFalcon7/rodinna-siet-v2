@@ -237,6 +237,38 @@ async function main() {
   mr = await fetch(`${BASE}/api/media/${uploaded.id}?mt=${'0'.repeat(32)}`);
   check('nesprávny token → 401', mr.status === 401, mr.status);
 
+  console.log('\n— Fotky v poznámkach a udalostiach (ladenie, 5. kolo) —');
+  const n1 = await seedImage(alica.id);
+  const n2 = await seedImage(bob.id); // cudzia fotka — family-wide je OK
+  r = await http(alica.token, 'POST', '/api/notes', {
+    kind: 'note',
+    title: 'Recept',
+    bodyMd: 'Babkin koláč',
+    items: [],
+    mediaIds: [n1],
+  });
+  check('poznámka s fotkou → 201', r.status === 201 && r.body.media?.length === 1, r.body.media);
+  const noteId = r.body.id;
+  r = await http(bob.token, 'POST', `/api/notes/${noteId}/media`, { mediaIds: [n2] });
+  check('pridanie cudzej fotky do poznámky → 200 (family-wide)', r.status === 200 && r.body.media?.length === 2, r.body.media?.length);
+  r = await http(bob.token, 'DELETE', `/api/notes/${noteId}/media/${n1}`);
+  check('odstránenie fotky z poznámky → 200', r.status === 200 && r.body.media?.length === 1, r.body.media?.length);
+
+  r = await http(alica.token, 'POST', '/api/events', {
+    title: 'Oslava',
+    startsAt: new Date(Date.now() + 48 * 3600_000).toISOString(),
+    allDay: true,
+    mediaIds: [n1],
+  });
+  check('udalosť s fotkou → 201', r.status === 201 && r.body.media?.length === 1, r.body.media);
+  const evId = r.body.id;
+  r = await http(bob.token, 'POST', `/api/events/${evId}/media`, { mediaIds: [n2] });
+  check('pridanie fotky do udalosti → 200', r.status === 200 && r.body.media?.length === 2, r.body.media?.length);
+  r = await http(bob.token, 'DELETE', `/api/events/${evId}/media/${n2}`);
+  check('fotku z udalosti odstráni len autor/admin → 403', r.status === 403, r.status);
+  r = await http(alica.token, 'DELETE', `/api/events/${evId}/media/${n2}`);
+  check('autor odstránil fotku udalosti → 200', r.status === 200 && r.body.media?.length === 1, r.body.media?.length);
+
   console.log('\n— Mazanie —');
   r = await http(bob.token, 'DELETE', `/api/feed/${postId}`);
   check('post zmaže len autor/admin → 403', r.status === 403, r.status);

@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { PostAuthorSchema } from './feed';
+import { MediaPublicSchema } from './media';
 
 /**
  * Kalendár & Udalosti (plán §M4): udalosti s RSVP (živá karta vo Feede,
@@ -28,6 +29,8 @@ export const CreateEventInputSchema = z
     bodyMd: z.string().max(MAX_EVENT_BODY).default(''),
     /** Vložiť RSVP kartu do Feedu (K1). Udalosti žijú v Kalendári/chate — default nie. */
     toFeed: z.boolean().default(false),
+    /** Prílohy (ladenie 07/2026) — fotky z composera alebo výberu vo feede. */
+    mediaIds: z.array(z.string().uuid()).max(20).default([]),
   })
   .refine((v) => !v.endsAt || new Date(v.endsAt) >= new Date(v.startsAt), {
     message: 'Koniec nemôže byť pred začiatkom',
@@ -67,9 +70,16 @@ export const EventPublicSchema = z.object({
     maybe: z.array(PostAuthorSchema),
   }),
   myRsvp: RsvpStatusSchema.nullable(),
+  media: z.array(MediaPublicSchema),
   createdAt: z.string(),
 });
 export type EventPublic = z.infer<typeof EventPublicSchema>;
+
+/** Pridanie fotiek do existujúcej udalosti (z výberu vo feede/chate). */
+export const AddEventMediaInputSchema = z.object({
+  mediaIds: z.array(z.string().uuid()).min(1).max(20),
+});
+export type AddEventMediaInput = z.infer<typeof AddEventMediaInputSchema>;
 
 /** Narodeniny v agende — virtuálne (z users.birthday), bez riadku v events. */
 export const BirthdayPublicSchema = z.object({

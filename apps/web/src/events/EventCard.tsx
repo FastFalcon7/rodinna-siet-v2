@@ -5,6 +5,7 @@ import { useAuth } from '../auth/AuthContext';
 import { useChat } from '../chat/ChatProvider';
 import { appNavigate } from '../app/navigate';
 import type { EntityCardProps } from '../app/cards';
+import { PhotoGallery } from '../shared/PhotoGallery';
 
 /**
  * Živá karta udalosti vo Feede/chate (M4, K1/K2): RSVP tlačidlá priamo
@@ -117,6 +118,12 @@ export function EventCard({ entityId, compact }: EntityCardProps) {
         <p className="mt-1 line-clamp-2 whitespace-pre-wrap text-sm text-neutral-600 dark:text-neutral-300">
           {event.bodyMd}
         </p>
+      )}
+
+      {event.media.some((m) => m.kind === 'image') && (
+        <div className="mt-2">
+          <PhotoGallery images={event.media.filter((m) => m.kind === 'image')} compact />
+        </div>
       )}
 
       <div className="mt-2 flex gap-1.5">

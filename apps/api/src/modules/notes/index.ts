@@ -3,6 +3,7 @@ import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import {
   AddNoteItemInputSchema,
+  AddNoteMediaInputSchema,
   CreateNoteInputSchema,
   UpdateNoteInputSchema,
   UpdateNoteItemInputSchema,
@@ -16,6 +17,7 @@ import {
   ForbiddenError,
   NotFoundError,
   addItem,
+  addNoteMedia,
   createNote,
   deleteItem,
   deleteNote,
@@ -23,6 +25,7 @@ import {
   getNote,
   listNotes,
   listRevisions,
+  removeNoteMedia,
   restoreRevision,
   updateItem,
   updateNote,
@@ -130,6 +133,33 @@ router.delete('/items/:itemId', requireAuth, async (c) => {
   const me = c.get('user')!;
   try {
     return c.json(await deleteItem(c.req.param('itemId'), me.id));
+  } catch (err) {
+    const m = mapError(err);
+    if (m) return c.json({ error: m.message }, m.status);
+    throw err;
+  }
+});
+
+/** POST /api/notes/:id/media — pridať fotky (z composera alebo výberu vo feede). */
+router.post('/:id/media', requireAuth, zValidator('json', AddNoteMediaInputSchema), async (c) => {
+  const me = c.get('user')!;
+  if (!rateLimit(`notesedit:${me.id}`, 30, 60_000)) {
+    return c.json({ error: 'Príliš veľa úprav, skús o chvíľu' }, 429);
+  }
+  try {
+    return c.json(await addNoteMedia(c.req.param('id'), me.id, c.req.valid('json').mediaIds));
+  } catch (err) {
+    const m = mapError(err);
+    if (m) return c.json({ error: m.message }, m.status);
+    throw err;
+  }
+});
+
+/** DELETE /api/notes/:id/media/:mediaId — odstrániť fotku z poznámky. */
+router.delete('/:id/media/:mediaId', requireAuth, async (c) => {
+  const me = c.get('user')!;
+  try {
+    return c.json(await removeNoteMedia(c.req.param('id'), me.id, c.req.param('mediaId')));
   } catch (err) {
     const m = mapError(err);
     if (m) return c.json({ error: m.message }, m.status);

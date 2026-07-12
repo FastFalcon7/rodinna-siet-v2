@@ -1,8 +1,10 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { AgendaResponse, EventPublic } from '@rodinna/shared-types';
 import { ApiError, eventsApi } from '../lib/api';
 import { useChat } from '../chat/ChatProvider';
 import { EventCard } from './EventCard';
+import { UploadPreviews } from '../shared/UploadPreviews';
+import { useMediaUpload } from '../shared/useMediaUpload';
 
 /**
  * Modul Kalendár (M4): agenda najbližších 60 dní — udalosti s RSVP kartou
@@ -145,11 +147,34 @@ function NewEventForm({ onDone, onCancel }: { onDone: () => void; onCancel: () =
   const [time, setTime] = useState('17:00');
   const [allDay, setAllDay] = useState(false);
   const [location, setLocation] = useState('');
+  const [locating, setLocating] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const uploads = useMediaUpload(20);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  /** 📍 vyplní pole Miesto odkazom na mapu z GPS. */
+  const fillLocation = () => {
+    if (!navigator.geolocation) {
+      setError('Zariadenie nepodporuje zisťovanie polohy');
+      return;
+    }
+    setLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setLocating(false);
+        setLocation(`https://maps.google.com/?q=${pos.coords.latitude.toFixed(6)},${pos.coords.longitude.toFixed(6)}`);
+      },
+      () => {
+        setLocating(false);
+        setError('Polohu sa nepodarilo zistiť (povoľ prístup k polohe)');
+      },
+      { enableHighAccuracy: true, timeout: 10_000 },
+    );
+  };
 
   const create = async () => {
-    if (!title.trim() || !date || busy) return;
+    if (!title.trim() || !date || busy || uploads.uploading) return;
     setBusy(true);
     setError(null);
     try {
@@ -163,7 +188,9 @@ function NewEventForm({ onDone, onCancel }: { onDone: () => void; onCancel: () =
         location: location.trim(),
         bodyMd: '',
         toFeed: false,
+        mediaIds: uploads.mediaIds,
       });
+      uploads.clear();
       onDone();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Udalosť sa nepodarilo vytvoriť');
@@ -201,26 +228,57 @@ function NewEventForm({ onDone, onCancel }: { onDone: () => void; onCancel: () =
           Celý deň
         </label>
       </div>
-      <input
-        value={location}
-        onChange={(e) => setLocation(e.target.value)}
-        maxLength={140}
-        placeholder="Miesto (voliteľné)"
-        className="w-full rounded-lg border border-neutral-300 bg-transparent px-3 py-2 text-sm outline-none focus:border-accent dark:border-neutral-700"
-      />
+      <div className="flex gap-2">
+        <input
+          value={location}
+          onChange={(e) => setLocation(e.target.value)}
+          maxLength={140}
+          placeholder="Miesto (voliteľné)"
+          className="min-w-0 flex-1 rounded-lg border border-neutral-300 bg-transparent px-3 py-2 text-sm outline-none focus:border-accent dark:border-neutral-700"
+        />
+        <button
+          onClick={fillLocation}
+          disabled={locating}
+          title="Vyplniť aktuálnou polohou"
+          className="shrink-0 rounded-lg border border-neutral-300 px-3 py-2 text-sm disabled:opacity-50 dark:border-neutral-700"
+        >
+          {locating ? '…' : '📍'}
+        </button>
+      </div>
+      <UploadPreviews items={uploads.items} onRemove={uploads.remove} onMakeCover={uploads.makeFirst} />
       {error && <p className="text-sm text-red-600">{error}</p>}
-      <div className="flex justify-end gap-2">
-        <button onClick={onCancel} className="rounded-lg px-3 py-1.5 text-sm text-neutral-500">
+      <div className="flex items-center gap-2">
+        <button
+          onClick={() => fileRef.current?.click()}
+          disabled={busy}
+          title="Pridať prílohu"
+          aria-label="Pridať prílohu"
+          className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-2xl leading-none text-neutral-500 hover:bg-neutral-100 disabled:opacity-40 dark:hover:bg-neutral-800"
+        >
+          +
+        </button>
+        <button onClick={onCancel} className="ml-auto rounded-lg px-3 py-1.5 text-sm text-neutral-500">
           Zrušiť
         </button>
         <button
           onClick={() => void create()}
-          disabled={!title.trim() || !date || busy}
+          disabled={!title.trim() || !date || busy || uploads.uploading}
           className="rounded-lg bg-accent px-4 py-1.5 text-sm font-medium text-white disabled:opacity-40"
         >
-          {busy ? 'Vytváram…' : 'Vytvoriť (karta ide do Feedu)'}
+          {busy ? 'Vytváram…' : 'Vytvoriť'}
         </button>
       </div>
+      <input
+        ref={fileRef}
+        type="file"
+        multiple
+        hidden
+        onChange={(e) => {
+          const files = Array.from(e.target.files ?? []);
+          e.target.value = '';
+          if (files.length > 0) uploads.addFiles(files);
+        }}
+      />
     </div>
   );
 }

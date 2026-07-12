@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import type { MediaPublic } from '@rodinna/shared-types';
-import { Lightbox } from './Lightbox';
-import { AlbumPickerDialog } from '../albums/AlbumPickerDialog';
+import { PhotoBrowser } from './PhotoBrowser';
 
 /** Slovenské množné číslo pre badge „+N fotiek". */
 function extraLabel(n: number): string {
@@ -14,17 +13,18 @@ interface PhotoGalleryProps {
   images: MediaPublic[];
   /** Kompaktný variant (bublina v chate, komentár) — menšia výška, jemnejší rám. */
   compact?: boolean;
+  /** Ak je zadané, prehliadač ponúkne aj odstránenie vybraných fotiek. */
+  onRemove?: (mediaIds: string[]) => Promise<void>;
 }
 
 /**
  * Fotky príspevku/správy (ladenie 07/2026): zobrazuje sa LEN úvodná fotka
  * (prvá v poradí — autor si ju vyberie v composeri), pri viacerých fotkách
- * badge „+N fotiek" v pravom dolnom rohu. Klik otvorí lightbox so všetkými
- * (swipe hore/dole listuje, swipe doprava zatvára, 💾 uloží do albumu).
+ * badge „+N fotiek". Klik otvorí PhotoBrowser — mriežku ako v albume
+ * s režimom „Vybrať" (Do albumu / poznámky / udalosti) a lightboxom.
  */
-export function PhotoGallery({ images, compact = false }: PhotoGalleryProps) {
-  const [lightbox, setLightbox] = useState<number | null>(null);
-  const [saveMediaId, setSaveMediaId] = useState<string | null>(null);
+export function PhotoGallery({ images, compact = false, onRemove }: PhotoGalleryProps) {
+  const [open, setOpen] = useState(false);
   if (images.length === 0) return null;
 
   const cover = images[0]!;
@@ -32,7 +32,7 @@ export function PhotoGallery({ images, compact = false }: PhotoGalleryProps) {
 
   return (
     <>
-      <button type="button" onClick={() => setLightbox(0)} className="relative block w-full">
+      <button type="button" onClick={() => setOpen(true)} className="relative block w-full">
         <img
           src={cover.url}
           alt=""
@@ -52,23 +52,7 @@ export function PhotoGallery({ images, compact = false }: PhotoGalleryProps) {
         )}
       </button>
 
-      {lightbox !== null && (
-        <Lightbox
-          items={images}
-          initialIndex={lightbox}
-          onClose={() => setLightbox(null)}
-          renderActions={(current) => (
-            <button
-              type="button"
-              onClick={() => setSaveMediaId(current.id)}
-              className="rounded-lg bg-white/10 px-3 py-1.5 text-sm transition hover:bg-white/20"
-            >
-              💾 Do albumu
-            </button>
-          )}
-        />
-      )}
-      {saveMediaId && <AlbumPickerDialog mediaIds={[saveMediaId]} onClose={() => setSaveMediaId(null)} />}
+      {open && <PhotoBrowser images={images} onClose={() => setOpen(false)} onRemove={onRemove} />}
     </>
   );
 }

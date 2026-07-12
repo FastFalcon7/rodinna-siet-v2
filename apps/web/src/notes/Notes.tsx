@@ -1,11 +1,15 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { NoteDetail, NoteRevision, NoteSummary } from '@rodinna/shared-types';
-import { ApiError, chatApi, notesApi, usersApi } from '../lib/api';
+import { ApiError, chatApi, mediaApi, notesApi, usersApi } from '../lib/api';
 import { useAuth } from '../auth/AuthContext';
 import { useChat } from '../chat/ChatProvider';
 import { consumePendingNav } from '../app/navigate';
 import { buildAppLink } from '../shared/appLink';
 import { relativeTime } from '../shared/time';
+import { PhotoGallery } from '../shared/PhotoGallery';
+import { UploadPreviews } from '../shared/UploadPreviews';
+import { useMediaUpload } from '../shared/useMediaUpload';
+import { useSwipeBack } from '../shared/useSwipeBack';
 
 /**
  * Modul Zoznamy & Poznámky (M3): rodinne zdieľané zoznamy s odškrtávaním
@@ -90,14 +94,23 @@ function NewNoteButtons({ onCreated }: { onCreated: (id: string) => void }) {
   const [mode, setMode] = useState<'list' | 'note' | null>(null);
   const [title, setTitle] = useState('');
   const [busy, setBusy] = useState(false);
+  const uploads = useMediaUpload(20);
+  const fileRef = useRef<HTMLInputElement>(null);
 
   const create = async () => {
-    if (!title.trim() || busy || !mode) return;
+    if (!title.trim() || busy || !mode || uploads.uploading) return;
     setBusy(true);
     try {
-      const n = await notesApi.create({ kind: mode, title: title.trim(), bodyMd: '', items: [] });
+      const n = await notesApi.create({
+        kind: mode,
+        title: title.trim(),
+        bodyMd: '',
+        items: [],
+        mediaIds: uploads.mediaIds,
+      });
       setMode(null);
       setTitle('');
+      uploads.clear();
       onCreated(n.id);
     } finally {
       setBusy(false);
@@ -123,24 +136,46 @@ function NewNoteButtons({ onCreated }: { onCreated: (id: string) => void }) {
     );
   }
   return (
-    <div className="flex gap-2 rounded-2xl border border-neutral-200 bg-white p-3 dark:border-neutral-800 dark:bg-neutral-900">
+    <div className="space-y-2 rounded-2xl border border-neutral-200 bg-white p-3 dark:border-neutral-800 dark:bg-neutral-900">
+      <UploadPreviews items={uploads.items} onRemove={uploads.remove} onMakeCover={uploads.makeFirst} />
+      <div className="flex gap-2">
+        <input
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && void create()}
+          autoFocus
+          maxLength={120}
+          placeholder={mode === 'list' ? 'Názov zoznamu (napr. Nákup)' : 'Názov poznámky'}
+          className="min-w-0 flex-1 rounded-lg border border-neutral-300 bg-transparent px-3 py-1.5 text-sm outline-none focus:border-accent dark:border-neutral-700"
+        />
+        <button
+          onClick={() => fileRef.current?.click()}
+          title="Pridať prílohu"
+          aria-label="Pridať prílohu"
+          className="grid h-8 w-8 shrink-0 place-items-center self-center rounded-full text-xl leading-none text-neutral-500 hover:bg-neutral-100 dark:hover:bg-neutral-800"
+        >
+          +
+        </button>
+        <button onClick={() => setMode(null)} className="text-sm text-neutral-400">Zrušiť</button>
+        <button
+          onClick={() => void create()}
+          disabled={!title.trim() || busy || uploads.uploading}
+          className="rounded-lg bg-accent px-3 py-1.5 text-sm font-medium text-white disabled:opacity-40"
+        >
+          Vytvoriť
+        </button>
+      </div>
       <input
-        value={title}
-        onChange={(e) => setTitle(e.target.value)}
-        onKeyDown={(e) => e.key === 'Enter' && void create()}
-        autoFocus
-        maxLength={120}
-        placeholder={mode === 'list' ? 'Názov zoznamu (napr. Nákup)' : 'Názov poznámky'}
-        className="min-w-0 flex-1 rounded-lg border border-neutral-300 bg-transparent px-3 py-1.5 text-sm outline-none focus:border-accent dark:border-neutral-700"
+        ref={fileRef}
+        type="file"
+        multiple
+        hidden
+        onChange={(e) => {
+          const files = Array.from(e.target.files ?? []);
+          e.target.value = '';
+          if (files.length > 0) uploads.addFiles(files);
+        }}
       />
-      <button onClick={() => setMode(null)} className="text-sm text-neutral-400">Zrušiť</button>
-      <button
-        onClick={() => void create()}
-        disabled={!title.trim() || busy}
-        className="rounded-lg bg-accent px-3 py-1.5 text-sm font-medium text-white disabled:opacity-40"
-      >
-        Vytvoriť
-      </button>
     </div>
   );
 }
@@ -157,6 +192,10 @@ function NoteDetailView({ noteId, onBack }: { noteId: string; onBack: () => void
   const [sharePick, setSharePick] = useState(false);
   const [revisions, setRevisions] = useState<NoteRevision[] | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+  const [uploadingMedia, setUploadingMedia] = useState(false);
+  const [locating, setLocating] = useState(false);
+  const mediaFileRef = useRef<HTMLInputElement>(null);
+  const swipeBack = useSwipeBack(onBack);
 
   const load = () =>
     notesApi
@@ -216,8 +255,52 @@ function NoteDetailView({ noteId, onBack }: { noteId: string; onBack: () => void
     flash('Uložené ✓');
   };
 
+  const uploadMedia = async (files: File[]) => {
+    if (files.length === 0) return;
+    setUploadingMedia(true);
+    try {
+      const ids: string[] = [];
+      for (const f of files) ids.push((await mediaApi.upload(f)).id);
+      setNote(await notesApi.addMedia(noteId, ids));
+      flash('Prílohy pridané ✓');
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Nahrávanie zlyhalo');
+    } finally {
+      setUploadingMedia(false);
+    }
+  };
+
+  /** 📍 Poloha: do poznámky ako riadok textu, do zoznamu ako položka. */
+  const insertLocation = () => {
+    if (!navigator.geolocation) {
+      flash('Zariadenie nepodporuje polohu');
+      return;
+    }
+    setLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setLocating(false);
+        const { latitude, longitude } = pos.coords;
+        const text = `📍 Poloha: https://maps.google.com/?q=${latitude.toFixed(6)},${longitude.toFixed(6)}`;
+        if (note.kind === 'note') {
+          setBody((cur) => (cur?.trim() ? `${cur}\n${text}` : text));
+          flash('Poloha vložená — nezabudni Uložiť');
+        } else {
+          void notesApi.addItem(noteId, text).then(setNote);
+        }
+      },
+      () => {
+        setLocating(false);
+        flash('Polohu sa nepodarilo zistiť');
+      },
+      { enableHighAccuracy: true, timeout: 10_000 },
+    );
+  };
+
+  const noteImages = note.media.filter((m) => m.kind === 'image');
+
   return (
-    <div className="px-4 py-4">
+    <div className="px-4 py-4" {...swipeBack}>
       <div className="mb-3 flex items-center gap-2">
         <button onClick={onBack} aria-label="Späť na zoznamy" className="grid h-8 w-8 place-items-center rounded-full text-lg hover:bg-neutral-100 dark:hover:bg-neutral-800">
           ←
@@ -246,6 +329,46 @@ function NoteDetailView({ noteId, onBack }: { noteId: string; onBack: () => void
           💬 Zdieľať
         </button>
       </div>
+
+      {/* Fotky poznámky (ladenie 07/2026) + pridávanie príloh a polohy. */}
+      {noteImages.length > 0 && (
+        <div className="mb-3">
+          <PhotoGallery
+            images={noteImages}
+            onRemove={async (ids) => {
+              for (const id of ids) await notesApi.removeMedia(noteId, id).catch(() => {});
+              void load();
+            }}
+          />
+        </div>
+      )}
+      <div className="mb-3 flex gap-2 text-sm">
+        <button
+          onClick={() => mediaFileRef.current?.click()}
+          disabled={uploadingMedia}
+          className="rounded-lg border border-neutral-300 px-3 py-1.5 text-neutral-500 transition hover:border-accent hover:text-accent disabled:opacity-50 dark:border-neutral-700"
+        >
+          {uploadingMedia ? 'Nahrávam…' : '📎 Príloha'}
+        </button>
+        <button
+          onClick={insertLocation}
+          disabled={locating}
+          className="rounded-lg border border-neutral-300 px-3 py-1.5 text-neutral-500 transition hover:border-accent hover:text-accent disabled:opacity-50 dark:border-neutral-700"
+        >
+          {locating ? 'Zisťujem…' : '📍 Poloha'}
+        </button>
+      </div>
+      <input
+        ref={mediaFileRef}
+        type="file"
+        multiple
+        hidden
+        onChange={(e) => {
+          const files = Array.from(e.target.files ?? []);
+          e.target.value = '';
+          void uploadMedia(files);
+        }}
+      />
 
       {note.kind === 'list' ? (
         <>
