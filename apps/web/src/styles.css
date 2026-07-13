@@ -11,10 +11,19 @@
 }
 
 body {
-  background: var(--color-bg);
+  background-color: var(--color-bg);
+  /* Jemné pozadie (ladenie 07/2026): decentné čmáranice psa/mačky/sliepky —
+     len textúra vo viditeľných medzerách, nízka nepriehľadnosť zapečená v SVG. */
+  background-image: url('./assets/pattern-animals-light.svg');
+  background-repeat: repeat;
+  background-size: 260px 240px;
   color: var(--color-text);
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
+}
+
+[data-theme='dark'] body {
+  background-image: url('./assets/pattern-animals-dark.svg');
 }
 
 /*
