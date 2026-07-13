@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import type { CommentPublic, PostPublic } from '@rodinna/shared-types';
 import { ApiError, feedApi } from '../lib/api';
 import { useAuth } from '../auth/AuthContext';
@@ -13,6 +13,7 @@ import { ReactionBar } from './ReactionBar';
 import { CommentThread } from './CommentThread';
 import { CommentComposer } from './CommentComposer';
 import { PhotoGallery } from '../shared/PhotoGallery';
+import { useAutoGrow } from '../shared/useAutoGrow';
 
 interface PostCardProps {
   post: PostPublic;
@@ -33,6 +34,9 @@ export function PostCard({ post, onChange, onDeleted }: PostCardProps) {
   const [editText, setEditText] = useState('');
   const [editBusy, setEditBusy] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
+  const editRef = useRef<HTMLTextAreaElement>(null);
+  useAutoGrow(editRef, editing ? editText : '', 50);
+  const swipeRef = useRef<{ x: number; y: number; t: number } | null>(null);
   if (!user) return null;
 
   const isAuthor = post.author.id === user.id;
@@ -92,7 +96,25 @@ export function PostCard({ post, onChange, onDeleted }: PostCardProps) {
   const previewUrl = post.media.length === 0 && !appLink ? extractFirstUrl(post.bodyMd) : null;
 
   return (
-    <article className="px-4 py-3">
+    // Swipe doprava rozbalí vlákno komentárov, doľava zbalí (ladenie 07/2026).
+    <article
+      className="px-4 py-3"
+      onTouchStart={(e) => {
+        const t = e.touches[0]!;
+        swipeRef.current = { x: t.clientX, y: t.clientY, t: Date.now() };
+      }}
+      onTouchEnd={(e) => {
+        const s = swipeRef.current;
+        swipeRef.current = null;
+        if (!s) return;
+        const t = e.changedTouches[0]!;
+        const dx = t.clientX - s.x;
+        const dy = t.clientY - s.y;
+        if (Math.abs(dx) < 80 || Math.abs(dx) < Math.abs(dy) * 2 || Date.now() - s.t > 800) return;
+        if (dx > 0 && !commentsOpen) void loadComments();
+        if (dx < 0 && commentsOpen) setCommentsOpen(false);
+      }}
+    >
       <div className="flex gap-3">
         <Avatar user={post.author} size={40} />
         <div className="min-w-0 flex-1">
@@ -145,12 +167,13 @@ export function PostCard({ post, onChange, onDeleted }: PostCardProps) {
           {editing ? (
             <div className="mt-1 space-y-2">
               <textarea
+                ref={editRef}
                 value={editText}
                 onChange={(e) => setEditText(e.target.value)}
                 maxLength={4000}
                 rows={3}
                 autoFocus
-                className="w-full resize-none rounded-lg border border-neutral-300 bg-transparent px-3 py-2 text-[15px] outline-none focus:border-accent dark:border-neutral-700"
+                className="min-h-20 w-full resize-none rounded-lg border border-neutral-300 bg-transparent px-3 py-2 text-[15px] outline-none focus:border-accent dark:border-neutral-700"
               />
               <div className="flex gap-2">
                 <button

@@ -18,8 +18,17 @@ export const MAX_NOTE_ITEMS = 200;
 export const NoteKindSchema = z.enum(['note', 'list']);
 export type NoteKind = z.infer<typeof NoteKindSchema>;
 
+/**
+ * Viditeľnosť (ladenie 07/2026): 'private' vidí len autor (poznámka „na
+ * zariadení"), 'family' celá rodina. Nové poznámky sú predvolene súkromné;
+ * zdieľanie do chatu poznámku prepne na rodinnú.
+ */
+export const NoteVisibilitySchema = z.enum(['private', 'family']);
+export type NoteVisibility = z.infer<typeof NoteVisibilitySchema>;
+
 export const CreateNoteInputSchema = z.object({
   kind: NoteKindSchema,
+  visibility: NoteVisibilitySchema.default('private'),
   title: z.string().trim().min(1, 'Chýba názov').max(MAX_NOTE_TITLE),
   bodyMd: z.string().max(MAX_NOTE_BODY).default(''),
   /** Počiatočné položky zoznamu (napr. z duplikátu/šablóny). */
@@ -40,6 +49,8 @@ export const UpdateNoteInputSchema = z.object({
   /** Zmena textu poznámky uloží predchádzajúci obsah ako revíziu. */
   bodyMd: z.string().max(MAX_NOTE_BODY).optional(),
   pinned: z.boolean().optional(),
+  /** Zmeniť viditeľnosť môže len autor poznámky. */
+  visibility: NoteVisibilitySchema.optional(),
 });
 export type UpdateNoteInput = z.infer<typeof UpdateNoteInputSchema>;
 
@@ -69,6 +80,7 @@ export type NoteItemPublic = z.infer<typeof NoteItemPublicSchema>;
 export const NoteSummarySchema = z.object({
   id: z.string().uuid(),
   kind: NoteKindSchema,
+  visibility: NoteVisibilitySchema,
   title: z.string(),
   pinned: z.boolean(),
   createdBy: PostAuthorSchema,

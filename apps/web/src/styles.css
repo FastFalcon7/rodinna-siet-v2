@@ -16,3 +16,16 @@ body {
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
 }
+
+/*
+ * iOS Safari automaticky zoomuje stránku pri fokuse poľa s písmom < 16px
+ * (ladenie 07/2026: „obrazovka sa zväčší a pravý okraj je mimo display").
+ * 16px na mobilných inputoch zoom vypína bez zákazu pinch-zoomu.
+ */
+@media (max-width: 767px) {
+  input,
+  textarea,
+  select {
+    font-size: 16px;
+  }
+}

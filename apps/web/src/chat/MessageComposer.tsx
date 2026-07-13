@@ -6,6 +6,7 @@ import { AttachmentSheet } from '../shared/AttachmentSheet';
 import { UploadPreviews } from '../shared/UploadPreviews';
 import { useMediaUpload } from '../shared/useMediaUpload';
 import { buildAppLink } from '../shared/appLink';
+import { useAutoGrow } from '../shared/useAutoGrow';
 import { PollComposerDialog } from '../polls/PollComposerDialog';
 import { EventComposerDialog } from '../events/EventComposerDialog';
 
@@ -45,13 +46,8 @@ export function MessageComposer({
     }
   }, [editing]);
 
-  // Autogrow textarea.
-  useEffect(() => {
-    const ta = taRef.current;
-    if (!ta) return;
-    ta.style.height = 'auto';
-    ta.style.height = `${Math.min(ta.scrollHeight, 160)}px`;
-  }, [text]);
+  // Autogrow textarea — strop 40 % výšky okna (ladenie 07/2026).
+  useAutoGrow(taRef, text, 40);
 
   const emitTyping = () => {
     if (editing) return;
@@ -175,7 +171,7 @@ export function MessageComposer({
           onKeyDown={onKeyDown}
           rows={1}
           placeholder="Napíš správu…"
-          className="max-h-40 flex-1 resize-none rounded-2xl border border-neutral-300 bg-neutral-50 px-3 py-2 text-sm outline-none focus:border-accent dark:border-neutral-700 dark:bg-neutral-800"
+          className="flex-1 resize-none rounded-2xl border border-neutral-300 bg-neutral-50 px-3 py-2 text-sm outline-none focus:border-accent dark:border-neutral-700 dark:bg-neutral-800"
         />
         <button
           type="button"

@@ -50,14 +50,21 @@ async function fetchNoteMedia(noteId: string) {
   return rows.map((r) => toMediaPublic(r.media));
 }
 
-async function getNoteRow(noteId: string): Promise<NoteRow> {
+/**
+ * Načíta poznámku a overí viditeľnosť (ladenie 07/2026): 'private' vidí
+ * len autor — pre ostatných (aj admina) sa tvári ako neexistujúca.
+ */
+async function getNoteRow(noteId: string, viewerId: string): Promise<NoteRow> {
   const rows = await db
     .select()
     .from(notes)
     .where(and(eq(notes.id, noteId), isNull(notes.deletedAt)))
     .limit(1);
-  if (!rows[0]) throw new NotFoundError('Zoznam/poznámka nenájdená');
-  return rows[0];
+  const note = rows[0];
+  if (!note || (note.visibility === 'private' && note.createdBy !== viewerId)) {
+    throw new NotFoundError('Zoznam/poznámka nenájdená');
+  }
+  return note;
 }
 
 /** Každá zmena: updatedBy/updatedAt + WS event pre živé karty a modul. */
@@ -85,6 +92,7 @@ async function buildSummaries(rows: NoteRow[]): Promise<NoteSummary[]> {
   return rows.map((row) => ({
     id: row.id,
     kind: row.kind,
+    visibility: row.visibility,
     title: row.title,
     pinned: row.pinned,
     createdBy: authors.get(row.createdBy)!,
@@ -96,8 +104,10 @@ async function buildSummaries(rows: NoteRow[]): Promise<NoteSummary[]> {
   }));
 }
 
-export async function listNotes(): Promise<NoteSummary[]> {
-  const rows = await db.select().from(notes).where(isNull(notes.deletedAt));
+export async function listNotes(viewerId: string): Promise<NoteSummary[]> {
+  const all = await db.select().from(notes).where(isNull(notes.deletedAt));
+  // Súkromné poznámky vidí len ich autor.
+  const rows = all.filter((n) => n.visibility === 'family' || n.createdBy === viewerId);
   const summaries = await buildSummaries(rows);
   // Pripnuté hore, potom podľa poslednej aktivity.
   return summaries.sort(
@@ -105,8 +115,8 @@ export async function listNotes(): Promise<NoteSummary[]> {
   );
 }
 
-export async function getNote(noteId: string): Promise<NoteDetail> {
-  const row = await getNoteRow(noteId);
+export async function getNote(noteId: string, viewerId: string): Promise<NoteDetail> {
+  const row = await getNoteRow(noteId, viewerId);
   const [summary] = await buildSummaries([row]);
 
   const itemRows = await db
@@ -150,6 +160,7 @@ export async function createNote(creatorId: string, input: CreateNoteInput): Pro
     .insert(notes)
     .values({
       kind: input.kind,
+      visibility: input.visibility,
       title: input.title,
       bodyMd: input.bodyMd,
       createdBy: creatorId,
@@ -167,12 +178,12 @@ export async function createNote(creatorId: string, input: CreateNoteInput): Pro
     await db.insert(noteMedia).values(mediaIds.map((mediaId, order) => ({ noteId: note.id, mediaId, order })));
   }
   await publishCrossProcess(APP_TOPIC, { t: 'note:update', noteId: note.id });
-  return getNote(note.id);
+  return getNote(note.id, creatorId);
 }
 
 /** Pridá fotky do poznámky (z výberu vo feede/chate alebo composera). */
 export async function addNoteMedia(noteId: string, userId: string, mediaIds: string[]): Promise<NoteDetail> {
-  await getNoteRow(noteId);
+  await getNoteRow(noteId, userId);
   const unique = [...new Set(mediaIds)];
   await verifyMediaExist(unique);
   const maxOrder = await db
@@ -184,19 +195,22 @@ export async function addNoteMedia(noteId: string, userId: string, mediaIds: str
     .values(unique.map((mediaId, i) => ({ noteId, mediaId, order: (maxOrder[0]?.max ?? 0) + 1 + i })))
     .onConflictDoNothing();
   await touch(noteId, userId);
-  return getNote(noteId);
+  return getNote(noteId, userId);
 }
 
 /** Odstráni fotku z poznámky (family-wide, ako editácia textu). */
 export async function removeNoteMedia(noteId: string, userId: string, mediaId: string): Promise<NoteDetail> {
-  await getNoteRow(noteId);
+  await getNoteRow(noteId, userId);
   await db.delete(noteMedia).where(and(eq(noteMedia.noteId, noteId), eq(noteMedia.mediaId, mediaId)));
   await touch(noteId, userId);
-  return getNote(noteId);
+  return getNote(noteId, userId);
 }
 
 export async function updateNote(noteId: string, userId: string, input: UpdateNoteInput): Promise<NoteDetail> {
-  const note = await getNoteRow(noteId);
+  const note = await getNoteRow(noteId, userId);
+  if (input.visibility !== undefined && input.visibility !== note.visibility && note.createdBy !== userId) {
+    throw new ForbiddenError('Viditeľnosť poznámky mení len jej autor');
+  }
 
   // Zmena textu: predchádzajúci obsah do revízií (história verzií).
   if (input.bodyMd !== undefined && input.bodyMd !== note.bodyMd) {
@@ -213,14 +227,15 @@ export async function updateNote(noteId: string, userId: string, input: UpdateNo
       ...(input.title !== undefined ? { title: input.title } : {}),
       ...(input.bodyMd !== undefined ? { bodyMd: input.bodyMd } : {}),
       ...(input.pinned !== undefined ? { pinned: input.pinned } : {}),
+      ...(input.visibility !== undefined ? { visibility: input.visibility } : {}),
     })
     .where(eq(notes.id, noteId));
   await touch(noteId, userId);
-  return getNote(noteId);
+  return getNote(noteId, userId);
 }
 
 export async function deleteNote(noteId: string, userId: string, isAdmin: boolean): Promise<void> {
-  const note = await getNoteRow(noteId);
+  const note = await getNoteRow(noteId, userId);
   if (note.createdBy !== userId && !isAdmin) {
     throw new ForbiddenError('Zmazať môže len autor alebo admin');
   }
@@ -229,7 +244,7 @@ export async function deleteNote(noteId: string, userId: string, isAdmin: boolea
 }
 
 export async function addItem(noteId: string, userId: string, label: string): Promise<NoteDetail> {
-  const note = await getNoteRow(noteId);
+  const note = await getNoteRow(noteId, userId);
   if (note.kind !== 'list') throw new BadRequestError('Položky má len zoznam');
   const maxOrder = await db
     .select({ max: sql<number>`coalesce(max("order"), 0)::int` })
@@ -237,7 +252,7 @@ export async function addItem(noteId: string, userId: string, label: string): Pr
     .where(eq(noteItems.noteId, noteId));
   await db.insert(noteItems).values({ noteId, label, order: (maxOrder[0]?.max ?? 0) + 1 });
   await touch(noteId, userId);
-  return getNote(noteId);
+  return getNote(noteId, userId);
 }
 
 export async function updateItem(
@@ -248,7 +263,7 @@ export async function updateItem(
   const rows = await db.select().from(noteItems).where(eq(noteItems.id, itemId)).limit(1);
   const item = rows[0];
   if (!item) throw new NotFoundError('Položka nenájdená');
-  await getNoteRow(item.noteId); // 404 pre zmazaný zoznam
+  await getNoteRow(item.noteId, userId); // 404 pre zmazaný/súkromný zoznam
 
   if (input.assignedTo) {
     const u = await db.select({ id: users.id }).from(users).where(eq(users.id, input.assignedTo));
@@ -268,21 +283,22 @@ export async function updateItem(
     })
     .where(eq(noteItems.id, itemId));
   await touch(item.noteId, userId);
-  return getNote(item.noteId);
+  return getNote(item.noteId, userId);
 }
 
 export async function deleteItem(itemId: string, userId: string): Promise<NoteDetail> {
   const rows = await db.select().from(noteItems).where(eq(noteItems.id, itemId)).limit(1);
   const item = rows[0];
   if (!item) throw new NotFoundError('Položka nenájdená');
+  await getNoteRow(item.noteId, userId); // 404 pre súkromný zoznam iného autora
   await db.delete(noteItems).where(eq(noteItems.id, itemId));
   await touch(item.noteId, userId);
-  return getNote(item.noteId);
+  return getNote(item.noteId, userId);
 }
 
 /** „Šablóna": duplikát zoznamu s odškrtnutím zmazaným (týždenný nákup a pod.). */
 export async function duplicateNote(noteId: string, userId: string, title?: string): Promise<NoteDetail> {
-  const note = await getNoteRow(noteId);
+  const note = await getNoteRow(noteId, userId);
   const items = await db
     .select({ label: noteItems.label })
     .from(noteItems)
@@ -290,6 +306,7 @@ export async function duplicateNote(noteId: string, userId: string, title?: stri
     .orderBy(asc(noteItems.order), asc(noteItems.createdAt));
   return createNote(userId, {
     kind: note.kind,
+    visibility: note.visibility,
     title: title ?? `${note.title} (kópia)`,
     bodyMd: note.bodyMd,
     items: items.map((i) => i.label),
@@ -299,8 +316,8 @@ export async function duplicateNote(noteId: string, userId: string, title?: stri
 
 // ── Revízie ──────────────────────────────────────────────────────────────────
 
-export async function listRevisions(noteId: string): Promise<NoteRevision[]> {
-  await getNoteRow(noteId);
+export async function listRevisions(noteId: string, viewerId: string): Promise<NoteRevision[]> {
+  await getNoteRow(noteId, viewerId);
   const rows = await db
     .select()
     .from(noteRevisions)

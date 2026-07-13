@@ -51,7 +51,7 @@ export function NotePickerDialog({ mediaIds, onClose }: NotePickerDialogProps) {
     setBusy(true);
     setError(null);
     try {
-      await notesApi.create({ kind: 'note', title, bodyMd: '', items: [], mediaIds });
+      await notesApi.create({ kind: 'note', visibility: 'private', title, bodyMd: '', items: [], mediaIds });
       finish(title);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Poznámku sa nepodarilo vytvoriť');

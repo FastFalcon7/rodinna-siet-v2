@@ -537,12 +537,15 @@ export const memoryMarks = pgTable('memory_marks', {
  * predchádzajúcu verziu do note_revisions (last-write-wins + história).
  */
 export const noteKindValues = ['note', 'list'] as const;
+/** Ladenie 07/2026: 'private' vidí len autor; DB default 'family' drží staré riadky viditeľné. */
+export const noteVisibilityValues = ['private', 'family'] as const;
 
 export const notes = pgTable(
   'notes',
   {
     id: uuid('id').primaryKey().defaultRandom(),
     kind: text('kind', { enum: noteKindValues }).notNull(),
+    visibility: text('visibility', { enum: noteVisibilityValues }).notNull().default('family'),
     title: text('title').notNull(),
     bodyMd: text('body_md').notNull().default(''),
     pinned: boolean('pinned').notNull().default(false),

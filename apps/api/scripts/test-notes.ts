@@ -128,12 +128,32 @@ async function main() {
 
   r = await http(bob.token, 'POST', '/api/notes', {
     kind: 'list',
+    visibility: 'family',
     title: 'Nákup',
     items: ['Mlieko', 'Chlieb', 'Vajcia'],
   });
   check('zoznam s 3 položkami → 201', r.status === 201 && r.body.items.length === 3, r.body.items?.length);
   const listId = r.body.id;
   const [i1, i2] = r.body.items;
+
+  console.log('\n— Viditeľnosť: private/family (ladenie, 7. kolo) —');
+  r = await http(bob.token, 'POST', '/api/notes', { kind: 'note', title: 'Tajný denníček' });
+  check('default viditeľnosť je private', r.status === 201 && r.body.visibility === 'private', r.body.visibility);
+  const privId = r.body.id;
+  r = await http(alica.token, 'GET', `/api/notes/${privId}`);
+  check('cudzia súkromná poznámka → 404 (aj pre admina)', r.status === 404, r.status);
+  r = await http(alica.token, 'GET', '/api/notes');
+  check('súkromná nie je v zozname iných', !r.body.notes.some((n: any) => n.id === privId), r.body.notes?.length);
+  r = await http(bob.token, 'GET', '/api/notes');
+  check('autor svoju súkromnú vidí', r.body.notes.some((n: any) => n.id === privId), r.body.notes?.length);
+  r = await http(alica.token, 'PATCH', `/api/notes/${privId}`, { visibility: 'family' });
+  check('viditeľnosť cudzej poznámky nezmeníš → 404', r.status === 404, r.status);
+  r = await http(bob.token, 'PATCH', `/api/notes/${privId}`, { visibility: 'family' });
+  check('autor prepne na family', r.status === 200 && r.body.visibility === 'family', r.body.visibility);
+  r = await http(alica.token, 'GET', `/api/notes/${privId}`);
+  check('po prepnutí ju vidia ostatní', r.status === 200, r.status);
+  r = await http(alica.token, 'PATCH', `/api/notes/${privId}`, { visibility: 'private' });
+  check('ne-autor neprepne rodinnú na súkromnú → 403', r.status === 403, r.status);
 
   const aliceWs = connectWs(alica.token);
   await aliceWs.opened;
@@ -164,7 +184,7 @@ async function main() {
   check('odznačenie (checkedBy zmizne)', r.body.items[0].checkedBy === null, r.body.items[0]);
 
   console.log('\n— Poznámka: revízie —');
-  r = await http(alica.token, 'POST', '/api/notes', { kind: 'note', title: 'Recept', bodyMd: 'verzia 1' });
+  r = await http(alica.token, 'POST', '/api/notes', { kind: 'note', visibility: 'family', title: 'Recept', bodyMd: 'verzia 1' });
   const noteId = r.body.id;
   r = await http(bob.token, 'PATCH', `/api/notes/${noteId}`, { bodyMd: 'verzia 2' });
   check('úprava textu (updatedBy=Bob)', r.body.updatedBy?.displayName === 'Bob' && r.body.bodyMd === 'verzia 2', r.body.updatedBy);

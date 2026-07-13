@@ -2,6 +2,7 @@ import { useRef, useState } from 'react';
 import { ApiError } from '../lib/api';
 import { UploadPreviews } from '../shared/UploadPreviews';
 import { useMediaUpload } from '../shared/useMediaUpload';
+import { useAutoGrow } from '../shared/useAutoGrow';
 
 interface CommentComposerProps {
   placeholder: string;
@@ -21,6 +22,9 @@ export function CommentComposer({ placeholder, autoFocus, onSubmit }: CommentCom
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const taRef = useRef<HTMLTextAreaElement>(null);
+  // Komentár rastie s textom (ladenie 07/2026) — text sa nestráca.
+  useAutoGrow(taRef, text, 35);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -44,13 +48,21 @@ export function CommentComposer({ placeholder, autoFocus, onSubmit }: CommentCom
     <div className="min-w-0 flex-1 space-y-2">
       <UploadPreviews items={uploads.items} onRemove={uploads.remove} onMakeCover={uploads.makeFirst} />
       <form onSubmit={submit} className="flex gap-2">
-        <input
+        <textarea
+          ref={taRef}
           value={text}
           onChange={(e) => setText(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+              e.preventDefault();
+              void submit(e);
+            }
+          }}
           maxLength={2000}
+          rows={1}
           autoFocus={autoFocus}
           placeholder={placeholder}
-          className="min-w-0 flex-1 rounded-lg border border-neutral-300 bg-transparent px-3 py-1.5 text-sm outline-none focus:border-accent dark:border-neutral-700"
+          className="min-w-0 flex-1 resize-none rounded-lg border border-neutral-300 bg-transparent px-3 py-1.5 text-sm outline-none focus:border-accent dark:border-neutral-700"
         />
         <button
           type="button"

@@ -10,6 +10,7 @@ import { PhotoGallery } from '../shared/PhotoGallery';
 import { UploadPreviews } from '../shared/UploadPreviews';
 import { useMediaUpload } from '../shared/useMediaUpload';
 import { useSwipeBack } from '../shared/useSwipeBack';
+import { useAutoGrow } from '../shared/useAutoGrow';
 
 /**
  * Modul Zoznamy & Poznámky (M3): rodinne zdieľané zoznamy s odškrtávaním
@@ -62,6 +63,7 @@ export function Notes() {
               <span className="flex items-center gap-2">
                 <span className="min-w-0 flex-1 truncate text-sm font-medium">
                   {n.pinned && '📌 '}
+                  {n.visibility === 'private' && '🔒 '}
                   {n.kind === 'list' ? '✅' : '📝'} {n.title}
                 </span>
                 {n.kind === 'list' && (
@@ -93,6 +95,8 @@ export function Notes() {
 function NewNoteButtons({ onCreated }: { onCreated: (id: string) => void }) {
   const [mode, setMode] = useState<'list' | 'note' | null>(null);
   const [title, setTitle] = useState('');
+  // Nové poznámky sú predvolene súkromné (ladenie 07/2026) — vidí ich len autor.
+  const [shared, setShared] = useState(false);
   const [busy, setBusy] = useState(false);
   const uploads = useMediaUpload(20);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -103,6 +107,7 @@ function NewNoteButtons({ onCreated }: { onCreated: (id: string) => void }) {
     try {
       const n = await notesApi.create({
         kind: mode,
+        visibility: shared ? 'family' : 'private',
         title: title.trim(),
         bodyMd: '',
         items: [],
@@ -165,6 +170,10 @@ function NewNoteButtons({ onCreated }: { onCreated: (id: string) => void }) {
           Vytvoriť
         </button>
       </div>
+      <label className="flex items-center gap-1.5 text-sm text-neutral-600 dark:text-neutral-300">
+        <input type="checkbox" checked={shared} onChange={(e) => setShared(e.target.checked)} className="accent-accent" />
+        👪 Zdieľať s rodinou (inak je len pre mňa)
+      </label>
       <input
         ref={fileRef}
         type="file"
@@ -195,6 +204,8 @@ function NoteDetailView({ noteId, onBack }: { noteId: string; onBack: () => void
   const [uploadingMedia, setUploadingMedia] = useState(false);
   const [locating, setLocating] = useState(false);
   const mediaFileRef = useRef<HTMLInputElement>(null);
+  const bodyRef = useRef<HTMLTextAreaElement>(null);
+  useAutoGrow(bodyRef, body ?? '', 60);
   const swipeBack = useSwipeBack(onBack);
 
   const load = () =>
@@ -245,13 +256,17 @@ function NoteDetailView({ noteId, onBack }: { noteId: string; onBack: () => void
 
   const shareTo = async (roomId: string) => {
     setSharePick(false);
+    // Súkromnú poznámku ostatní neuvidia — zdieľanie ju prepne na rodinnú.
+    if (note?.visibility === 'private') {
+      setNote(await notesApi.update(noteId, { visibility: 'family' }));
+    }
     await chatApi.sendMessage(roomId, { bodyMd: buildAppLink('notes', noteId), mediaIds: [] });
-    flash('Poslané do chatu ✓');
+    flash('Poslané do chatu ✓ (poznámka je teraz rodinná)');
   };
 
   const saveBody = async () => {
-    if (body === null || body === note.bodyMd) return;
-    setNote(await notesApi.update(noteId, { bodyMd: body }));
+    if (body === null) return;
+    if (body !== note.bodyMd) setNote(await notesApi.update(noteId, { bodyMd: body }));
     flash('Uložené ✓');
   };
 
@@ -314,6 +329,22 @@ function NoteDetailView({ noteId, onBack }: { noteId: string; onBack: () => void
             {relativeTime(note.updatedAt)}
           </p>
         </div>
+        {user && note.createdBy.id === user.id && (
+          <button
+            onClick={() =>
+              void notesApi
+                .update(noteId, { visibility: note.visibility === 'private' ? 'family' : 'private' })
+                .then((n) => {
+                  setNote(n);
+                  flash(n.visibility === 'private' ? 'Poznámka je len pre teba 🔒' : 'Poznámka je pre celú rodinu 👪');
+                })
+            }
+            title={note.visibility === 'private' ? 'Len pre mňa — prepnúť na rodinnú' : 'Rodinná — prepnúť na súkromnú'}
+            className="shrink-0 rounded-lg px-2 py-1.5 text-sm"
+          >
+            {note.visibility === 'private' ? '🔒' : '👪'}
+          </button>
+        )}
         <button
           onClick={() => void notesApi.update(noteId, { pinned: !note.pinned }).then(setNote)}
           title={note.pinned ? 'Odopnúť' : 'Pripnúť hore'}
@@ -469,16 +500,17 @@ function NoteDetailView({ noteId, onBack }: { noteId: string; onBack: () => void
       ) : (
         <>
           <textarea
+            ref={bodyRef}
             value={body ?? ''}
             onChange={(e) => setBody(e.target.value)}
-            rows={12}
+            rows={6}
             placeholder="Píš sem…"
-            className="w-full resize-y rounded-2xl border border-neutral-200 bg-white px-4 py-3 text-sm leading-relaxed outline-none focus:border-accent dark:border-neutral-800 dark:bg-neutral-900"
+            className="min-h-40 w-full resize-none rounded-2xl border border-neutral-200 bg-white px-4 py-3 text-sm leading-relaxed outline-none focus:border-accent dark:border-neutral-800 dark:bg-neutral-900"
           />
           <div className="mt-2 flex items-center gap-3">
             <button
               onClick={() => void saveBody()}
-              disabled={body === null || body === note.bodyMd}
+              disabled={body === null}
               className="rounded-lg bg-accent px-4 py-1.5 text-sm font-medium text-white disabled:opacity-40"
             >
               Uložiť

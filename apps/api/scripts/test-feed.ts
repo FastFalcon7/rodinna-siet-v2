@@ -242,6 +242,7 @@ async function main() {
   const n2 = await seedImage(bob.id); // cudzia fotka — family-wide je OK
   r = await http(alica.token, 'POST', '/api/notes', {
     kind: 'note',
+    visibility: 'family',
     title: 'Recept',
     bodyMd: 'Babkin koláč',
     items: [],

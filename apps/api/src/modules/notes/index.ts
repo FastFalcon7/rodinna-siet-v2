@@ -42,7 +42,7 @@ function mapError(err: unknown): { message: string; status: 400 | 403 | 404 } | 
 
 /** GET /api/notes — zoznamy a poznámky (pripnuté hore, potom podľa aktivity). */
 router.get('/', requireAuth, async (c) => {
-  return c.json({ notes: await listNotes() });
+  return c.json({ notes: await listNotes(c.get('user')!.id) });
 });
 
 /** POST /api/notes — nový zoznam/poznámka. */
@@ -63,7 +63,7 @@ router.post('/', requireAuth, zValidator('json', CreateNoteInputSchema), async (
 /** GET /api/notes/:id — detail s položkami. */
 router.get('/:id', requireAuth, async (c) => {
   try {
-    return c.json(await getNote(c.req.param('id')));
+    return c.json(await getNote(c.req.param('id'), c.get('user')!.id));
   } catch (err) {
     const m = mapError(err);
     if (m) return c.json({ error: m.message }, m.status);
@@ -191,7 +191,7 @@ router.post(
 /** GET /api/notes/:id/revisions — história verzií textu. */
 router.get('/:id/revisions', requireAuth, async (c) => {
   try {
-    return c.json({ revisions: await listRevisions(c.req.param('id')) });
+    return c.json({ revisions: await listRevisions(c.req.param('id'), c.get('user')!.id) });
   } catch (err) {
     const m = mapError(err);
     if (m) return c.json({ error: m.message }, m.status);
