@@ -58,9 +58,16 @@ export const CreatePostInputSchema = z
   });
 export type CreatePostInput = z.infer<typeof CreatePostInputSchema>;
 
-export const UpdatePostInputSchema = z.object({
-  bodyMd: z.string().trim().min(1, 'Príspevok nemôže byť prázdny').max(4000),
-});
+export const UpdatePostInputSchema = z
+  .object({
+    bodyMd: z.string().trim().max(4000),
+    /** Kompletná množina príloh po úprave (ladenie 07/2026) — pridanie aj mazanie. */
+    mediaIds: z.array(z.string().uuid()).max(10).optional(),
+  })
+  .refine((v) => v.bodyMd.length > 0 || (v.mediaIds?.length ?? 0) > 0, {
+    message: 'Príspevok nemôže byť prázdny',
+    path: ['bodyMd'],
+  });
 export type UpdatePostInput = z.infer<typeof UpdatePostInputSchema>;
 
 export const PostPublicSchema = z.object({

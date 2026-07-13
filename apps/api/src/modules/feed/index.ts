@@ -61,7 +61,7 @@ router.patch('/:id', requireAuth, zValidator('json', UpdatePostInputSchema), asy
   const me = c.get('user')!;
   const input = c.req.valid('json');
   try {
-    const post = await updatePost(c.req.param('id'), me.id, input.bodyMd, me.id);
+    const post = await updatePost(c.req.param('id'), me.id, input, me.id);
     return c.json(post);
   } catch (err) {
     if (err instanceof NotFoundError) return c.json({ error: err.message }, 404);

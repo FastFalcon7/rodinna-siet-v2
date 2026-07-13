@@ -270,6 +270,20 @@ async function main() {
   r = await http(alica.token, 'DELETE', `/api/events/${evId}/media/${n2}`);
   check('autor odstránil fotku udalosti → 200', r.status === 200 && r.body.media?.length === 1, r.body.media?.length);
 
+  console.log('\n— Editácia postu s prílohami (ladenie, 8. kolo) —');
+  const e1 = await seedImage(alica.id);
+  r = await http(alica.token, 'PATCH', `/api/feed/${postId}`, { bodyMd: 'Ahoj rodina! (upravené)', mediaIds: [p1, e1] });
+  check(
+    'edit: odobratá p2, pridaná e1 → media = [p1, e1]',
+    r.status === 200 && r.body.media?.length === 2 && r.body.media[0].id === p1 && r.body.media[1].id === e1,
+    r.body.media,
+  );
+  const cudzia2 = await seedImage(bob.id);
+  r = await http(alica.token, 'PATCH', `/api/feed/${postId}`, { bodyMd: 'X', mediaIds: [p1, cudzia2] });
+  check('edit: nová cudzia fotka → 403', r.status === 403, r.status);
+  r = await http(bob.token, 'PATCH', `/api/feed/${postId}`, { bodyMd: 'Hack', mediaIds: [] });
+  check('edit cudzieho postu → 403', r.status === 403, r.status);
+
   console.log('\n— Anketa s fotkami možností (ladenie, 6. kolo) —');
   const p1img = await seedImage(alica.id);
   r = await http(alica.token, 'POST', '/api/polls', {

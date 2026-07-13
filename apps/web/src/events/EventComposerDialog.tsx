@@ -3,6 +3,7 @@ import { MAX_EVENT_LOCATION, MAX_EVENT_TITLE, type EventPublic } from '@rodinna/
 import { ApiError, eventsApi } from '../lib/api';
 import { UploadPreviews } from '../shared/UploadPreviews';
 import { useMediaUpload } from '../shared/useMediaUpload';
+import { TitleInput } from '../shared/TitleInput';
 
 /**
  * Dialóg tvorby udalosti pre chat [+] sheet (M4 doplnok): rovnaký vzor ako
@@ -10,9 +11,12 @@ import { useMediaUpload } from '../shared/useMediaUpload';
  * správu len do konkrétnej miestnosti namiesto karty do celorodinného Feedu.
  */
 export function EventComposerDialog({
+  roomId,
   onCreated,
   onClose,
 }: {
+  /** Miestnosť chatu — udalosť uvidia len jej členovia (visibility='rooms'). */
+  roomId?: string;
   onCreated: (event: EventPublic) => void;
   onClose: () => void;
 }) {
@@ -65,6 +69,9 @@ export function EventComposerDialog({
         bodyMd: '',
         toFeed: false,
         mediaIds: uploads.mediaIds,
+        // Z chatu: udalosť vidia len účastníci miestnosti (ladenie 07/2026).
+        visibility: roomId ? 'rooms' : 'family',
+        roomIds: roomId ? [roomId] : [],
       });
       uploads.clear();
       onCreated(event);
@@ -86,13 +93,13 @@ export function EventComposerDialog({
         <div className="mx-auto h-1 w-10 rounded-full bg-neutral-300 md:hidden dark:bg-neutral-700" />
         <h2 className="font-semibold">📅 Nová udalosť</h2>
 
-        <input
+        <TitleInput
           value={title}
-          onChange={(e) => setTitle(e.target.value)}
+          onChange={setTitle}
           autoFocus
           maxLength={MAX_EVENT_TITLE}
           placeholder="Názov (napr. Grilovačka u nás)"
-          className="w-full rounded-lg border border-neutral-300 bg-transparent px-3 py-2 text-sm outline-none focus:border-accent dark:border-neutral-700"
+          className="w-full px-3 py-2"
         />
         <div className="flex flex-wrap items-center gap-2">
           <input

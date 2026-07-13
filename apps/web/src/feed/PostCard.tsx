@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import type { CommentPublic, PostPublic } from '@rodinna/shared-types';
+import type { CommentPublic, MediaPublic, PostPublic } from '@rodinna/shared-types';
 import { ApiError, feedApi } from '../lib/api';
 import { useAuth } from '../auth/AuthContext';
 import { Avatar } from '../shared/Avatar';
@@ -14,6 +14,8 @@ import { CommentThread } from './CommentThread';
 import { CommentComposer } from './CommentComposer';
 import { PhotoGallery } from '../shared/PhotoGallery';
 import { useAutoGrow } from '../shared/useAutoGrow';
+import { UploadPreviews } from '../shared/UploadPreviews';
+import { useMediaUpload } from '../shared/useMediaUpload';
 
 interface PostCardProps {
   post: PostPublic;
@@ -32,6 +34,10 @@ export function PostCard({ post, onChange, onDeleted }: PostCardProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [editing, setEditing] = useState(false);
   const [editText, setEditText] = useState('');
+  // Prílohy pri úprave (ladenie 07/2026): existujúce sa dajú odobrať, nové pridať.
+  const [editMedia, setEditMedia] = useState<MediaPublic[]>([]);
+  const editUploads = useMediaUpload(10);
+  const editFileRef = useRef<HTMLInputElement>(null);
   const [editBusy, setEditBusy] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
   const editRef = useRef<HTMLTextAreaElement>(null);
@@ -66,18 +72,23 @@ export function PostCard({ post, onChange, onDeleted }: PostCardProps) {
   const startEdit = () => {
     setMenuOpen(false);
     setEditText(post.bodyMd);
+    setEditMedia(post.media);
+    editUploads.clear();
     setEditError(null);
     setEditing(true);
   };
 
   const saveEdit = async () => {
     const trimmed = editText.trim();
-    if (!trimmed || editBusy) return;
+    const mediaIds = [...editMedia.map((m) => m.id), ...editUploads.mediaIds];
+    if (editBusy || editUploads.uploading) return;
+    if (!trimmed && mediaIds.length === 0) return;
     setEditBusy(true);
     setEditError(null);
     try {
-      const updated = await feedApi.updatePost(post.id, { bodyMd: trimmed });
+      const updated = await feedApi.updatePost(post.id, { bodyMd: trimmed, mediaIds });
       onChange(updated);
+      editUploads.clear();
       setEditing(false);
     } catch (err) {
       setEditError(err instanceof ApiError ? err.message : 'Úprava sa nepodarila');
@@ -175,21 +186,72 @@ export function PostCard({ post, onChange, onDeleted }: PostCardProps) {
                 autoFocus
                 className="min-h-20 w-full resize-none rounded-lg border border-neutral-300 bg-transparent px-3 py-2 text-[15px] outline-none focus:border-accent dark:border-neutral-700"
               />
-              <div className="flex gap-2">
+              {/* Existujúce prílohy — ✕ odoberie z príspevku. */}
+              {editMedia.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  {editMedia.map((m) => (
+                    <div key={m.id} className="relative">
+                      {m.kind === 'image' ? (
+                        <img src={m.url} alt="" className="h-16 w-16 rounded-lg object-cover" />
+                      ) : (
+                        <div className="grid h-16 w-16 place-items-center rounded-lg bg-neutral-100 text-xl dark:bg-neutral-800">
+                          {m.kind === 'video' ? '🎬' : '📄'}
+                        </div>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => setEditMedia((cur) => cur.filter((x) => x.id !== m.id))}
+                        aria-label="Odstrániť prílohu"
+                        className="absolute -right-1.5 -top-1.5 grid h-5 w-5 place-items-center rounded-full bg-neutral-800 text-xs text-white"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <UploadPreviews items={editUploads.items} onRemove={editUploads.remove} />
+              {/* „+" vľavo, Uložiť/Zrušiť vpravo (ladenie 07/2026). */}
+              <div className="flex items-center gap-2">
                 <button
                   type="button"
-                  onClick={() => void saveEdit()}
-                  disabled={editBusy || !editText.trim()}
-                  className="rounded-lg bg-accent px-3 py-1.5 text-sm font-medium text-white disabled:opacity-40"
+                  onClick={() => editFileRef.current?.click()}
+                  disabled={editBusy || editMedia.length + editUploads.items.length >= 10}
+                  title="Pridať prílohu"
+                  aria-label="Pridať prílohu"
+                  className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-2xl leading-none text-neutral-500 transition hover:bg-neutral-100 disabled:opacity-40 dark:hover:bg-neutral-800"
                 >
-                  Uložiť
+                  +
                 </button>
+                <input
+                  ref={editFileRef}
+                  type="file"
+                  multiple
+                  hidden
+                  onChange={(e) => {
+                    const files = Array.from(e.target.files ?? []);
+                    e.target.value = '';
+                    if (files.length > 0) editUploads.addFiles(files);
+                  }}
+                />
                 <button
                   type="button"
                   onClick={() => setEditing(false)}
-                  className="rounded-lg px-3 py-1.5 text-sm text-neutral-500 hover:bg-neutral-100 dark:hover:bg-neutral-800"
+                  className="ml-auto rounded-lg px-3 py-1.5 text-sm text-neutral-500 hover:bg-neutral-100 dark:hover:bg-neutral-800"
                 >
                   Zrušiť
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void saveEdit()}
+                  disabled={
+                    editBusy ||
+                    editUploads.uploading ||
+                    (!editText.trim() && editMedia.length + editUploads.mediaIds.length === 0)
+                  }
+                  className="rounded-lg bg-accent px-3 py-1.5 text-sm font-medium text-white disabled:opacity-40"
+                >
+                  Uložiť
                 </button>
               </div>
               {editError && <p className="text-sm text-red-600">{editError}</p>}

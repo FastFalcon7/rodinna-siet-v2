@@ -9,7 +9,7 @@ import type {
   UpdateEventInput,
 } from '@rodinna/shared-types';
 import { db } from '../../core/db/client';
-import { eventMedia, eventRsvps, events, feedCards, media, users, type EventRow } from '../../core/db/schema';
+import { chatRooms, eventMedia, eventRooms, eventRsvps, events, feedCards, media, roomMembers, users, type EventRow } from '../../core/db/schema';
 import { APP_TOPIC } from '../../core/realtime';
 import { publishCrossProcess } from '../../core/events';
 import { enqueueJob } from '../../core/jobs/queue';
@@ -31,14 +31,52 @@ async function fetchAuthors(userIds: string[]): Promise<Map<string, PostAuthor>>
   return new Map(rows.map((r) => [r.id, r]));
 }
 
-async function getEventRow(eventId: string): Promise<EventRow> {
+/** Množina miestností, ktorých je viewer členom (na 'rooms' viditeľnosť). */
+async function viewerRoomIds(viewerId: string): Promise<Set<string>> {
+  const rows = await db
+    .select({ roomId: roomMembers.roomId })
+    .from(roomMembers)
+    .where(eq(roomMembers.userId, viewerId));
+  return new Set(rows.map((r) => r.roomId));
+}
+
+async function eventRoomIdsOf(eventId: string): Promise<string[]> {
+  const rows = await db.select({ roomId: eventRooms.roomId }).from(eventRooms).where(eq(eventRooms.eventId, eventId));
+  return rows.map((r) => r.roomId);
+}
+
+/** Overí, že miestnosti existujú a užívateľ je ich členom. */
+async function verifyRoomsMembership(roomIds: string[], userId: string): Promise<void> {
+  if (roomIds.length === 0) return;
+  const rows = await db
+    .select({ roomId: roomMembers.roomId })
+    .from(roomMembers)
+    .innerJoin(chatRooms, eq(roomMembers.roomId, chatRooms.id))
+    .where(and(inArray(roomMembers.roomId, roomIds), eq(roomMembers.userId, userId)));
+  if (new Set(rows.map((r) => r.roomId)).size !== new Set(roomIds).size) {
+    throw new BadRequestError('Zdieľať sa dá len so skupinami, ktorých si členom');
+  }
+}
+
+/**
+ * Načíta udalosť a overí viditeľnosť (ladenie 07/2026): 'private' vidí len
+ * tvorca, 'rooms' tvorca + členovia priradených miestností, 'family' všetci.
+ */
+async function getEventRow(eventId: string, viewerId: string): Promise<EventRow> {
   const rows = await db
     .select()
     .from(events)
     .where(and(eq(events.id, eventId), isNull(events.deletedAt)))
     .limit(1);
-  if (!rows[0]) throw new NotFoundError('Udalosť nenájdená');
-  return rows[0];
+  const event = rows[0];
+  if (!event) throw new NotFoundError('Udalosť nenájdená');
+  if (event.createdBy !== viewerId && event.visibility !== 'family') {
+    if (event.visibility === 'private') throw new NotFoundError('Udalosť nenájdená');
+    const mine = await viewerRoomIds(viewerId);
+    const shared = await eventRoomIdsOf(eventId);
+    if (!shared.some((r) => mine.has(r))) throw new NotFoundError('Udalosť nenájdená');
+  }
+  return event;
 }
 
 // ── Hydratácia ───────────────────────────────────────────────────────────────
@@ -66,6 +104,16 @@ async function hydrateEvents(rows: EventRow[], viewerId: string): Promise<EventP
     ...rows.map((r) => r.createdBy),
     ...rsvpRows.map((r) => r.userId),
   ]);
+  const roomRows = await db
+    .select()
+    .from(eventRooms)
+    .where(inArray(eventRooms.eventId, eventIds));
+  const roomsMap = new Map<string, string[]>();
+  for (const r of roomRows) {
+    const list = roomsMap.get(r.eventId) ?? [];
+    list.push(r.roomId);
+    roomsMap.set(r.eventId, list);
+  }
 
   return rows.map((row) => {
     const mine = rsvpRows.find((r) => r.eventId === row.id && r.userId === viewerId);
@@ -87,6 +135,8 @@ async function hydrateEvents(rows: EventRow[], viewerId: string): Promise<EventP
       rsvps: { yes: by('yes'), no: by('no'), maybe: by('maybe') },
       myRsvp: mine?.status ?? null,
       media: mediaMap.get(row.id) ?? [],
+      visibility: row.visibility,
+      roomIds: roomsMap.get(row.id) ?? [],
       createdAt: row.createdAt.toISOString(),
     };
   });
@@ -103,7 +153,7 @@ async function verifyMediaExist(mediaIds: string[]): Promise<void> {
 
 /** Pridá fotky do udalosti (z výberu vo feede/chate alebo composera). */
 export async function addEventMedia(eventId: string, viewerId: string, mediaIds: string[]): Promise<EventPublic> {
-  await getEventRow(eventId);
+  await getEventRow(eventId, viewerId);
   const unique = [...new Set(mediaIds)];
   await verifyMediaExist(unique);
   const maxOrder = await db
@@ -125,7 +175,7 @@ export async function removeEventMedia(
   isAdmin: boolean,
   mediaId: string,
 ): Promise<EventPublic> {
-  const event = await getEventRow(eventId);
+  const event = await getEventRow(eventId, userId);
   if (event.createdBy !== userId && !isAdmin) {
     throw new ForbiddenError('Fotku z udalosti odstráni len jej autor alebo admin');
   }
@@ -135,7 +185,7 @@ export async function removeEventMedia(
 }
 
 export async function getEvent(eventId: string, viewerId: string): Promise<EventPublic> {
-  const [pub] = await hydrateEvents([await getEventRow(eventId)], viewerId);
+  const [pub] = await hydrateEvents([await getEventRow(eventId, viewerId)], viewerId);
   return pub!;
 }
 
@@ -180,8 +230,18 @@ export async function listAgenda(from: Date, to: Date, viewerId: string): Promis
       ),
     )
     .orderBy(asc(events.startsAt));
+  // Viditeľnosť (ladenie 07/2026): private len tvorca, rooms členovia miestností.
+  const mine = await viewerRoomIds(viewerId);
+  const shares = await db.select().from(eventRooms);
+  const sharedWithMe = new Set(shares.filter((sh) => mine.has(sh.roomId)).map((sh) => sh.eventId));
+  const visible = rows.filter(
+    (e) =>
+      e.visibility === 'family' ||
+      e.createdBy === viewerId ||
+      (e.visibility === 'rooms' && sharedWithMe.has(e.id)),
+  );
   return {
-    events: await hydrateEvents(rows, viewerId),
+    events: await hydrateEvents(visible, viewerId),
     birthdays: await birthdaysBetween(from, to),
   };
 }
@@ -207,6 +267,12 @@ export async function createEvent(creatorId: string, input: CreateEventInput): P
   if (startsAt < new Date(Date.now() - 60_000)) {
     throw new BadRequestError('Udalosť nemôže začínať v minulosti');
   }
+  const roomIds = [...new Set(input.roomIds)];
+  if (input.visibility === 'rooms') {
+    if (roomIds.length === 0) throw new BadRequestError('Vyber aspoň jednu skupinu');
+    await verifyRoomsMembership(roomIds, creatorId);
+  }
+
   const inserted = await db
     .insert(events)
     .values({
@@ -216,10 +282,15 @@ export async function createEvent(creatorId: string, input: CreateEventInput): P
       allDay: input.allDay,
       location: input.location,
       bodyMd: input.bodyMd,
+      visibility: input.visibility,
       createdBy: creatorId,
     })
     .returning();
   const event = inserted[0]!;
+
+  if (input.visibility === 'rooms' && roomIds.length > 0) {
+    await db.insert(eventRooms).values(roomIds.map((roomId) => ({ eventId: event.id, roomId })));
+  }
 
   // Autor ide automaticky (usporadúva to on).
   await db.insert(eventRsvps).values({ eventId: event.id, userId: creatorId, status: 'yes' });
@@ -230,7 +301,8 @@ export async function createEvent(creatorId: string, input: CreateEventInput): P
     await db.insert(eventMedia).values(mediaIds.map((mediaId, order) => ({ eventId: event.id, mediaId, order })));
   }
 
-  if (input.toFeed) {
+  // Feed karta len pri rodinnej udalosti — súkromnú/skupinovú by videli všetci.
+  if (input.toFeed && input.visibility === 'family') {
     await db.insert(feedCards).values({ module: 'events', entityId: event.id, authorId: creatorId });
     await publishCrossProcess(APP_TOPIC, { t: 'feed:card', module: 'events', entityId: event.id });
   }
@@ -245,7 +317,7 @@ export async function updateEvent(
   isAdmin: boolean,
   input: UpdateEventInput,
 ): Promise<EventPublic> {
-  const event = await getEventRow(eventId);
+  const event = await getEventRow(eventId, userId);
   if (event.createdBy !== userId && !isAdmin) {
     throw new ForbiddenError('Udalosť môže upraviť len jej autor alebo admin');
   }
@@ -271,7 +343,7 @@ export async function updateEvent(
 }
 
 export async function deleteEvent(eventId: string, userId: string, isAdmin: boolean): Promise<void> {
-  const event = await getEventRow(eventId);
+  const event = await getEventRow(eventId, userId);
   if (event.createdBy !== userId && !isAdmin) {
     throw new ForbiddenError('Udalosť môže zmazať len jej autor alebo admin');
   }
@@ -282,7 +354,7 @@ export async function deleteEvent(eventId: string, userId: string, isAdmin: bool
 }
 
 export async function setRsvp(eventId: string, userId: string, status: RsvpStatus): Promise<EventPublic> {
-  const event = await getEventRow(eventId);
+  const event = await getEventRow(eventId, userId);
   if (event.source === 'birthday') throw new BadRequestError('Na narodeniny sa nechodí cez RSVP 🙂');
   await db
     .insert(eventRsvps)
@@ -317,7 +389,14 @@ export async function buildIcs(): Promise<string> {
   const rows = await db
     .select()
     .from(events)
-    .where(and(isNull(events.deletedAt), sql`${events.source} <> 'birthday'`, gte(events.startsAt, since)))
+    .where(
+      and(
+        isNull(events.deletedAt),
+        sql`${events.source} <> 'birthday'`,
+        eq(events.visibility, 'family'),
+        gte(events.startsAt, since),
+      ),
+    )
     .orderBy(asc(events.startsAt));
   const people = await db
     .select({ id: users.id, displayName: users.displayName, birthday: users.birthday })

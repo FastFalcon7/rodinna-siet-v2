@@ -19,6 +19,14 @@ export type RsvpStatus = z.infer<typeof RsvpStatusSchema>;
 export const EventSourceSchema = z.enum(['manual', 'birthday', 'poll', 'suggested']);
 export type EventSource = z.infer<typeof EventSourceSchema>;
 
+/**
+ * Viditeľnosť udalosti (ladenie 07/2026): 'private' len tvorca, 'family'
+ * celá rodina (default — udalosť je pozvánka), 'rooms' členovia vybraných
+ * chat miestností.
+ */
+export const EventVisibilitySchema = z.enum(['private', 'family', 'rooms']);
+export type EventVisibility = z.infer<typeof EventVisibilitySchema>;
+
 export const CreateEventInputSchema = z
   .object({
     title: z.string().trim().min(1, 'Chýba názov').max(MAX_EVENT_TITLE),
@@ -27,10 +35,13 @@ export const CreateEventInputSchema = z
     allDay: z.boolean().default(false),
     location: z.string().trim().max(MAX_EVENT_LOCATION).default(''),
     bodyMd: z.string().max(MAX_EVENT_BODY).default(''),
-    /** Vložiť RSVP kartu do Feedu (K1). Udalosti žijú v Kalendári/chate — default nie. */
+    /** Vložiť RSVP kartu do Feedu (K1) — len pri visibility='family'. */
     toFeed: z.boolean().default(false),
     /** Prílohy (ladenie 07/2026) — fotky z composera alebo výberu vo feede. */
     mediaIds: z.array(z.string().uuid()).max(20).default([]),
+    visibility: EventVisibilitySchema.default('family'),
+    /** Pri visibility='rooms': miestnosti (podskupiny), ktoré udalosť vidia. */
+    roomIds: z.array(z.string().uuid()).max(20).default([]),
   })
   .refine((v) => !v.endsAt || new Date(v.endsAt) >= new Date(v.startsAt), {
     message: 'Koniec nemôže byť pred začiatkom',
@@ -71,6 +82,9 @@ export const EventPublicSchema = z.object({
   }),
   myRsvp: RsvpStatusSchema.nullable(),
   media: z.array(MediaPublicSchema),
+  visibility: EventVisibilitySchema,
+  /** Miestnosti, s ktorými je udalosť zdieľaná (visibility='rooms'). */
+  roomIds: z.array(z.string().uuid()),
   createdAt: z.string(),
 });
 export type EventPublic = z.infer<typeof EventPublicSchema>;

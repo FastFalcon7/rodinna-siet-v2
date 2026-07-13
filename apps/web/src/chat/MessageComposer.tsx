@@ -9,6 +9,7 @@ import { buildAppLink } from '../shared/appLink';
 import { useAutoGrow } from '../shared/useAutoGrow';
 import { PollComposerDialog } from '../polls/PollComposerDialog';
 import { EventComposerDialog } from '../events/EventComposerDialog';
+import { NoteComposerDialog } from '../notes/NoteComposerDialog';
 
 interface MessageComposerProps {
   roomId: string;
@@ -33,6 +34,7 @@ export function MessageComposer({
   const [sheet, setSheet] = useState(false);
   const [pollDialog, setPollDialog] = useState(false);
   const [eventDialog, setEventDialog] = useState(false);
+  const [noteDialog, setNoteDialog] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const taRef = useRef<HTMLTextAreaElement>(null);
@@ -198,7 +200,22 @@ export function MessageComposer({
               .catch(() => setError('Piškvorky sa nepodarilo založiť'));
           }}
           onEvent={() => setEventDialog(true)}
+          onNote={() => setNoteDialog(true)}
           onClose={() => setSheet(false)}
+        />
+      )}
+      {noteDialog && (
+        <NoteComposerDialog
+          roomId={roomId}
+          onCreated={(note) => {
+            setNoteDialog(false);
+            // Zoznam/poznámka ide do miestnosti ako živá karta (K2).
+            void chatApi
+              .sendMessage(roomId, { bodyMd: buildAppLink('notes', note.id), mediaIds: [] })
+              .then(onSent)
+              .catch(() => setError('Zoznam sa nepodarilo poslať do chatu'));
+          }}
+          onClose={() => setNoteDialog(false)}
         />
       )}
       {pollDialog && (
@@ -217,6 +234,7 @@ export function MessageComposer({
       )}
       {eventDialog && (
         <EventComposerDialog
+          roomId={roomId}
           onCreated={(event) => {
             setEventDialog(false);
             // Udalosť sa do miestnosti pošle ako app:// správa → RSVP karta (K2),

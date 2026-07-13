@@ -5,6 +5,8 @@ import { useChat } from '../chat/ChatProvider';
 import { EventCard } from './EventCard';
 import { UploadPreviews } from '../shared/UploadPreviews';
 import { useMediaUpload } from '../shared/useMediaUpload';
+import { TitleInput } from '../shared/TitleInput';
+import { VisibilityPicker, type ShareVisibility } from '../shared/VisibilityPicker';
 
 /**
  * Modul Kalendár (M4): agenda najbližších 60 dní — udalosti s RSVP kartou
@@ -148,6 +150,9 @@ function NewEventForm({ onDone, onCancel }: { onDone: () => void; onCancel: () =
   const [allDay, setAllDay] = useState(false);
   const [location, setLocation] = useState('');
   const [locating, setLocating] = useState(false);
+  // Udalosť je pozvánka — default pre celú rodinu; dá sa zúžiť na skupiny/seba.
+  const [visibility, setVisibility] = useState<ShareVisibility>('family');
+  const [roomIds, setRoomIds] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const uploads = useMediaUpload(20);
@@ -175,6 +180,7 @@ function NewEventForm({ onDone, onCancel }: { onDone: () => void; onCancel: () =
 
   const create = async () => {
     if (!title.trim() || !date || busy || uploads.uploading) return;
+    if (visibility === 'rooms' && roomIds.length === 0) return;
     setBusy(true);
     setError(null);
     try {
@@ -189,6 +195,8 @@ function NewEventForm({ onDone, onCancel }: { onDone: () => void; onCancel: () =
         bodyMd: '',
         toFeed: false,
         mediaIds: uploads.mediaIds,
+        visibility,
+        roomIds: visibility === 'rooms' ? roomIds : [],
       });
       uploads.clear();
       onDone();
@@ -200,13 +208,13 @@ function NewEventForm({ onDone, onCancel }: { onDone: () => void; onCancel: () =
 
   return (
     <div className="space-y-2.5 rounded-2xl border border-neutral-200 bg-white p-4 dark:border-neutral-800 dark:bg-neutral-900">
-      <input
+      <TitleInput
         value={title}
-        onChange={(e) => setTitle(e.target.value)}
+        onChange={setTitle}
         autoFocus
         maxLength={140}
         placeholder="Názov (napr. Grilovačka u nás)"
-        className="w-full rounded-lg border border-neutral-300 bg-transparent px-3 py-2 text-sm outline-none focus:border-accent dark:border-neutral-700"
+        className="w-full px-3 py-2"
       />
       <div className="flex flex-wrap items-center gap-2">
         <input
@@ -246,6 +254,14 @@ function NewEventForm({ onDone, onCancel }: { onDone: () => void; onCancel: () =
         </button>
       </div>
       <UploadPreviews items={uploads.items} onRemove={uploads.remove} onMakeCover={uploads.makeFirst} />
+      <VisibilityPicker
+        visibility={visibility}
+        roomIds={roomIds}
+        onChange={(v, r) => {
+          setVisibility(v);
+          setRoomIds(r);
+        }}
+      />
       {error && <p className="text-sm text-red-600">{error}</p>}
       <div className="flex items-center gap-2">
         <button

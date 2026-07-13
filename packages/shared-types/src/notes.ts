@@ -23,7 +23,7 @@ export type NoteKind = z.infer<typeof NoteKindSchema>;
  * zariadení"), 'family' celá rodina. Nové poznámky sú predvolene súkromné;
  * zdieľanie do chatu poznámku prepne na rodinnú.
  */
-export const NoteVisibilitySchema = z.enum(['private', 'family']);
+export const NoteVisibilitySchema = z.enum(['private', 'family', 'rooms']);
 export type NoteVisibility = z.infer<typeof NoteVisibilitySchema>;
 
 export const CreateNoteInputSchema = z.object({
@@ -35,6 +35,8 @@ export const CreateNoteInputSchema = z.object({
   items: z.array(z.string().trim().min(1).max(MAX_ITEM_LABEL)).max(MAX_NOTE_ITEMS).default([]),
   /** Prílohy (ladenie 07/2026) — fotky z composera alebo výberu vo feede. */
   mediaIds: z.array(z.string().uuid()).max(20).default([]),
+  /** Pri visibility='rooms': miestnosti (podskupiny), ktoré poznámku vidia. */
+  roomIds: z.array(z.string().uuid()).max(20).default([]),
 });
 export type CreateNoteInput = z.infer<typeof CreateNoteInputSchema>;
 
@@ -51,6 +53,8 @@ export const UpdateNoteInputSchema = z.object({
   pinned: z.boolean().optional(),
   /** Zmeniť viditeľnosť môže len autor poznámky. */
   visibility: NoteVisibilitySchema.optional(),
+  /** Pri visibility='rooms': kompletná množina miestností (replace). */
+  roomIds: z.array(z.string().uuid()).max(20).optional(),
 });
 export type UpdateNoteInput = z.infer<typeof UpdateNoteInputSchema>;
 
@@ -95,6 +99,8 @@ export type NoteSummary = z.infer<typeof NoteSummarySchema>;
 
 export const NoteDetailSchema = NoteSummarySchema.extend({
   bodyMd: z.string(),
+  /** Miestnosti, s ktorými je poznámka zdieľaná (visibility='rooms'). */
+  roomIds: z.array(z.string().uuid()),
   items: z.array(NoteItemPublicSchema),
   media: z.array(MediaPublicSchema),
   revisionCount: z.number().int(),

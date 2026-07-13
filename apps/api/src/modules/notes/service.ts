@@ -9,7 +9,7 @@ import type {
   UpdateNoteItemInput,
 } from '@rodinna/shared-types';
 import { db } from '../../core/db/client';
-import { media, noteItems, noteMedia, noteRevisions, notes, users, type NoteRow } from '../../core/db/schema';
+import { chatRooms, media, noteItems, noteMedia, noteRevisions, noteRooms, notes, roomMembers, users, type NoteRow } from '../../core/db/schema';
 import { APP_TOPIC } from '../../core/realtime';
 import { publishCrossProcess } from '../../core/events';
 import { toMediaPublic } from '../media/service';
@@ -50,9 +50,40 @@ async function fetchNoteMedia(noteId: string) {
   return rows.map((r) => toMediaPublic(r.media));
 }
 
+/** Množina miestností, ktorých je viewer členom (na 'rooms' viditeľnosť). */
+async function viewerRoomIds(viewerId: string): Promise<Set<string>> {
+  const rows = await db
+    .select({ roomId: roomMembers.roomId })
+    .from(roomMembers)
+    .where(eq(roomMembers.userId, viewerId));
+  return new Set(rows.map((r) => r.roomId));
+}
+
+async function noteRoomIds(noteId: string): Promise<string[]> {
+  const rows = await db.select({ roomId: noteRooms.roomId }).from(noteRooms).where(eq(noteRooms.noteId, noteId));
+  return rows.map((r) => r.roomId);
+}
+
+/**
+ * Overí, že miestnosti existujú a užívateľ je ich členom — s cudzou
+ * miestnosťou sa zdieľať nedá.
+ */
+async function verifyRoomsMembership(roomIds: string[], userId: string): Promise<void> {
+  if (roomIds.length === 0) return;
+  const rows = await db
+    .select({ roomId: roomMembers.roomId })
+    .from(roomMembers)
+    .innerJoin(chatRooms, eq(roomMembers.roomId, chatRooms.id))
+    .where(and(inArray(roomMembers.roomId, roomIds), eq(roomMembers.userId, userId)));
+  if (new Set(rows.map((r) => r.roomId)).size !== new Set(roomIds).size) {
+    throw new BadRequestError('Zdieľať sa dá len so skupinami, ktorých si členom');
+  }
+}
+
 /**
  * Načíta poznámku a overí viditeľnosť (ladenie 07/2026): 'private' vidí
- * len autor — pre ostatných (aj admina) sa tvári ako neexistujúca.
+ * len autor, 'rooms' autor + členovia priradených miestností — pre
+ * ostatných (aj admina) sa tvári ako neexistujúca.
  */
 async function getNoteRow(noteId: string, viewerId: string): Promise<NoteRow> {
   const rows = await db
@@ -61,8 +92,14 @@ async function getNoteRow(noteId: string, viewerId: string): Promise<NoteRow> {
     .where(and(eq(notes.id, noteId), isNull(notes.deletedAt)))
     .limit(1);
   const note = rows[0];
-  if (!note || (note.visibility === 'private' && note.createdBy !== viewerId)) {
-    throw new NotFoundError('Zoznam/poznámka nenájdená');
+  if (!note) throw new NotFoundError('Zoznam/poznámka nenájdená');
+  if (note.createdBy !== viewerId) {
+    if (note.visibility === 'private') throw new NotFoundError('Zoznam/poznámka nenájdená');
+    if (note.visibility === 'rooms') {
+      const mine = await viewerRoomIds(viewerId);
+      const shared = await noteRoomIds(noteId);
+      if (!shared.some((r) => mine.has(r))) throw new NotFoundError('Zoznam/poznámka nenájdená');
+    }
   }
   return note;
 }
@@ -106,8 +143,16 @@ async function buildSummaries(rows: NoteRow[]): Promise<NoteSummary[]> {
 
 export async function listNotes(viewerId: string): Promise<NoteSummary[]> {
   const all = await db.select().from(notes).where(isNull(notes.deletedAt));
-  // Súkromné poznámky vidí len ich autor.
-  const rows = all.filter((n) => n.visibility === 'family' || n.createdBy === viewerId);
+  const mine = await viewerRoomIds(viewerId);
+  const shares = await db.select().from(noteRooms);
+  const sharedWithMe = new Set(shares.filter((sh) => mine.has(sh.roomId)).map((sh) => sh.noteId));
+  // Súkromné vidí len autor; 'rooms' autor + členovia priradených miestností.
+  const rows = all.filter(
+    (n) =>
+      n.visibility === 'family' ||
+      n.createdBy === viewerId ||
+      (n.visibility === 'rooms' && sharedWithMe.has(n.id)),
+  );
   const summaries = await buildSummaries(rows);
   // Pripnuté hore, potom podľa poslednej aktivity.
   return summaries.sort(
@@ -143,6 +188,7 @@ export async function getNote(noteId: string, viewerId: string): Promise<NoteDet
       order: i.order,
     })),
     media: await fetchNoteMedia(noteId),
+    roomIds: row.visibility === 'rooms' ? await noteRoomIds(noteId) : [],
     revisionCount: revCount[0]?.count ?? 0,
   };
 }
@@ -155,6 +201,11 @@ export async function createNote(creatorId: string, input: CreateNoteInput): Pro
   }
   const mediaIds = [...new Set(input.mediaIds)];
   await verifyMediaExist(mediaIds);
+  const roomIds = [...new Set(input.roomIds)];
+  if (input.visibility === 'rooms') {
+    if (roomIds.length === 0) throw new BadRequestError('Vyber aspoň jednu skupinu');
+    await verifyRoomsMembership(roomIds, creatorId);
+  }
 
   const inserted = await db
     .insert(notes)
@@ -176,6 +227,9 @@ export async function createNote(creatorId: string, input: CreateNoteInput): Pro
   }
   if (mediaIds.length > 0) {
     await db.insert(noteMedia).values(mediaIds.map((mediaId, order) => ({ noteId: note.id, mediaId, order })));
+  }
+  if (input.visibility === 'rooms' && roomIds.length > 0) {
+    await db.insert(noteRooms).values(roomIds.map((roomId) => ({ noteId: note.id, roomId })));
   }
   await publishCrossProcess(APP_TOPIC, { t: 'note:update', noteId: note.id });
   return getNote(note.id, creatorId);
@@ -208,8 +262,22 @@ export async function removeNoteMedia(noteId: string, userId: string, mediaId: s
 
 export async function updateNote(noteId: string, userId: string, input: UpdateNoteInput): Promise<NoteDetail> {
   const note = await getNoteRow(noteId, userId);
-  if (input.visibility !== undefined && input.visibility !== note.visibility && note.createdBy !== userId) {
+  const visibilityChange =
+    (input.visibility !== undefined && input.visibility !== note.visibility) || input.roomIds !== undefined;
+  if (visibilityChange && note.createdBy !== userId) {
     throw new ForbiddenError('Viditeľnosť poznámky mení len jej autor');
+  }
+  const nextVisibility = input.visibility ?? note.visibility;
+  if (input.roomIds !== undefined || input.visibility !== undefined) {
+    const roomIds = [...new Set(input.roomIds ?? (await noteRoomIds(noteId)))];
+    if (nextVisibility === 'rooms') {
+      if (roomIds.length === 0) throw new BadRequestError('Vyber aspoň jednu skupinu');
+      await verifyRoomsMembership(roomIds, userId);
+      await db.delete(noteRooms).where(eq(noteRooms.noteId, noteId));
+      await db.insert(noteRooms).values(roomIds.map((roomId) => ({ noteId, roomId })));
+    } else {
+      await db.delete(noteRooms).where(eq(noteRooms.noteId, noteId));
+    }
   }
 
   // Zmena textu: predchádzajúci obsah do revízií (história verzií).
@@ -311,6 +379,7 @@ export async function duplicateNote(noteId: string, userId: string, title?: stri
     bodyMd: note.bodyMd,
     items: items.map((i) => i.label),
     mediaIds: [],
+    roomIds: note.visibility === 'rooms' ? await noteRoomIds(noteId) : [],
   });
 }
 

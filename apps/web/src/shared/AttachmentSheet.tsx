@@ -10,6 +10,8 @@ interface AttachmentSheetProps {
   onGame?: () => void;
   /** Ak je zadané, sheet ponúkne „Udalosť" (M4) — volajúci otvorí dialóg tvorby. */
   onEvent?: () => void;
+  /** Ak je zadané, sheet ponúkne „Zoznam" (poznámka/zoznam pre miestnosť). */
+  onNote?: () => void;
   onClose: () => void;
 }
 
@@ -25,6 +27,7 @@ export function AttachmentSheet({
   onPoll,
   onGame,
   onEvent,
+  onNote,
   onClose,
 }: AttachmentSheetProps) {
   const fileRef = useRef<HTMLInputElement>(null);
@@ -99,6 +102,18 @@ export function AttachmentSheet({
             onClick: () => {
               onClose();
               onEvent();
+            },
+          },
+        ]
+      : []),
+    ...(onNote
+      ? [
+          {
+            icon: '✅',
+            label: 'Zoznam',
+            onClick: () => {
+              onClose();
+              onNote();
             },
           },
         ]

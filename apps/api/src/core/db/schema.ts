@@ -537,8 +537,11 @@ export const memoryMarks = pgTable('memory_marks', {
  * predchádzajúcu verziu do note_revisions (last-write-wins + história).
  */
 export const noteKindValues = ['note', 'list'] as const;
-/** Ladenie 07/2026: 'private' vidí len autor; DB default 'family' drží staré riadky viditeľné. */
-export const noteVisibilityValues = ['private', 'family'] as const;
+/**
+ * Ladenie 07/2026: 'private' vidí len autor, 'rooms' členovia priradených
+ * chat miestností (note_rooms); DB default 'family' drží staré riadky viditeľné.
+ */
+export const noteVisibilityValues = ['private', 'family', 'rooms'] as const;
 
 export const notes = pgTable(
   'notes',
@@ -575,6 +578,21 @@ export const noteItems = pgTable(
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index('note_items_note_idx').on(t.noteId)],
+);
+
+/** Zdieľanie poznámky s podskupinami — členovia miestnosti ju vidia (visibility='rooms'). */
+export const noteRooms = pgTable(
+  'note_rooms',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    noteId: uuid('note_id')
+      .notNull()
+      .references(() => notes.id, { onDelete: 'cascade' }),
+    roomId: uuid('room_id')
+      .notNull()
+      .references(() => chatRooms.id, { onDelete: 'cascade' }),
+  },
+  (t) => [index('note_rooms_note_idx').on(t.noteId), unique('note_rooms_unique').on(t.noteId, t.roomId)],
 );
 
 /** Fotky/prílohy poznámky (ladenie 07/2026) — ako postMedia, family-wide. */
@@ -614,6 +632,8 @@ export const noteRevisions = pgTable(
  */
 export const eventSourceValues = ['manual', 'birthday', 'poll', 'suggested'] as const;
 export const rsvpStatusValues = ['yes', 'no', 'maybe'] as const;
+/** Ladenie 07/2026: viditeľnosť udalosti ako pri poznámkach (default family — pozvánka). */
+export const eventVisibilityValues = ['private', 'family', 'rooms'] as const;
 
 export const events = pgTable(
   'events',
@@ -625,6 +645,7 @@ export const events = pgTable(
     allDay: boolean('all_day').notNull().default(false),
     location: text('location').notNull().default(''),
     bodyMd: text('body_md').notNull().default(''),
+    visibility: text('visibility', { enum: eventVisibilityValues }).notNull().default('family'),
     source: text('source', { enum: eventSourceValues }).notNull().default('manual'),
     // Pri source='birthday' odkazuje na oslávenca (kvôli gratulácii z karty).
     subjectUserId: uuid('subject_user_id').references(() => users.id, { onDelete: 'cascade' }),
@@ -635,6 +656,21 @@ export const events = pgTable(
     deletedAt: timestamp('deleted_at', { withTimezone: true }),
   },
   (t) => [index('events_starts_idx').on(t.startsAt)],
+);
+
+/** Zdieľanie udalosti s podskupinami (visibility='rooms') — ako note_rooms. */
+export const eventRooms = pgTable(
+  'event_rooms',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    eventId: uuid('event_id')
+      .notNull()
+      .references(() => events.id, { onDelete: 'cascade' }),
+    roomId: uuid('room_id')
+      .notNull()
+      .references(() => chatRooms.id, { onDelete: 'cascade' }),
+  },
+  (t) => [index('event_rooms_event_idx').on(t.eventId), unique('event_rooms_unique').on(t.eventId, t.roomId)],
 );
 
 /** Fotky/prílohy udalosti (ladenie 07/2026) — ako postMedia, family-wide. */

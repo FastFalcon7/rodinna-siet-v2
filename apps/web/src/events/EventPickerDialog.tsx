@@ -61,6 +61,8 @@ export function EventPickerDialog({ mediaIds, onClose }: EventPickerDialogProps)
         bodyMd: '',
         toFeed: false,
         mediaIds,
+        visibility: 'family',
+        roomIds: [],
       });
       finish(title);
     } catch (err) {

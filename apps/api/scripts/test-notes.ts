@@ -98,7 +98,7 @@ async function seedUser(email: string, displayName: string, role: 'admin' | 'mem
 async function main() {
   await runMigrations();
   await db.execute(
-    dsql`truncate table note_revisions, note_items, notes, memory_marks, album_photos, albums, poll_votes, poll_options, polls, feed_cards, jobs, push_subs, notifications, reactions, message_media, messages, room_members, chat_rooms, post_media, comments, posts, media, sessions, users restart identity cascade`,
+    dsql`truncate table note_rooms, note_revisions, note_items, notes, memory_marks, album_photos, albums, poll_votes, poll_options, polls, feed_cards, jobs, push_subs, notifications, reactions, message_media, messages, room_members, chat_rooms, post_media, comments, posts, media, sessions, users restart identity cascade`,
   );
 
   const server = Bun.serve({
@@ -154,6 +154,40 @@ async function main() {
   check('po prepnutí ju vidia ostatní', r.status === 200, r.status);
   r = await http(alica.token, 'PATCH', `/api/notes/${privId}`, { visibility: 'private' });
   check('ne-autor neprepne rodinnú na súkromnú → 403', r.status === 403, r.status);
+
+  console.log('\n— Zdieľanie s podskupinou (ladenie, 8. kolo) —');
+  r = await http(alica.token, 'POST', '/api/chat/rooms', {
+    kind: 'group',
+    title: 'Výletníci',
+    memberIds: [bob.id],
+  });
+  check('skupina alica+bob → 201', r.status === 201, r.status);
+  const groupId = r.body.id;
+
+  r = await http(alica.token, 'POST', '/api/notes', {
+    kind: 'list',
+    visibility: 'rooms',
+    roomIds: [groupId],
+    title: 'Zoznam pre výletníkov',
+    items: ['Mapa'],
+  });
+  check('poznámka pre podskupinu → 201', r.status === 201 && r.body.visibility === 'rooms', r.body.visibility);
+  const roomNoteId = r.body.id;
+  r = await http(bob.token, 'GET', `/api/notes/${roomNoteId}`);
+  check('člen skupiny ju vidí', r.status === 200, r.status);
+  r = await http(cyril.token, 'GET', `/api/notes/${roomNoteId}`);
+  check('nečlen ju nevidí → 404', r.status === 404, r.status);
+  r = await http(cyril.token, 'GET', '/api/notes');
+  check('nečlen ju nemá v zozname', !r.body.notes.some((n: any) => n.id === roomNoteId), r.body.notes?.length);
+  r = await http(cyril.token, 'POST', '/api/notes', {
+    kind: 'note',
+    visibility: 'rooms',
+    roomIds: [groupId],
+    title: 'X',
+  });
+  check('zdieľanie s cudzou skupinou → 400', r.status === 400, r.status);
+  r = await http(alica.token, 'POST', '/api/notes', { kind: 'note', visibility: 'rooms', title: 'X' });
+  check("visibility='rooms' bez skupín → 400", r.status === 400, r.status);
 
   const aliceWs = connectWs(alica.token);
   await aliceWs.opened;

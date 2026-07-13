@@ -104,7 +104,7 @@ async function seedUser(email: string, displayName: string, role: 'admin' | 'mem
 async function main() {
   await runMigrations();
   await db.execute(
-    dsql`truncate table event_rsvps, events, note_revisions, note_items, notes, memory_marks, album_photos, albums, poll_votes, poll_options, polls, feed_cards, jobs, push_subs, notifications, reactions, message_media, messages, room_members, chat_rooms, post_media, comments, posts, media, sessions, users restart identity cascade`,
+    dsql`truncate table event_rooms, event_rsvps, events, note_revisions, note_items, notes, memory_marks, album_photos, albums, poll_votes, poll_options, polls, feed_cards, jobs, push_subs, notifications, reactions, message_media, messages, room_members, chat_rooms, post_media, comments, posts, media, sessions, users restart identity cascade`,
   );
 
   const server = Bun.serve({
@@ -175,6 +175,33 @@ async function main() {
   );
   check('2 reminder joby (deň + hodina vopred)', remindJobs.length === 2, remindJobs.length);
 
+  console.log('\n— Viditeľnosť: podskupiny (ladenie, 8. kolo) —');
+  r = await http(alica.token, 'POST', '/api/chat/rooms', { kind: 'group', title: 'Oslavy', memberIds: [bob.id] });
+  const evGroupId = r.body.id;
+  const cyril0 = await seedUser('cyril0@rodina.sk', 'Cyril0', 'member');
+  r = await http(alica.token, 'POST', '/api/events', {
+    title: 'Tajná oslava',
+    startsAt: tomorrow5pm.toISOString(),
+    visibility: 'rooms',
+    roomIds: [evGroupId],
+  });
+  check('udalosť pre podskupinu → 201', r.status === 201 && r.body.visibility === 'rooms', r.body.visibility);
+  const roomEvId = r.body.id;
+  r = await http(bob.token, 'GET', `/api/events/${roomEvId}`);
+  check('člen skupiny ju vidí', r.status === 200, r.status);
+  r = await http(cyril0.token, 'GET', `/api/events/${roomEvId}`);
+  check('nečlen ju nevidí → 404', r.status === 404, r.status);
+  r = await http(cyril0.token, 'GET', '/api/events');
+  check('nečlen ju nemá v agende', !r.body.events.some((e: any) => e.id === roomEvId), r.body.events?.length);
+  r = await http(alica.token, 'POST', '/api/events', {
+    title: 'Len moja',
+    startsAt: tomorrow5pm.toISOString(),
+    visibility: 'private',
+  });
+  const privEvId = r.body.id;
+  r = await http(bob.token, 'GET', `/api/events/${privEvId}`);
+  check('súkromnú udalosť iný nevidí → 404', r.status === 404, r.status);
+
   console.log('\n— RSVP —');
   const alicaWs = connectWs(alica.token);
   await alicaWs.opened;
@@ -225,7 +252,11 @@ async function main() {
   const bdayCard = bdayEvents.find((c) => c.authorId === bob.id);
   check('narodeninová karta vo feede', bdayCard !== undefined, bdayEvents.length);
   const bdayNotifs = await db.select().from(notifications).where(eq(notifications.kind, 'events.birthday'));
-  check('push ostatným (nie oslávencovi)', bdayNotifs.length === 1 && bdayNotifs[0]!.userId === alica.id, bdayNotifs);
+  check(
+    'push ostatným (nie oslávencovi)',
+    bdayNotifs.length === 2 && bdayNotifs.every((n) => n.userId !== bob.id),
+    bdayNotifs.length,
+  );
   await processBirthdays();
   const bdayEvents2 = await db.select().from(feedCards).where(eq(feedCards.module, 'events'));
   check('idempotencia (žiadna druhá karta)', bdayEvents2.length === bdayEvents.length, bdayEvents2.length);
@@ -248,7 +279,7 @@ async function main() {
   await db.execute(dsql`truncate table notifications`);
   await processBirthdays();
   const soonNotifs = await db.select().from(notifications).where(eq(notifications.kind, 'events.birthday'));
-  check('push „o 3 dni" ostatným', soonNotifs.length === 2 && soonNotifs.every((n) => n.userId !== cyril.id), soonNotifs.length);
+  check('push „o 3 dni" ostatným', soonNotifs.length === 3 && soonNotifs.every((n) => n.userId !== cyril.id), soonNotifs.length);
 
   console.log('\n— ICS feed —');
   let res = await fetch(`${BASE}/api/events/calendar.ics`);
