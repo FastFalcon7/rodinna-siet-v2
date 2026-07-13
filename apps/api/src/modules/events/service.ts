@@ -132,6 +132,7 @@ async function hydrateEvents(rows: EventRow[], viewerId: string): Promise<EventP
       bodyMd: row.bodyMd,
       source: row.source,
       createdBy: authors.get(row.createdBy)!,
+      rsvp: row.rsvp,
       rsvps: { yes: by('yes'), no: by('no'), maybe: by('maybe') },
       myRsvp: mine?.status ?? null,
       media: mediaMap.get(row.id) ?? [],
@@ -282,6 +283,7 @@ export async function createEvent(creatorId: string, input: CreateEventInput): P
       allDay: input.allDay,
       location: input.location,
       bodyMd: input.bodyMd,
+      rsvp: input.rsvp,
       visibility: input.visibility,
       createdBy: creatorId,
     })
@@ -292,8 +294,10 @@ export async function createEvent(creatorId: string, input: CreateEventInput): P
     await db.insert(eventRooms).values(roomIds.map((roomId) => ({ eventId: event.id, roomId })));
   }
 
-  // Autor ide automaticky (usporadúva to on).
-  await db.insert(eventRsvps).values({ eventId: event.id, userId: creatorId, status: 'yes' });
+  // Pozvánka: autor ide automaticky (usporadúva to on). Bez pozvánky žiadne RSVP.
+  if (input.rsvp) {
+    await db.insert(eventRsvps).values({ eventId: event.id, userId: creatorId, status: 'yes' });
+  }
 
   const mediaIds = [...new Set(input.mediaIds)];
   if (mediaIds.length > 0) {
@@ -330,9 +334,18 @@ export async function updateEvent(
       ...(input.allDay !== undefined ? { allDay: input.allDay } : {}),
       ...(input.location !== undefined ? { location: input.location } : {}),
       ...(input.bodyMd !== undefined ? { bodyMd: input.bodyMd } : {}),
+      ...(input.rsvp !== undefined ? { rsvp: input.rsvp } : {}),
     })
     .where(eq(events.id, eventId))
     .returning();
+
+  // Zapnutie pozvánky → autor ide automaticky (ak ešte nepotvrdil).
+  if (input.rsvp === true && !event.rsvp) {
+    await db
+      .insert(eventRsvps)
+      .values({ eventId, userId: event.createdBy, status: 'yes' })
+      .onConflictDoNothing();
+  }
 
   // Zmena času → nové pripomienky (staré sa samé zahodia — startsAt už nesedí).
   if (input.startsAt !== undefined && updated[0]!.startsAt.getTime() !== event.startsAt.getTime()) {
@@ -356,6 +369,7 @@ export async function deleteEvent(eventId: string, userId: string, isAdmin: bool
 export async function setRsvp(eventId: string, userId: string, status: RsvpStatus): Promise<EventPublic> {
   const event = await getEventRow(eventId, userId);
   if (event.source === 'birthday') throw new BadRequestError('Na narodeniny sa nechodí cez RSVP 🙂');
+  if (!event.rsvp) throw new BadRequestError('Táto udalosť nezbiera účasť');
   await db
     .insert(eventRsvps)
     .values({ eventId, userId, status })

@@ -60,6 +60,7 @@ export function EventPickerDialog({ mediaIds, onClose }: EventPickerDialogProps)
         location: '',
         bodyMd: '',
         toFeed: false,
+        rsvp: false,
         mediaIds,
         visibility: 'family',
         roomIds: [],

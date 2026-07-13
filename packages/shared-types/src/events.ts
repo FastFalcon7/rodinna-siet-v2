@@ -37,6 +37,11 @@ export const CreateEventInputSchema = z
     bodyMd: z.string().max(MAX_EVENT_BODY).default(''),
     /** Vložiť RSVP kartu do Feedu (K1) — len pri visibility='family'. */
     toFeed: z.boolean().default(false),
+    /**
+     * Pozvánka (ladenie 07/2026): zbierať účasť (Prídem/Neviem/Neprídem).
+     * Vypnuté = obyčajný oznam bez RSVP tlačidiel.
+     */
+    rsvp: z.boolean().default(false),
     /** Prílohy (ladenie 07/2026) — fotky z composera alebo výberu vo feede. */
     mediaIds: z.array(z.string().uuid()).max(20).default([]),
     visibility: EventVisibilitySchema.default('family'),
@@ -56,6 +61,7 @@ export const UpdateEventInputSchema = z.object({
   allDay: z.boolean().optional(),
   location: z.string().trim().max(MAX_EVENT_LOCATION).optional(),
   bodyMd: z.string().max(MAX_EVENT_BODY).optional(),
+  rsvp: z.boolean().optional(),
 });
 export type UpdateEventInput = z.infer<typeof UpdateEventInputSchema>;
 
@@ -74,6 +80,8 @@ export const EventPublicSchema = z.object({
   bodyMd: z.string(),
   source: EventSourceSchema,
   createdBy: PostAuthorSchema,
+  /** Pozvánka — či karta ukazuje RSVP tlačidlá a zoznam „kto príde". */
+  rsvp: z.boolean(),
   /** RSVP zoznamy s menami (rodina je malá, netreba len počty). */
   rsvps: z.object({
     yes: z.array(PostAuthorSchema),

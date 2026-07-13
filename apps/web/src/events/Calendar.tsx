@@ -150,6 +150,8 @@ function NewEventForm({ onDone, onCancel }: { onDone: () => void; onCancel: () =
   const [allDay, setAllDay] = useState(false);
   const [location, setLocation] = useState('');
   const [locating, setLocating] = useState(false);
+  // Pozvánka (zbieranie účasti) je voliteľná — default vypnutá, obyčajný oznam.
+  const [rsvp, setRsvp] = useState(false);
   // Udalosť je pozvánka — default pre celú rodinu; dá sa zúžiť na skupiny/seba.
   const [visibility, setVisibility] = useState<ShareVisibility>('family');
   const [roomIds, setRoomIds] = useState<string[]>([]);
@@ -194,6 +196,7 @@ function NewEventForm({ onDone, onCancel }: { onDone: () => void; onCancel: () =
         location: location.trim(),
         bodyMd: '',
         toFeed: false,
+        rsvp,
         mediaIds: uploads.mediaIds,
         visibility,
         roomIds: visibility === 'rooms' ? roomIds : [],
@@ -254,6 +257,10 @@ function NewEventForm({ onDone, onCancel }: { onDone: () => void; onCancel: () =
         </button>
       </div>
       <UploadPreviews items={uploads.items} onRemove={uploads.remove} onMakeCover={uploads.makeFirst} />
+      <label className="flex items-center gap-2 text-sm">
+        <input type="checkbox" checked={rsvp} onChange={(e) => setRsvp(e.target.checked)} className="accent-accent" />
+        Pozvánka — zbierať účasť (Prídem/Neviem/Neprídem)
+      </label>
       <VisibilityPicker
         visibility={visibility}
         roomIds={roomIds}

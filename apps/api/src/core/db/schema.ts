@@ -645,6 +645,9 @@ export const events = pgTable(
     allDay: boolean('all_day').notNull().default(false),
     location: text('location').notNull().default(''),
     bodyMd: text('body_md').notNull().default(''),
+    // Ladenie 07/2026: 'pozvánka' — či sa zbiera účasť (Prídem/Neviem/Neprídem).
+    // Vypnuté = obyčajný oznam bez RSVP tlačidiel.
+    rsvp: boolean('rsvp').notNull().default(true),
     visibility: text('visibility', { enum: eventVisibilityValues }).notNull().default('family'),
     source: text('source', { enum: eventSourceValues }).notNull().default('manual'),
     // Pri source='birthday' odkazuje na oslávenca (kvôli gratulácii z karty).

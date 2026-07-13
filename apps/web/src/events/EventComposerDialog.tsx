@@ -26,6 +26,7 @@ export function EventComposerDialog({
   const [allDay, setAllDay] = useState(false);
   const [location, setLocation] = useState('');
   const [locating, setLocating] = useState(false);
+  const [rsvp, setRsvp] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const uploads = useMediaUpload(20);
@@ -68,6 +69,7 @@ export function EventComposerDialog({
         location: location.trim(),
         bodyMd: '',
         toFeed: false,
+        rsvp,
         mediaIds: uploads.mediaIds,
         // Z chatu: udalosť vidia len účastníci miestnosti (ladenie 07/2026).
         visibility: roomId ? 'rooms' : 'family',
@@ -139,6 +141,10 @@ export function EventComposerDialog({
           </button>
         </div>
         <UploadPreviews items={uploads.items} onRemove={uploads.remove} onMakeCover={uploads.makeFirst} />
+        <label className="flex items-center gap-2 text-sm">
+          <input type="checkbox" checked={rsvp} onChange={(e) => setRsvp(e.target.checked)} className="accent-accent" />
+          Pozvánka — zbierať účasť (Prídem/Neviem/Neprídem)
+        </label>
 
         {error && <p className="text-sm text-red-600">{error}</p>}
 

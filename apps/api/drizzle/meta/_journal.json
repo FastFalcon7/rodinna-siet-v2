@@ -169,6 +169,13 @@
       "when": 1783949949788,
       "tag": "0023_lazy_mulholland_black",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1783954591545,
+      "tag": "0024_sloppy_gorilla_man",
+      "breakpoints": true
     }
   ]
 }
