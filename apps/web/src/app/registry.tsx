@@ -83,12 +83,12 @@ export const webModules: WebModule[] = [
     layout: 'scroll',
     Component: Albums,
   },
-  // Slot 'more': bottom nav má 4 sloty plné — Zoznamy a Kalendár žijú vo „Viac".
+  // Ladenie 07/2026: Zoznamy a Kalendár povýšené do bottom navu (len ikony).
   {
     name: 'notes',
     label: 'Zoznamy a poznámky',
     icon: ChecklistIcon,
-    slot: 'more',
+    slot: 'bar',
     layout: 'scroll',
     Component: Notes,
   },
@@ -96,7 +96,7 @@ export const webModules: WebModule[] = [
     name: 'calendar',
     label: 'Kalendár',
     icon: CalendarIcon,
-    slot: 'more',
+    slot: 'bar',
     layout: 'scroll',
     Component: Calendar,
   },

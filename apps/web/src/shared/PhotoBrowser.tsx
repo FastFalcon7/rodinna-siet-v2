@@ -4,6 +4,7 @@ import { Lightbox } from './Lightbox';
 import { AlbumPickerDialog } from '../albums/AlbumPickerDialog';
 import { NotePickerDialog } from '../notes/NotePickerDialog';
 import { EventPickerDialog } from '../events/EventPickerDialog';
+import { MediaTargetButtons } from './MediaTargetButtons';
 
 interface PhotoBrowserProps {
   images: MediaPublic[];
@@ -140,36 +141,15 @@ export function PhotoBrowser({ images, onClose, onRemove }: PhotoBrowserProps) {
           style={{ paddingBottom: 'max(0.625rem, env(safe-area-inset-bottom))' }}
         >
           <span className="min-w-0 flex-1 truncate text-sm text-neutral-500">Vybraté: {selected.size}</span>
-          <button
-            type="button"
-            onClick={() => openPicker('album')}
-            disabled={selected.size === 0 || busy}
-            className="rounded-lg bg-accent px-2.5 py-1.5 text-sm font-medium text-white disabled:opacity-40"
-          >
-            💾 Album
-          </button>
-          <button
-            type="button"
-            onClick={() => openPicker('note')}
-            disabled={selected.size === 0 || busy}
-            className="rounded-lg border border-neutral-300 px-2.5 py-1.5 text-sm disabled:opacity-40 dark:border-neutral-700"
-          >
-            📝 Poznámka
-          </button>
-          <button
-            type="button"
-            onClick={() => openPicker('event')}
-            disabled={selected.size === 0 || busy}
-            className="rounded-lg border border-neutral-300 px-2.5 py-1.5 text-sm disabled:opacity-40 dark:border-neutral-700"
-          >
-            📅 Udalosť
-          </button>
+          <MediaTargetButtons disabled={selected.size === 0 || busy} onPick={openPicker} />
           {onRemove && (
             <button
               type="button"
               onClick={() => void bulkRemove()}
               disabled={selected.size === 0 || busy}
-              className="rounded-lg border border-red-300 px-2.5 py-1.5 text-sm text-red-600 disabled:opacity-40 dark:border-red-900"
+              title="Odstrániť vybrané"
+              aria-label="Odstrániť vybrané"
+              className="grid h-10 w-10 place-items-center rounded-xl border border-red-300 text-red-600 disabled:opacity-40 dark:border-red-900"
             >
               🗑
             </button>

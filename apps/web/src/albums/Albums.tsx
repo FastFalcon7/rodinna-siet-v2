@@ -5,6 +5,9 @@ import { useAuth } from '../auth/AuthContext';
 import { consumePendingNav } from '../app/navigate';
 import { useSwipeBack } from '../shared/useSwipeBack';
 import { AlbumPickerDialog } from './AlbumPickerDialog';
+import { NotePickerDialog } from '../notes/NotePickerDialog';
+import { EventPickerDialog } from '../events/EventPickerDialog';
+import { MediaTargetButtons, type MediaTargetKind } from '../shared/MediaTargetButtons';
 
 /**
  * Modul Albumy (M2): zoznam albumov + Zberač banner, detail s fotkami,
@@ -206,8 +209,7 @@ function AlbumDetailView({ albumId, onBack }: { albumId: string; onBack: () => v
   // Hromadný výber fotiek (ladenie 07/2026): kopírovanie do albumu / odstránenie.
   const [selecting, setSelecting] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [pickerOpen, setPickerOpen] = useState(false);
-  const [bulkBusy, setBulkBusy] = useState(false);
+  const [picker, setPicker] = useState<MediaTargetKind | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   // Swipe doprava = späť na zoznam albumov; lightbox si gestá rieši sám.
   const swipeBack = useSwipeBack(onBack);
@@ -267,19 +269,6 @@ function AlbumDetailView({ albumId, onBack }: { albumId: string; onBack: () => v
     setSelected(new Set());
   };
 
-  const bulkRemove = async () => {
-    if (selected.size === 0 || bulkBusy) return;
-    if (!confirm(`Odstrániť ${selected.size} fotiek z albumu? (Zo systému nezmiznú.)`)) return;
-    setBulkBusy(true);
-    let failed = 0;
-    for (const id of selected) {
-      await albumsApi.removePhoto(albumId, id).catch(() => failed++);
-    }
-    setBulkBusy(false);
-    exitSelecting();
-    void load();
-    if (failed > 0) setError(`${failed} fotiek sa nepodarilo odstrániť (cudzie fotky odstráni len autor albumu/admin)`);
-  };
 
   const isOwner = album && user ? album.createdBy.id === user.id || user.role === 'admin' : false;
 
@@ -438,7 +427,7 @@ function AlbumDetailView({ albumId, onBack }: { albumId: string; onBack: () => v
         </div>
       )}
 
-      {/* Akčná lišta hromadného výberu */}
+      {/* Akčná lišta hromadného výberu — len ikony (Album / Poznámka / Udalosť). */}
       {selecting && (
         <div
           className="fixed inset-x-0 bottom-0 z-40 flex items-center gap-2 border-t border-neutral-200 bg-white/95 px-4 py-3 backdrop-blur-xl dark:border-neutral-800 dark:bg-neutral-900/95"
@@ -447,28 +436,33 @@ function AlbumDetailView({ albumId, onBack }: { albumId: string; onBack: () => v
           <span className="min-w-0 flex-1 truncate text-sm text-neutral-500">
             Vybraté: {selected.size}
           </span>
-          <button
-            onClick={() => setPickerOpen(true)}
-            disabled={selected.size === 0 || bulkBusy}
-            className="rounded-lg bg-accent px-3 py-1.5 text-sm font-medium text-white disabled:opacity-40"
-          >
-            💾 Do albumu
-          </button>
-          <button
-            onClick={() => void bulkRemove()}
-            disabled={selected.size === 0 || bulkBusy}
-            className="rounded-lg border border-red-300 px-3 py-1.5 text-sm text-red-600 disabled:opacity-40 dark:border-red-900"
-          >
-            {bulkBusy ? 'Pracujem…' : '🗑 Odstrániť'}
-          </button>
+          <MediaTargetButtons disabled={selected.size === 0} onPick={setPicker} />
         </div>
       )}
 
-      {pickerOpen && selected.size > 0 && (
+      {picker === 'album' && selected.size > 0 && (
         <AlbumPickerDialog
           mediaIds={[...selected]}
           onClose={() => {
-            setPickerOpen(false);
+            setPicker(null);
+            exitSelecting();
+          }}
+        />
+      )}
+      {picker === 'note' && selected.size > 0 && (
+        <NotePickerDialog
+          mediaIds={[...selected]}
+          onClose={() => {
+            setPicker(null);
+            exitSelecting();
+          }}
+        />
+      )}
+      {picker === 'event' && selected.size > 0 && (
+        <EventPickerDialog
+          mediaIds={[...selected]}
+          onClose={() => {
+            setPicker(null);
             exitSelecting();
           }}
         />

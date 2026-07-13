@@ -269,6 +269,23 @@ async function main() {
   r = await http(alica.token, 'DELETE', `/api/events/${evId}/media/${n2}`);
   check('autor odstránil fotku udalosti → 200', r.status === 200 && r.body.media?.length === 1, r.body.media?.length);
 
+  console.log('\n— Anketa s fotkami možností (ladenie, 6. kolo) —');
+  const p1img = await seedImage(alica.id);
+  r = await http(alica.token, 'POST', '/api/polls', {
+    question: 'Ktorá fotka na obálku?',
+    options: [{ label: 'Táto', mediaId: p1img }, { label: 'Bez fotky' }],
+  });
+  check(
+    'anketa s fotkou možnosti → 201 + option.media',
+    r.status === 201 && r.body.options?.[0]?.media?.id === p1img && r.body.options?.[1]?.media === null,
+    r.body.options,
+  );
+  r = await http(alica.token, 'POST', '/api/polls', {
+    question: 'X',
+    options: [{ label: 'a', mediaId: crypto.randomUUID() }, { label: 'b' }],
+  });
+  check('neexistujúca fotka možnosti → 400', r.status === 400, r.status);
+
   console.log('\n— Mazanie —');
   r = await http(bob.token, 'DELETE', `/api/feed/${postId}`);
   check('post zmaže len autor/admin → 403', r.status === 403, r.status);

@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
-import type { PollPublic } from '@rodinna/shared-types';
+import type { MediaPublic, PollPublic } from '@rodinna/shared-types';
 import { pollsApi } from '../lib/api';
 import { useAuth } from '../auth/AuthContext';
 import { useChat } from '../chat/ChatProvider';
 import type { EntityCardProps } from '../app/cards';
+import { Lightbox } from '../shared/Lightbox';
 
 /**
  * Živá karta ankety (M1, kontrakty K1/K2): renderuje sa vo Feede aj v chat
@@ -34,6 +35,7 @@ export function PollCard({ entityId, compact }: EntityCardProps) {
   const [poll, setPoll] = useState<PollPublic | null>(null);
   const [error, setError] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [zoom, setZoom] = useState<MediaPublic | null>(null);
 
   useEffect(() => {
     let alive = true;
@@ -149,10 +151,26 @@ export function PollCard({ entityId, compact }: EntityCardProps) {
                   aria-hidden
                 />
                 <span className="relative flex items-center justify-between gap-2">
-                  <span className={`min-w-0 truncate ${winner ? 'font-semibold' : ''}`}>
-                    {winner && '🏆 '}
-                    {o.votedByMe && '✓ '}
-                    {o.label}
+                  <span className="flex min-w-0 items-center gap-2">
+                    {o.media && (
+                      <span
+                        role="button"
+                        tabIndex={0}
+                        title="Zväčšiť fotku"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setZoom(o.media);
+                        }}
+                        className="h-9 w-9 shrink-0 overflow-hidden rounded-md"
+                      >
+                        <img src={o.media.url} alt="" loading="lazy" className="h-full w-full object-cover" />
+                      </span>
+                    )}
+                    <span className={`min-w-0 truncate ${winner ? 'font-semibold' : ''}`}>
+                      {winner && '🏆 '}
+                      {o.votedByMe && '✓ '}
+                      {o.label}
+                    </span>
                   </span>
                   <span className="shrink-0 text-xs tabular-nums text-neutral-500">
                     {o.votes > 0 && !poll.anonymous && (
@@ -175,6 +193,8 @@ export function PollCard({ entityId, compact }: EntityCardProps) {
         {poll.anonymous && ' · anonymná'}
         {poll.closed ? ' · ukončená' : poll.closesAt ? ` · ${closesIn(poll.closesAt)}` : ''}
       </p>
+
+      {zoom && <Lightbox items={[zoom]} initialIndex={0} onClose={() => setZoom(null)} />}
     </div>
   );
 }

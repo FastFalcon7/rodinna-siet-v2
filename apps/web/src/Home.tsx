@@ -69,11 +69,14 @@ function HomeInner() {
         </button>
       );
     }
+    // Bottom nav (ladenie 07/2026): 6 položiek, len ikony — texty by sa nezmestili.
     return (
       <button
         key={key}
         onClick={() => setTab(key)}
-        className={`flex flex-1 flex-col items-center gap-0.5 py-2 transition ${
+        title={label}
+        aria-label={label}
+        className={`flex flex-1 flex-col items-center py-2.5 transition ${
           isActive ? 'text-accent' : 'text-neutral-500 dark:text-neutral-400'
         }`}
       >
@@ -81,7 +84,6 @@ function HomeInner() {
           <Icon className="h-6 w-6" />
           {module && <NavBadge module={module} />}
         </span>
-        <span className="text-[11px] font-medium">{label}</span>
       </button>
     );
   };

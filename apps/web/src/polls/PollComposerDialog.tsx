@@ -1,11 +1,11 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import {
   MAX_POLL_OPTION,
   MAX_POLL_OPTIONS,
   MAX_POLL_QUESTION,
   type PollPublic,
 } from '@rodinna/shared-types';
-import { ApiError, pollsApi } from '../lib/api';
+import { ApiError, mediaApi, pollsApi } from '../lib/api';
 
 /**
  * Dialóg tvorby ankety (M1) — spoločný pre Feed composer (toFeed=true)
@@ -30,20 +30,44 @@ export function PollComposerDialog({
   onCreated: (poll: PollPublic) => void;
   onClose: () => void;
 }) {
+  interface OptionDraft {
+    label: string;
+    /** Lokálny náhľad + nahraté id fotky možnosti (ladenie 07/2026). */
+    mediaId: string | null;
+    previewUrl: string | null;
+    uploading: boolean;
+  }
+  const emptyOption = (): OptionDraft => ({ label: '', mediaId: null, previewUrl: null, uploading: false });
+
   const [question, setQuestion] = useState('');
-  const [options, setOptions] = useState<string[]>(['', '']);
+  const [options, setOptions] = useState<OptionDraft[]>([emptyOption(), emptyOption()]);
   const [multi, setMulti] = useState(false);
   const [anonymous, setAnonymous] = useState(false);
   const [deadline, setDeadline] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const fileRefs = useRef<(HTMLInputElement | null)[]>([]);
 
-  const setOption = (i: number, v: string) =>
-    setOptions((prev) => prev.map((o, idx) => (idx === i ? v : o)));
+  const patchOption = (i: number, p: Partial<OptionDraft>) =>
+    setOptions((prev) => prev.map((o, idx) => (idx === i ? { ...o, ...p } : o)));
   const removeOption = (i: number) => setOptions((prev) => prev.filter((_, idx) => idx !== i));
 
-  const validOptions = options.map((o) => o.trim()).filter(Boolean);
-  const canSubmit = question.trim().length > 0 && validOptions.length >= 2 && !busy;
+  const attachPhoto = (i: number, file: File) => {
+    patchOption(i, { previewUrl: URL.createObjectURL(file), uploading: true, mediaId: null });
+    void mediaApi
+      .upload(file)
+      .then((m) => patchOption(i, { mediaId: m.id, uploading: false }))
+      .catch(() => {
+        patchOption(i, { previewUrl: null, uploading: false });
+        setError('Fotku sa nepodarilo nahrať');
+      });
+  };
+
+  const validOptions = options
+    .map((o) => ({ label: o.label.trim(), mediaId: o.mediaId }))
+    .filter((o) => o.label.length > 0);
+  const uploading = options.some((o) => o.uploading);
+  const canSubmit = question.trim().length > 0 && validOptions.length >= 2 && !busy && !uploading;
 
   const submit = async () => {
     if (!canSubmit) return;
@@ -89,9 +113,48 @@ export function PollComposerDialog({
         <div className="space-y-1.5">
           {options.map((o, i) => (
             <div key={i} className="flex items-center gap-1.5">
+              {/* Fotka možnosti: náhľad alebo tlačidlo na výber. */}
+              {o.previewUrl ? (
+                <button
+                  type="button"
+                  onClick={() => patchOption(i, { previewUrl: null, mediaId: null })}
+                  title="Odstrániť fotku"
+                  className="relative h-9 w-9 shrink-0 overflow-hidden rounded-lg"
+                >
+                  <img src={o.previewUrl} alt="" className="h-full w-full object-cover" />
+                  {o.uploading && (
+                    <span className="absolute inset-0 grid place-items-center bg-black/45 text-[9px] font-semibold text-white">
+                      …
+                    </span>
+                  )}
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => fileRefs.current[i]?.click()}
+                  title="Pridať fotku k možnosti"
+                  aria-label="Pridať fotku k možnosti"
+                  className="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-dashed border-neutral-300 text-neutral-400 hover:border-accent hover:text-accent dark:border-neutral-700"
+                >
+                  📷
+                </button>
+              )}
               <input
-                value={o}
-                onChange={(e) => setOption(i, e.target.value)}
+                ref={(el) => {
+                  fileRefs.current[i] = el;
+                }}
+                type="file"
+                accept="image/*"
+                hidden
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  e.target.value = '';
+                  if (f) attachPhoto(i, f);
+                }}
+              />
+              <input
+                value={o.label}
+                onChange={(e) => patchOption(i, { label: e.target.value })}
                 maxLength={MAX_POLL_OPTION}
                 placeholder={`Možnosť ${i + 1}`}
                 className="min-w-0 flex-1 rounded-lg border border-neutral-300 bg-transparent px-3 py-1.5 text-sm outline-none focus:border-accent dark:border-neutral-700"
@@ -111,7 +174,7 @@ export function PollComposerDialog({
           {options.length < MAX_POLL_OPTIONS && (
             <button
               type="button"
-              onClick={() => setOptions((prev) => [...prev, ''])}
+              onClick={() => setOptions((prev) => [...prev, emptyOption()])}
               className="text-sm text-accent hover:underline"
             >
               + Pridať možnosť

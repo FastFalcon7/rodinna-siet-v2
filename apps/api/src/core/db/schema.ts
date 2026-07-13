@@ -459,6 +459,8 @@ export const pollOptions = pgTable(
       .notNull()
       .references(() => polls.id, { onDelete: 'cascade' }),
     label: text('label').notNull(),
+    /** Fotka možnosti (ladenie 07/2026) — anketa s obrázkovými voľbami. */
+    mediaId: uuid('media_id').references(() => media.id, { onDelete: 'set null' }),
     order: integer('order').notNull().default(0),
   },
   (t) => [index('poll_options_poll_idx').on(t.pollId)],
