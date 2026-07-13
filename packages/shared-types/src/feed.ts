@@ -6,6 +6,8 @@ export const PostAuthorSchema = z.object({
   id: z.string().uuid(),
   displayName: z.string(),
   avatarUrl: z.string().nullable(),
+  /** Farba mena (hex) pre vizuálnu orientáciu; nepovinné (staršie výrezy). */
+  nameColor: z.string().nullable().optional(),
 });
 export type PostAuthor = z.infer<typeof PostAuthorSchema>;
 

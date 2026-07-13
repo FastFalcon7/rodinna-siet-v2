@@ -51,7 +51,7 @@ function dmKeyOf(a: string, b: string): string {
 async function fetchAuthors(userIds: string[]): Promise<Map<string, PostAuthor>> {
   if (userIds.length === 0) return new Map();
   const rows = await db
-    .select({ id: users.id, displayName: users.displayName, avatarUrl: users.avatarUrl })
+    .select({ id: users.id, displayName: users.displayName, avatarUrl: users.avatarUrl, nameColor: users.nameColor })
     .from(users)
     .where(inArray(users.id, userIds));
   return new Map(rows.map((r) => [r.id, r]));
@@ -193,6 +193,7 @@ async function buildRooms(rooms: ChatRoomRow[], viewerId: string): Promise<ChatR
       userId: users.id,
       displayName: users.displayName,
       avatarUrl: users.avatarUrl,
+      nameColor: users.nameColor,
     })
     .from(roomMembers)
     .innerJoin(users, eq(roomMembers.userId, users.id))
@@ -206,6 +207,7 @@ async function buildRooms(rooms: ChatRoomRow[], viewerId: string): Promise<ChatR
       id: m.userId,
       displayName: m.displayName,
       avatarUrl: m.avatarUrl,
+      nameColor: m.nameColor,
       role: m.role,
       lastReadAt: m.lastReadAt?.toISOString() ?? null,
     });

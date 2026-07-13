@@ -40,7 +40,7 @@ export async function getPoll(pollId: string, viewerId: string): Promise<PollPub
 async function hydratePoll(poll: PollRow, viewerId: string): Promise<PollPublic> {
   const [authorRows, optionRows, voteRows] = await Promise.all([
     db
-      .select({ id: users.id, displayName: users.displayName, avatarUrl: users.avatarUrl })
+      .select({ id: users.id, displayName: users.displayName, avatarUrl: users.avatarUrl, nameColor: users.nameColor })
       .from(users)
       .where(eq(users.id, poll.authorId)),
     db.select().from(pollOptions).where(eq(pollOptions.pollId, poll.id)).orderBy(asc(pollOptions.order)),

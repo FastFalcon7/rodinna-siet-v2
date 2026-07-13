@@ -127,6 +127,15 @@ async function main() {
   r = await http(alica.token, 'POST', '/api/feed', { bodyMd: 'X', mediaIds: [cudzia] });
   check('cudzie médium v poste → 403', r.status === 403, r.status);
 
+  // Ladenie 07/2026: farba mena z profilu preteká cez autora príspevku.
+  r = await http(alica.token, 'PATCH', '/api/users/me', { nameColor: '#3b82f6' });
+  check('nastavenie farby mena → 200', r.status === 200 && r.body.user.nameColor === '#3b82f6', r.body.user?.nameColor);
+  r = await http(alica.token, 'PATCH', '/api/users/me', { nameColor: '#123456' });
+  check('farba mimo palety → 400', r.status === 400, r.status);
+  r = await http(bob.token, 'GET', `/api/feed`);
+  const seen = r.body.items?.find((it: any) => it.type === 'post' && it.post.id === postId);
+  check('autor príspevku nesie farbu mena', seen?.post.author.nameColor === '#3b82f6', seen?.post.author);
+
   console.log('\n— Komentáre s prílohami (bod 3) —');
   r = await http(bob.token, 'POST', `/api/feed/${postId}/comments`, { bodyMd: '', mediaIds: [] });
   check('prázdny komentár → 400', r.status === 400, r.status);

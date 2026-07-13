@@ -37,7 +37,7 @@ const MAX_PAGE_SIZE = 50;
 async function fetchAuthors(userIds: string[]): Promise<Map<string, PostAuthor>> {
   if (userIds.length === 0) return new Map();
   const rows = await db
-    .select({ id: users.id, displayName: users.displayName, avatarUrl: users.avatarUrl })
+    .select({ id: users.id, displayName: users.displayName, avatarUrl: users.avatarUrl, nameColor: users.nameColor })
     .from(users)
     .where(inArray(users.id, userIds));
   return new Map(rows.map((r) => [r.id, r]));

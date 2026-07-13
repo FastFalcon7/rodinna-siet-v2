@@ -4,6 +4,7 @@ import { MAX_COMMENT_DEPTH } from '@rodinna/shared-types';
 import { feedApi } from '../lib/api';
 import { useAuth } from '../auth/AuthContext';
 import { Avatar } from '../shared/Avatar';
+import { nameStyle } from '../shared/nameColor';
 import { MediaItem } from '../shared/MediaItem';
 import { ReactionBar } from './ReactionBar';
 import { CommentComposer } from './CommentComposer';
@@ -60,7 +61,9 @@ function CommentNode({
         <Avatar user={comment.author} size={28} />
         <div className="flex-1">
           <div className="rounded-2xl bg-neutral-100 dark:bg-neutral-800 px-3 py-2">
-            <p className="text-sm font-medium">{comment.author.displayName}</p>
+            <p className="text-sm font-medium" style={nameStyle(comment.author)}>
+              {comment.author.displayName}
+            </p>
             {comment.bodyMd && <p className="text-sm whitespace-pre-wrap">{comment.bodyMd}</p>}
           </div>
           {comment.media.length > 0 && (

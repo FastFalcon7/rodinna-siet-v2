@@ -176,6 +176,13 @@
       "when": 1783954591545,
       "tag": "0024_sloppy_gorilla_man",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1783956174682,
+      "tag": "0025_smiling_amphibian",
+      "breakpoints": true
     }
   ]
 }

@@ -10,6 +10,8 @@ export const UserPublicSchema = z.object({
   email: z.string().email(),
   displayName: z.string(),
   avatarUrl: z.string().nullable(),
+  /** Farba zobrazovaného mena (hex z palety) — null = predvolená. */
+  nameColor: z.string().nullable(),
   role: RoleSchema,
   /** Dátum narodenia (YYYY-MM-DD) — M4 kalendár z neho počíta narodeniny. */
   birthday: z.string().nullable(),

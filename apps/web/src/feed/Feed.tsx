@@ -4,6 +4,7 @@ import { ApiError, feedApi } from '../lib/api';
 import { PostComposer } from './PostComposer';
 import { PostCard } from './PostCard';
 import { Avatar } from '../shared/Avatar';
+import { nameStyle } from '../shared/nameColor';
 import { relativeTime, fullDateTime } from '../shared/time';
 import { EntityCard } from '../app/cards';
 import { useChat } from '../chat/ChatProvider';
@@ -139,7 +140,9 @@ function FeedCardItem({ card }: { card: FeedCardPublic }) {
         <Avatar user={card.author} size={40} />
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1.5">
-            <span className="truncate font-semibold">{card.author.displayName}</span>
+            <span className="truncate font-semibold" style={nameStyle(card.author)}>
+              {card.author.displayName}
+            </span>
             <span className="shrink-0 text-sm text-neutral-500" title={fullDateTime(card.createdAt)}>
               · {relativeTime(card.createdAt)}
             </span>

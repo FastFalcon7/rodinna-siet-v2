@@ -36,6 +36,8 @@ export const users = pgTable('users', {
   email: text('email').notNull().unique(),
   displayName: text('display_name').notNull(),
   avatarUrl: text('avatar_url'),
+  // Ladenie 07/2026: farba zobrazovaného mena (hex) pre lepšiu orientáciu; null = predvolená.
+  nameColor: text('name_color'),
   // Nullable — užívateľ môže byť neskôr len-Passkey (T2b).
   passwordHash: text('password_hash'),
   role: text('role', { enum: roleEnumValues }).notNull().default('member'),

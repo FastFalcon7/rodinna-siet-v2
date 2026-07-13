@@ -3,6 +3,7 @@ import type { CommentPublic, MediaPublic, PostPublic } from '@rodinna/shared-typ
 import { ApiError, feedApi } from '../lib/api';
 import { useAuth } from '../auth/AuthContext';
 import { Avatar } from '../shared/Avatar';
+import { nameStyle } from '../shared/nameColor';
 import { MediaItem } from '../shared/MediaItem';
 import { LinkPreviewCard } from '../shared/LinkPreviewCard';
 import { extractFirstUrl, RichBody } from '../shared/linkify';
@@ -130,7 +131,9 @@ export function PostCard({ post, onChange, onDeleted }: PostCardProps) {
         <Avatar user={post.author} size={40} />
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1.5">
-            <span className="truncate font-semibold">{post.author.displayName}</span>
+            <span className="truncate font-semibold" style={nameStyle(post.author)}>
+              {post.author.displayName}
+            </span>
             <span
               className="shrink-0 text-sm text-neutral-500"
               title={fullDateTime(post.createdAt)}

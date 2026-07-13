@@ -1,5 +1,6 @@
 import { useAuth } from '../auth/AuthContext';
 import { Avatar } from '../shared/Avatar';
+import { nameStyle } from '../shared/nameColor';
 import { ProfileCard } from '../users/ProfileCard';
 import { MembersList } from '../users/MembersList';
 import { InvitePanel } from '../users/InvitePanel';
@@ -27,7 +28,9 @@ export function More({ onOpenModule }: { onOpenModule: (name: string) => void })
       <section className="flex items-center gap-4 rounded-2xl border border-neutral-200 bg-white p-6 dark:border-neutral-800 dark:bg-neutral-900">
         <Avatar user={user} size={56} />
         <div className="min-w-0 flex-1">
-          <p className="truncate font-semibold">{user.displayName}</p>
+          <p className="truncate font-semibold" style={nameStyle(user)}>
+            {user.displayName}
+          </p>
           <p className="truncate text-sm text-neutral-500">
             {user.email} · {user.role === 'admin' ? 'admin' : 'člen'}
           </p>

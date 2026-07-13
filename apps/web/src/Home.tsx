@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from './auth/AuthContext';
 import { Avatar } from './shared/Avatar';
+import { nameStyle } from './shared/nameColor';
 import { onAppNavigate, MORE_TAB } from './app/navigate';
 import { peekRoomParam } from './shared/deepLink';
 import { ChatProvider } from './chat/ChatProvider';
@@ -104,7 +105,9 @@ function HomeInner() {
         >
           <Avatar user={user} size={32} />
           <span className="min-w-0">
-            <span className="block truncate text-sm font-medium">{user.displayName}</span>
+            <span className="block truncate text-sm font-medium" style={nameStyle(user)}>
+              {user.displayName}
+            </span>
             <span className="block truncate text-xs text-neutral-500">{user.email}</span>
           </span>
         </button>

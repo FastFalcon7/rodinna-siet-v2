@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { ALLOWED_REACTION_EMOJIS, type MessagePublic } from '@rodinna/shared-types';
 import { chatApi } from '../lib/api';
 import { MediaItem } from '../shared/MediaItem';
+import { nameStyle } from '../shared/nameColor';
 import { PhotoGallery } from '../shared/PhotoGallery';
 import { LinkPreviewCard } from '../shared/LinkPreviewCard';
 import { extractFirstUrl, RichBody } from '../shared/linkify';
@@ -114,7 +115,9 @@ export function MessageBubble({ message, mine, showAuthor, seen, tail, onReply, 
         style={swipe.dx > 0 ? { transform: `translateX(${swipe.dx * 0.9}px)`, transition: 'none' } : { transition: 'transform 150ms' }}
       >
         {showAuthor && !mine && (
-          <span className="mb-0.5 ml-1 text-xs font-medium text-accent">{message.author.displayName}</span>
+          <span className="mb-0.5 ml-1 text-xs font-medium text-accent" style={nameStyle(message.author)}>
+            {message.author.displayName}
+          </span>
         )}
 
         <div

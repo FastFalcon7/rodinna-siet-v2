@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react';
+import { NAME_COLORS, type NameColor } from '@rodinna/shared-types';
 import { ApiError } from '../lib/api';
 import { useAuth } from '../auth/AuthContext';
 import { Avatar } from '../shared/Avatar';
@@ -31,6 +32,20 @@ export function ProfileCard() {
   };
 
   const dirty = name.trim() !== user?.displayName || (birthday || null) !== (user?.birthday ?? null);
+
+  /** Farba mena sa uloží hneď po kliknutí (nie cez „Uložiť" formulár). */
+  const pickColor = async (color: NameColor | null) => {
+    if (color === (user?.nameColor ?? null) || busy) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await updateProfile({ nameColor: color });
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Zmena farby zlyhala');
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const onSaveName = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -116,6 +131,42 @@ export function ProfileCard() {
         </button>
         {saved && <span className="text-sm text-emerald-600">Uložené ✓</span>}
       </form>
+
+      <div className="mt-5">
+        <span className="text-sm text-neutral-600 dark:text-neutral-300">Farba môjho mena</span>
+        <p className="mt-0.5 text-xs text-neutral-500">
+          Ukáž sa vo feede a chate:{' '}
+          <span className="font-semibold" style={user.nameColor ? { color: user.nameColor } : undefined}>
+            {name.trim() || user.displayName}
+          </span>
+        </p>
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          {NAME_COLORS.map((c) => (
+            <button
+              key={c}
+              type="button"
+              onClick={() => void pickColor(c)}
+              disabled={busy}
+              title="Nastaviť túto farbu"
+              className={`h-8 w-8 rounded-full transition disabled:opacity-50 ${
+                user.nameColor === c ? 'ring-2 ring-offset-2 ring-neutral-400 dark:ring-offset-neutral-900' : ''
+              }`}
+              style={{ backgroundColor: c }}
+            />
+          ))}
+          <button
+            type="button"
+            onClick={() => void pickColor(null)}
+            disabled={busy}
+            title="Bez farby (predvolená)"
+            className={`grid h-8 w-8 place-items-center rounded-full border border-neutral-300 text-xs text-neutral-500 transition disabled:opacity-50 dark:border-neutral-600 ${
+              !user.nameColor ? 'ring-2 ring-offset-2 ring-neutral-400 dark:ring-offset-neutral-900' : ''
+            }`}
+          >
+            ✕
+          </button>
+        </div>
+      </div>
 
       {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
     </section>
