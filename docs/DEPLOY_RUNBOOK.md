@@ -326,3 +326,11 @@ podrobnosti a kontext v `ARCHITECTURE_V2.md` §13 „Odchýlky implementácie":
   `dennikn.sk`). Zoznam feedov per kategória je `NEWS_FEEDS` v
   `apps/api/src/modules/news/service.ts` — zmena zdroja je úprava kódu (PR),
   nie config/env.
+- **Video na iPhone sa niekedy neprehrá.** Napriek transkódu na H.264/AAC
+  (worker `media.transcode`) a podpísanému capability tokenu v URL
+  (`apps/api/src/modules/media/urlToken.ts` — rieši, že iOS `AVPlayer`
+  neposiela session cookie) rodina opakovane hlásila čierne okno s
+  preškrtnutým prehrávaním na iPhone, zatiaľ čo na PC video hrá bez
+  problémov. Príčina nie je uzavretá; podľa dohody s rodinou je téma
+  **úmyselne odložená** na samostatné ladenie, nerieš ju mimochodom pri
+  inej práci na module Feed/Chat.

@@ -369,6 +369,8 @@ rodinna.tvojadomena.synology.me {
 | Read receipts | — | `room_members.last_read_at` nastavený priamo v SQL z `messages.created_at` | round-trip cez JS `Date` orezáva µs → vlastná správa by vyšla ako neprečítaná |
 | Denník — push po manuálnom zápise | notifikácia pri každom novom zápise | tlačidlo „Vygenerovať dnešný zápis" **nepošle** push; pošle ho len automatický nočný beh (`diary.daily`→`diary.notify`) | zistené pri reálnom testovaní na NAS-e (júl 2026), zatiaľ neopravené — odložené |
 | Kvalita LLM obsahu (M5 Denník, M8 Kvízy) | koherentný text / fakticky správne kvízy | `llama3.2:3b-instruct-q4_K_M` halucinuje (nezmyselný text, faktické chyby); `qwen2.5:7b-instruct-q4_K_M` o niečo lepší, ale stále chybný obsah (preklepy, zlé možnosti, miešanie jazykov) | limit malého kvantovaného modelu na CPU-only NAS-e bez GPU; otvorené — buď väčší lokálny model (14B+, pomalší), alebo cloud LLM API len pre tieto dve funkcie (mení privacy-model pre denník, kvíz je menej citlivý) |
+| AI vypínač (Denník, Hry — otázka dňa/týždňa, Kvízy) | voľba per zariadenie (`localStorage`) | globálne serverové nastavenie (`app_settings`), mení **výhradne admin** (`PUT /api/settings/ai`, 403 pre člena); predvolene vypnuté | pôvodná voľba len skrývala UI na danom zariadení — worker ďalej generoval obsah (napr. otázku dňa) pre celú rodinu, aj keď si to niekto lokálne „vypol" |
+| Video prílohy na iPhone | transkód (H.264/AAC) + podpísaný token v URL malo zaručiť prehrateľnosť | rodina opakovane hlásila čierne okno s preškrtnutým prehrávaním na iPhone (na PC hrá bez problémov); príčina neuzavretá | odložené na samostatné ladenie na žiadosť rodiny — pozri `docs/DEPLOY_RUNBOOK.md` §9 |
 
 ---
 

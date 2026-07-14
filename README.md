@@ -1,21 +1,28 @@
-# Rodinná Sieť v2
+# Naša rodina
 
 Privátna rodinná sociálna sieť (max 10 užívateľov), **100 % self-hosted** na
-Synology DS925+. Architektonický návrh: [`ARCHITECTURE_V2.md`](./ARCHITECTURE_V2.md).
+Synology DS925+. Pôvodný pracovný názov repozitára a architektonického návrhu
+je „Rodinná sieť v2" (`rodinna-siet-v2`) — appka samotná sa v UI (aj PWA
+manifeste) volá **„Naša rodina"**. Architektonický návrh: [`ARCHITECTURE_V2.md`](./ARCHITECTURE_V2.md).
 
 **Stack:** Bun + Hono + PostgreSQL/pgvector (backend) · Vite 7 + React 19 PWA
 (frontend) · Caddy (TLS) · Docker Compose. Monorepo cez **Bun workspaces**.
 
 > **Stav:** Phase 1 (T1–T9) aj celá Phase 2 (moduly M0–M8) sú **implementované a
-> nasadené** na produkčnom NAS-e. Jadro: monorepo, auth (email+heslo,
-> invite-only), profily/média, rodinný Feed, real-time Chat (WhatsApp-úroveň:
-> push, typing, read receipts, reakcie, prílohy), PWA (offline shell, install
-> prompt). Nad tým Phase 2 moduly: Ankety, Albumy, Zoznamy/Poznámky, Kalendár
-> (+ ICS), Denník (LLM), Hry (piškvorky 10×10 + AI súper, denná otázka, foto
-> výzva), Svet okolo (RSS), Kvízy (LLM). Detail per modul:
+> nasadené** na produkčnom NAS-e, plus niekoľko kôl doladenia podľa reálneho
+> používania rodinou (viď „Ladenie po nasadení" nižšie). Jadro: monorepo, auth
+> (email+heslo, invite-only), profily/média (vrátane farby zobrazovaného mena),
+> rodinný Feed, real-time Chat (WhatsApp-úroveň: push, typing, read receipts,
+> reakcie, prílohy), PWA (offline shell, install prompt), jemné pozadie
+> s ilustráciami zvierat a nastaviteľná veľkosť písma. Nad tým Phase 2 moduly:
+> Ankety, Albumy, Zoznamy/Poznámky, Kalendár (+ ICS), Denník (LLM), Hry
+> (piškvorky 10×10 + AI súper, denná otázka, foto výzva), Svet okolo (RSS),
+> Kvízy (LLM) — posledné tri sú AI funkcie, ktoré **zapína/vypína výhradne
+> admin**, globálne pre celú rodinu (predvolene vypnuté). Detail per modul:
 > [`docs/MODULES_PLAN_PHASE2.md`](./docs/MODULES_PLAN_PHASE2.md). Otvorené:
-> Passkey (T2b), feed virtualizácia, kvalita LLM obsahu — pozri
-> `ARCHITECTURE_V2.md §13` (Odchýlky) a [`docs/DEPLOY_RUNBOOK.md` §9](./docs/DEPLOY_RUNBOOK.md).
+> Passkey (T2b), feed virtualizácia, kvalita LLM obsahu, prehrávanie videa na
+> iPhone (viď nižšie) — pozri `ARCHITECTURE_V2.md §13` (Odchýlky) a
+> [`docs/DEPLOY_RUNBOOK.md` §9](./docs/DEPLOY_RUNBOOK.md).
 
 ## Auth (T2a)
 
@@ -41,21 +48,32 @@ Migrácie sa aplikujú automaticky pri štarte api.
 
 ## Users + Media (T3)
 
-- **Profil**: úprava zobrazovaného mena, nahranie **avatara** (štvorcový 512×512).
+- **Profil**: úprava zobrazovaného mena, nahranie **avatara** (štvorcový 512×512),
+  **farba zobrazovaného mena** (paleta 12 farieb alebo bez farby) — preteká cez
+  autora do Feedu, Chatu, komentárov aj zoznamu členov pre lepšiu orientáciu.
 - **Upload obrázkov**: `sharp` re-encode do WebP, **EXIF/GPS strip** (§9), `blurhash`
   placeholder, magic-byte kontrola (`file-type`), limit `MAX_IMAGE_MB` (default 50).
 - **Úložisko**: lokálny FS pod `MEDIA_HOST_PATH` (na NAS napr. `/volume1/rodinna/media`),
-  v DB len metadáta. Serve cez `GET /api/media/:id` (auth-gated, privátna sieť).
+  v DB len metadáta. Serve cez `GET /api/media/:id` (auth-gated; podporuje aj
+  podpísaný capability token `?mt=` pre iOS `<video>`, ktorý neposiela cookies).
+  Video sa pri uploade automaticky transkóduje na H.264/AAC MP4 (poster JPEG),
+  nech sa prehrá aj na zariadeniach bez HW dekodéra pre HEVC.
 - Endpointy: `GET /api/users`, `GET /api/users/:id`, `PATCH /api/users/me`,
   `POST /api/users/me/avatar`, `POST /api/media`, `GET /api/media/:id`.
 
 ## Feed (T4)
 
-- **Príspevky**: text (Markdown-ready) + až 10 fotiek, úprava/zmazanie (autor alebo admin).
-- **Komentáre**: vnorené odpovede max do hĺbky 3 (depth 0–2), mazanie autor/admin.
-- **Reakcie**: 6 emoji (👍❤️😂😮😢🙏), jedna reakcia na užívateľa/cieľ — klik na inú
-  emoji ju nahradí, klik na rovnakú ju zruší (toggle).
+- **Príspevky**: text (Markdown-ready) + až 10 fotiek, úprava (vrátane pridania/
+  odobratia príloh cez „+") a zmazanie (autor alebo admin).
+- **Komentáre**: vnorené odpovede max do hĺbky 3 (depth 0–2), s prílohami,
+  mazanie autor/admin.
+- **Reakcie**: ľubovoľné emoji — 12 rýchlych v základnej palete + „+" na veľkú
+  paletu (~120 ďalších). Jedna reakcia na užívateľa/cieľ (klik na inú ju
+  nahradí, na rovnakú ju zruší). Počítadlá pod príspevkom agregujú reakcie
+  celého vlákna (post + komentáre); na vlastný obsah sa nereaguje. Dlhé
+  podržanie príspevku (mimo fotky) otvorí paletu — rovnaké UI ako v Chate.
 - **Stránkovanie**: keyset (cursor) pagination, najnovšie prvé, tlačidlo „Načítať staršie".
+- **Gestá**: swipe doľava na príspevku rozbalí vlákno komentárov, doprava ho zbalí.
 - Rate limit: 20 príspevkov / 30 komentárov za minútu na užívateľa.
 - Endpointy: `GET/POST /api/feed`, `PATCH/DELETE /api/feed/:id`,
   `GET/POST /api/feed/:id/comments`, `DELETE /api/feed/comments/:id`,
@@ -77,6 +95,45 @@ Migrácie sa aplikujú automaticky pri štarte api.
   `PATCH/DELETE /api/chat/messages/:id`, `PUT /api/chat/reactions`, WS `/ws`.
 - E2E test (REST + WebSocket): `cd apps/api && bun scripts/test-chat.ts` (potrebuje
   bežiaci Postgres v `DATABASE_URL`).
+
+## Ladenie po nasadení
+
+Po nasadení Phase 1+2 prebehlo niekoľko kôl doladenia priamo podľa toho, ako appku
+rodina reálne používa. Zhrnutie (detaily v histórii commitov, hľadaj „ladenie"):
+
+- **AI funkcie sú globálny prepínač pre celú rodinu, mení ho výhradne admin**
+  (`app_settings` tabuľka, `PUT /api/settings/ai`) — nie voľba per zariadenie ako
+  spočiatku. Predvolene vypnuté; kým sú vypnuté, worker negeneruje otázku dňa/
+  týždňa (Hry), nočný denník ani kvízy.
+- **Poznámky, Zoznamy a Udalosti** majú viditeľnosť `private` (len autor) /
+  `family` (celá rodina) / `rooms` (vybrané chatové skupiny — `note_rooms` /
+  `event_rooms`). Dajú sa založiť priamo z Chatu cez „+" a sú potom viditeľné
+  len účastníkom danej miestnosti. Nová poznámka je predvolene súkromná, nová
+  udalosť rodinná (je to typicky pozvánka). ICS export obsahuje len rodinné
+  udalosti.
+- **Udalosti**: RSVP (Prídem/Neviem/Neprídem) je voliteľný prepínač „Pozvánka"
+  pri vytváraní — bez neho je udalosť len oznam bez hlasovania. Autor/admin
+  vie udalosť upraviť aj zmazať cez ⋯ menu na karte.
+- **Albumy**: voliteľný komentár/popis popri názve, hromadný výber fotiek má
+  „Vybrať všetko", ZIP export bol odstránený (nepoužívalo sa).
+- **Reakcie** (Feed aj Chat, zdieľaná paleta): ľubovoľné emoji — 12 rýchlych
+  v základnej palete + „+" na veľkú paletu (~120 ďalších). Vo Feede sa paleta
+  otvára aj dlhým podržaním príspevku, rovnako ako v Chate. Počítadlá pod
+  príspevkom agregujú celé vlákno (post + komentáre).
+- **Vzhľad**: jemné pozadie appky s ilustráciami zvierat (samostatný svetlý/
+  tmavý variant), voliteľná veľkosť písma (Normálne/Väčšie/Najväčšie, škáluje
+  celý layout), nočný režim (Svetlý/Tmavý/Systém), farba mena z 12-farebnej
+  palety (viď Users + Media vyššie).
+- **Navigácia**: spodné menu má 6 ikon bez textu (Feed, Chat, Albumy, Zoznamy
+  a poznámky, Kalendár, Viac); gestá — swipe doľava/doprava rozbaľuje/zbaľuje
+  vlákno komentárov vo Feede, swipe doprava od okraja obrazovky = späť (detail
+  albumu, konverzácia, moduly otvorené z Viac), lightbox má swipe hore/dole
+  medzi fotkami a doprava na zatvorenie.
+- **Fotky**: vo Feede/Chate/komentároch sa zobrazuje len úvodná fotka s
+  badge „+N fotiek"; klik otvorí mriežku všetkých fotiek (PhotoBrowser) s
+  vlastným hromadným výberom (Do albumu / Do poznámky / Do udalosti).
+- **Video na iPhone zostáva otvorená téma** — pozri
+  [`docs/DEPLOY_RUNBOOK.md` §9](./docs/DEPLOY_RUNBOOK.md).
 
 ---
 
@@ -156,4 +213,5 @@ krok za krokom v [`docs/DEPLOY_RUNBOOK.md`](./docs/DEPLOY_RUNBOOK.md).
 Pozri `ARCHITECTURE_V2.md §13` a [`docs/MODULES_PLAN_PHASE2.md`](./docs/MODULES_PLAN_PHASE2.md).
 Hotové: **T1–T9 (Phase 1 jadro) + M0–M8 (Phase 2 moduly).**
 Otvorené: T2b (Passkey), feed virtualizácia, diary push po manuálnom zápise,
-kvalita LLM obsahu (denník, kvízy) — pozri [`docs/DEPLOY_RUNBOOK.md` §9](./docs/DEPLOY_RUNBOOK.md).
+kvalita LLM obsahu (denník, kvízy), prehrávanie videa na iPhone — pozri
+[`docs/DEPLOY_RUNBOOK.md` §9](./docs/DEPLOY_RUNBOOK.md).

@@ -104,16 +104,21 @@ feed_cards (id, module, entity_type, entity_id, author_id, created_at, deleted_a
 „Kde bude nedeľný obed?" — najkratšia cesta k dennému používaniu a zároveň
 **testovací balón plugin kontraktu**: malý dátový model, ale dotkne sa všetkých K1–K4.
 
-- Anketa sa vytvára z Feed composeru (nový typ prílohy) **alebo** z chatu (`[+]` sheet).
+- Anketa sa vytvára z chatu (`[+]` sheet) — po ladení UI (2. kolo) sa vytvorenie
+  z Feed composeru odstránilo (duplicitná cesta, mätúce UX); karta sa vo Feede
+  aj tak zobrazí, keď je zdieľaná do rodinnej miestnosti.
 - Hlasovanie priamo v karte (Feed aj Chat), výsledky sa menia real-time cez WS.
 - Voľby: viac možností, anonymné áno/nie, deadline (+ push „anketa končí o hodinu").
+- **Fotky pri možnostiach** (ladenie 6. kolo): každá možnosť môže mať fotku
+  (`poll_options.media_id`) — composer má pri každej možnosti 📷 upload/náhľad,
+  `PollCard` zobrazuje miniatúry a ťuknutím ich zväčší v lightboxe.
 - **Inovácia — „rozhodovacie ankety":** po deadline karta sama vyhlási víťaza a
   autor môže jedným tapom vytvoriť z víťaznej možnosti udalosť v Kalendári (M4 ju
   neskôr len zapne — API sa navrhne teraz).
 
 ```
 polls        (id, author_id, question, kind ENUM('single','multi'), anonymous, closes_at, created_at)
-poll_options (id, poll_id, label, order)
+poll_options (id, poll_id, label, media_id, order)
 poll_votes   (poll_id, option_id, user_id, created_at, UNIQUE(poll_id, user_id, option_id))
 ```
 
@@ -124,26 +129,29 @@ poll_votes   (poll_id, option_id, user_id, created_at, UNIQUE(poll_id, user_id, 
 
 Fotky už v systéme sú (Feed aj Chat) — modul ich **organizuje a oživuje**, nie duplikuje.
 
-- **Albumy:** manuálne (názov, obálka, členovia môžu prispievať), fotky = existujúce
-  `media` id-čka + nové uploady. Grid s virtualizáciou, lightbox (react-zoom-pan-pinch
-  už je v pláne), reakcie na fotky cez `<ReactionBar>`.
+- **Albumy:** manuálne (názov, voliteľný komentár/popis, obálka, členovia môžu
+  prispievať), fotky = existujúce `media` id-čka + nové uploady. Grid, lightbox
+  so swipe gestami, hromadný výber fotiek (vrátane „Vybrať všetko") s akciami
+  Do albumu / Do poznámky / Do udalosti.
 - **Inovácia 1 — „Zberač":** worker si všíma fotky poslané do chatu/feedu a pri
   ≥ N fotkách z jedného dňa navrhne: *„Máte 14 fotiek zo soboty — vytvoriť album
-  ‚Výlet 28. 6.'?"* Jeden tap = album. (Heuristika dátum+autor, žiadne LLM.)
+  ‚Výlet 28. 6.'?"* Jeden tap = album, návrh názvu je len dátum (dá sa premenovať).
+  (Heuristika dátum+autor, žiadne LLM.)
 - **Inovácia 2 — „Na tento deň":** nočný job nájde fotky spred roka/dvoch a ráno
   vloží do Feedu spomienkovú kartu (K1) — najsilnejší dôvod otvárať appku denne.
 - **Timeline „Rok v rodine":** chronologický pás všetkých fotiek naprieč albumami
-  (mesiace ako sekcie) — cursor pagination už máme.
-- ZIP download albumu (worker job, push „archív je pripravený").
+  (mesiace ako sekcie) — cursor pagination už máme. *(zatiaľ nezrealizované)*
+- ~~ZIP download albumu~~ — implementovaný, no po ladení UI **odstránený**
+  (nepoužívalo sa; menej kódu na údržbu).
 
 ```
-albums        (id, title, cover_media_id, created_by, created_at)
+albums        (id, title, description, cover_media_id, created_by, created_at)
 album_photos  (album_id, media_id, added_by, order, created_at, PRIMARY KEY(album_id, media_id))
 memory_marks  (user_id, media_id, hidden_at)   -- „túto spomienku už neukazuj"
 ```
 
 **Akceptácia:** návrh albumu zo skupinového chatu s 10+ fotkami; spomienková karta
-vo Feede s fotkou spred roka; ZIP 200 fotiek stiahnuteľný z iPhonu.
+vo Feede s fotkou spred roka; hromadný výber a presun fotiek medzi albumami z iPhonu.
 
 ### M3 — Zoznamy & Poznámky ✅ (≈ 2 týždne)
 
@@ -157,14 +165,23 @@ Notes z pôvodného plánu, ale s ťahom na **spoluprácu v reálnom čase** —
 - **Inovácia — živá karta zoznamu v chate (K2 naplno):** *„pošli nákupný zoznam
   do Rodina"* → bublina s prvými 3 položkami a progresom `4/9 ✓`; odškrtávať sa dá
   **priamo v bubline** z chatu, v obchode, bez otvárania modulu.
-- Šablóny („týždenný nákup") + opakovanie; pripnuté zoznamy hore.
+- Šablóny („týždenný nákup") + opakovanie; pripnuté zoznamy hore. *(zatiaľ
+  nezrealizované — je len ručné vytváranie a triedenie)*
+- **Viditeľnosť** (ladenie 7.–8. kolo): `private` (len autor, neviditeľné aj pre
+  admina) / `family` (celá rodina) / `rooms` (vybrané chatové skupiny —
+  `note_rooms`). Nová poznámka je predvolene **súkromná**. Dá sa založiť priamo
+  z Chatu cez „+" — vtedy je automaticky `rooms` len pre danú miestnosť.
+  Poznámka aj zoznam nesú fotky/prílohy (`note_media`).
+- Prílohy: fotky (family-wide, ako v albumoch) aj poloha (GPS odkaz na mapu).
 - LLM-ready: `llmTools: [createList, addItem]` — pripraví pôdu pre `@asistent`
   („pridaj mlieko do nákupu") v M5+, bez implementácie teraz.
 
 ```
-notes       (id, kind ENUM('note','list'), title, body_md, created_by, pinned, created_at, updated_at, updated_by, deleted_at)
-note_items  (id, note_id, label, checked_by, checked_at, assigned_to, order)
+notes         (id, kind ENUM('note','list'), title, body_md, visibility ENUM('private','family','rooms'), created_by, pinned, created_at, updated_at, updated_by, deleted_at)
+note_items    (id, note_id, label, checked_by, checked_at, assigned_to, order)
 note_revisions (id, note_id, body_md, saved_by, saved_at)
+note_rooms    (note_id, room_id)   -- zdieľanie s podskupinou pri visibility='rooms'
+note_media    (note_id, media_id, order)
 ```
 
 **Akceptácia:** zoznam zdieľaný v chate; odškrtnutie z bubliny na zariadení A sa
@@ -175,27 +192,47 @@ do 300 ms ukáže v bubline aj v module na zariadení B.
 - **Narodeniny a výročia:** dátum narodenia v profile → automatické celodenné
   udalosti navždy; push ráno + 3 dni vopred; vo Feede oslávencova karta (K1) —
   reakcie a gratulácie priamo pod ňou.
-- **Udalosti s RSVP:** „Grilovačka u nás, sobota 17:00" → karta vo Feede s tlačidlami
-  Prídem / Neprídem / Neviem (technicky = špecializovaná anketa z M1). Zoznam „kto
-  príde" živý cez WS. Push pripomienka deň vopred a hodinu vopred.
+- **Udalosti žijú predovšetkým v Kalendári**, nie vo Feede — po ladení (2. kolo)
+  je vloženie karty do Feedu voliteľné (`toFeed`, len pri rodinnej viditeľnosti),
+  default je ticho len v Kalendári.
+- **RSVP je voliteľný prepínač „Pozvánka"** (ladenie 9. kolo), nie automatická
+  súčasť každej udalosti — bez neho je to len oznam bez hlasovania. Keď je
+  zapnutá, karta má tlačidlá Prídem / Neprídem / Neviem a živý zoznam „kto
+  príde" cez WS; autor/admin vie udalosť upraviť aj zmazať cez ⋯ menu.
+- **Viditeľnosť** (ladenie 8. kolo, ako pri Poznámkach): `private` / `family`
+  (default — udalosť je typicky pozvánka) / `rooms` (vybrané chatové skupiny,
+  `event_rooms`). Dá sa založiť priamo z Chatu cez „+".
 - **Mesačný pohľad + agenda** (mobil: agenda default — mesačná mriežka je na malom
   displeji nepoužiteľná).
 - **ICS export/subscribe** (read-only URL s tokenom) → rodinný kalendár sa objaví
-  v Apple/Google Calendar bez toho, aby tam museli dáta žiť.
+  v Apple/Google Calendar bez toho, aby tam museli dáta žiť. Obsahuje len
+  udalosti s `family` viditeľnosťou (súkromné/skupinové sa neexportujú).
 - LLM-ready háčik (§15): worker neskôr **navrhne** udalosť z chatovej správy
   („v sobotu o piatej u nás?") — vždy len návrh, nikdy automatický zápis.
+  *(zatiaľ nezrealizované)*
 
 ```
-events       (id, title, starts_at, ends_at, all_day, location, body_md, created_by, source ENUM('manual','birthday','poll','suggested'), created_at, deleted_at)
+events       (id, title, starts_at, ends_at, all_day, location, body_md, rsvp, visibility ENUM('private','family','rooms'), created_by, source ENUM('manual','birthday','poll','suggested'), created_at, deleted_at)
 event_rsvps  (event_id, user_id, status ENUM('yes','no','maybe'), created_at, PRIMARY KEY(event_id, user_id))
+event_rooms  (event_id, room_id)   -- zdieľanie s podskupinou pri visibility='rooms'
+event_media  (event_id, media_id, order)
 ```
 
-**Akceptácia:** narodeninová karta vo Feede v deň narodenín; RSVP z Feedu aj z chatu;
-udalosť viditeľná v Apple Calendar cez ICS subscribe; pripomienka na lock screene.
+**Akceptácia:** narodeninová karta vo Feede v deň narodenín; udalosť s pozvánkou
+má RSVP z Kalendára aj z chatu; udalosť viditeľná v Apple Calendar cez ICS
+subscribe (len rodinné); pripomienka na lock screene.
 
 ### M5 — LLM kernel + Denník 📖 (≈ 3–4 týždne)
 
 Prvé nasadenie Ollamy podľa §6 a §15.2 — **najosobnejší a najinovatívnejší modul**.
+
+> **AI funkcie — globálny prepínač (ladenie 13. kolo):** kým sa kvalita LLM
+> výstupov ladí, denník (nočný draft), denná otázka/foto výzva (M6) a kvízy (M8)
+> bežia len keď ich **admin výslovne zapne** v časti Viac — `app_settings` v DB,
+> `PUT /api/settings/ai` (403 pre bežného člena). Predvolene VYPNUTÉ. Pôvodne to
+> bola voľba per zariadenie (`localStorage`), čo neúmyselne nechávalo worker
+> ďalej generovať obsah pre celú rodinu, aj keď si ho niekto lokálne „vypol" —
+> preto server-side globálne nastavenie.
 
 1. **LLM kernel:** Ollama kontajner (`llama3.2:3b-instruct-q4_K_M` + `nomic-embed-text`,
    voliteľne vymeniteľné za väčší model cez `LLM_MODEL` v `.env`, napr. `qwen2.5:7b-instruct-q4_K_M`),
