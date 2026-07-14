@@ -202,7 +202,6 @@ export const albumsApi = {
   removePhoto: (id: string, mediaId: string) =>
     request<void>(`/albums/${id}/photos/${mediaId}`, { method: 'DELETE' }),
   suggestions: () => request<AlbumSuggestionsResponse>('/albums/suggestions'),
-  downloadUrl: (id: string) => `${API_URL}/albums/${id}/download`,
   getMemory: (mediaId: string) => request<MemoryPublic>(`/albums/memories/${mediaId}`),
   hideMemory: (mediaId: string) =>
     request<{ ok: boolean }>(`/albums/memories/${mediaId}/hide`, { method: 'POST' }),

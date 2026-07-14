@@ -29,6 +29,17 @@ export const appSecrets = pgTable('app_secrets', {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
+/**
+ * Globálne nastavenia appky (ladenie 07/2026) — KV, spravuje admin. Napr.
+ * `ai_features_enabled` prepína AI funkcie (Kvízy, Denník, otázka dňa/týždňa)
+ * pre celú rodinu, nie per zariadenie.
+ */
+export const appSettings = pgTable('app_settings', {
+  name: text('name').primaryKey(),
+  value: text('value').notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
 export const roleEnumValues = ['admin', 'member'] as const;
 
 export const users = pgTable('users', {
@@ -496,6 +507,8 @@ export const pollVotes = pgTable(
 export const albums = pgTable('albums', {
   id: uuid('id').primaryKey().defaultRandom(),
   title: text('title').notNull(),
+  // Ladenie 07/2026: voliteľný komentár/popis albumu popri názve.
+  description: text('description').notNull().default(''),
   coverMediaId: uuid('cover_media_id').references(() => media.id, { onDelete: 'set null' }),
   createdBy: uuid('created_by')
     .notNull()

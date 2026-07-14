@@ -1,38 +1,56 @@
 import { useSyncExternalStore } from 'react';
+import { ApiError } from '../lib/api';
 
 /**
- * LLM vypínač (ladenie 07/2026): funkcie postavené na lokálnom LLM (Kvízy,
- * Denník s otázkou dňa) sú predvolene VYPNUTÉ — výstupy sa ešte ladia.
- * Voľba žije v localStorage (per zariadenie), prepína sa v časti Viac.
+ * AI funkcie (ladenie 07/2026): Kvízy, Denník a otázka dňa/týždňa. Zapína ich
+ * VÝHRADNE admin — je to GLOBÁLNE serverové nastavenie (app_settings), nie
+ * per zariadenie. Predvolene VYPNUTÉ (výstupy sa ešte ladia). Klient si drží
+ * poslednú načítanú hodnotu; admin ju mení cez PUT /api/settings/ai.
  */
 
-const KEY = 'rs-llm-enabled';
-const EVT = 'rs-llm-change';
+const API_URL = import.meta.env.VITE_API_URL ?? '/api';
 
-export function isLlmEnabled(): boolean {
+let enabled = false;
+const listeners = new Set<() => void>();
+function emit(): void {
+  for (const l of listeners) l();
+}
+
+/** Načíta stav zo servera (volá sa po prihlásení). */
+export async function loadAiSettings(): Promise<void> {
   try {
-    return localStorage.getItem(KEY) === '1';
+    const res = await fetch(`${API_URL}/settings`, { credentials: 'include' });
+    if (!res.ok) return;
+    const data = (await res.json()) as { aiEnabled?: boolean };
+    enabled = data.aiEnabled === true;
+    emit();
   } catch {
-    return false;
+    /* offline → ponechaj predchádzajúci stav */
   }
 }
 
-export function setLlmEnabled(on: boolean): void {
-  if (on) localStorage.setItem(KEY, '1');
-  else localStorage.removeItem(KEY);
-  window.dispatchEvent(new Event(EVT));
+/** Admin: zapne/vypne AI funkcie pre celú rodinu. */
+export async function setLlmEnabled(on: boolean): Promise<void> {
+  const res = await fetch(`${API_URL}/settings/ai`, {
+    method: 'PUT',
+    credentials: 'include',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ enabled: on }),
+  });
+  if (!res.ok) {
+    const data = (await res.json().catch(() => ({}))) as { error?: string };
+    throw new ApiError(res.status, data.error ?? `Chyba ${res.status}`);
+  }
+  enabled = on;
+  emit();
 }
 
 function subscribe(cb: () => void): () => void {
-  window.addEventListener(EVT, cb);
-  window.addEventListener('storage', cb);
-  return () => {
-    window.removeEventListener(EVT, cb);
-    window.removeEventListener('storage', cb);
-  };
+  listeners.add(cb);
+  return () => listeners.delete(cb);
 }
 
 /** Reaktívna verzia pre komponenty (More, CommandPalette…). */
 export function useLlmEnabled(): boolean {
-  return useSyncExternalStore(subscribe, isLlmEnabled);
+  return useSyncExternalStore(subscribe, () => enabled);
 }

@@ -10,16 +10,19 @@ import { PostAuthorSchema } from './feed';
  */
 
 export const MAX_ALBUM_TITLE = 120;
+export const MAX_ALBUM_DESC = 2000;
 export const MAX_ALBUM_ADD = 500;
 
 export const CreateAlbumInputSchema = z.object({
   title: z.string().trim().min(1, 'Album potrebuje názov').max(MAX_ALBUM_TITLE),
+  description: z.string().trim().max(MAX_ALBUM_DESC).default(''),
   mediaIds: z.array(z.string().uuid()).max(MAX_ALBUM_ADD).default([]),
 });
 export type CreateAlbumInput = z.infer<typeof CreateAlbumInputSchema>;
 
 export const UpdateAlbumInputSchema = z.object({
   title: z.string().trim().min(1).max(MAX_ALBUM_TITLE).optional(),
+  description: z.string().trim().max(MAX_ALBUM_DESC).optional(),
   coverMediaId: z.string().uuid().nullable().optional(),
 });
 export type UpdateAlbumInput = z.infer<typeof UpdateAlbumInputSchema>;
@@ -32,6 +35,7 @@ export type AddAlbumPhotosInput = z.infer<typeof AddAlbumPhotosInputSchema>;
 export const AlbumSummarySchema = z.object({
   id: z.string().uuid(),
   title: z.string(),
+  description: z.string(),
   cover: MediaPublicSchema.nullable(),
   photoCount: z.number().int(),
   createdBy: PostAuthorSchema,

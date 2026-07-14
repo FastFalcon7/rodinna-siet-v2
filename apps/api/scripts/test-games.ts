@@ -118,7 +118,7 @@ async function seedImage(ownerId: string): Promise<string> {
 async function main() {
   await runMigrations();
   await db.execute(
-    dsql`truncate table game_moves, game_sessions, diary_embeddings, diary_entries, diary_fragments, event_rsvps, events, note_revisions, note_items, notes, memory_marks, album_photos, albums, poll_votes, poll_options, polls, feed_cards, jobs, push_subs, notifications, reactions, message_media, messages, room_members, chat_rooms, post_media, comments, posts, media, sessions, users restart identity cascade`,
+    dsql`truncate table app_settings, game_moves, game_sessions, diary_embeddings, diary_entries, diary_fragments, event_rsvps, events, note_revisions, note_items, notes, memory_marks, album_photos, albums, poll_votes, poll_options, polls, feed_cards, jobs, push_subs, notifications, reactions, message_media, messages, room_members, chat_rooms, post_media, comments, posts, media, sessions, users restart identity cascade`,
   );
 
   const server = Bun.serve({
@@ -176,18 +176,22 @@ async function main() {
   r = await http(cyril.token, 'POST', `/api/games/${gameId}/move`, { cell: 4 });
   check('nehráč → 404 (nečlen)', r.status === 404, r.status);
 
-  // X: 0,1,2 vyhráva; O: 4,5.
+  // 10×10, vyhráva 5 v rade: X v riadku 0 (0-4), O v riadku 1 (10-13).
   await http(alica.token, 'POST', `/api/games/${gameId}/move`, { cell: 0 });
   const evt = await bobWs.waitFor((e) => e.t === 'game:update');
   check('game:update cez WS', (evt as any).gameId === gameId, evt);
   r = await http(bob.token, 'POST', `/api/games/${gameId}/move`, { cell: 0 });
   check('obsadené políčko → 400', r.status === 400, r.status);
-  await http(bob.token, 'POST', `/api/games/${gameId}/move`, { cell: 4 });
+  await http(bob.token, 'POST', `/api/games/${gameId}/move`, { cell: 10 });
   await http(alica.token, 'POST', `/api/games/${gameId}/move`, { cell: 1 });
-  await http(bob.token, 'POST', `/api/games/${gameId}/move`, { cell: 5 });
-  r = await http(alica.token, 'POST', `/api/games/${gameId}/move`, { cell: 2 });
-  check('výherný ťah → finished, winner x', r.body.status === 'finished' && r.body.winner === 'x', r.body);
-  r = await http(bob.token, 'POST', `/api/games/${gameId}/move`, { cell: 8 });
+  await http(bob.token, 'POST', `/api/games/${gameId}/move`, { cell: 11 });
+  await http(alica.token, 'POST', `/api/games/${gameId}/move`, { cell: 2 });
+  await http(bob.token, 'POST', `/api/games/${gameId}/move`, { cell: 12 });
+  await http(alica.token, 'POST', `/api/games/${gameId}/move`, { cell: 3 });
+  await http(bob.token, 'POST', `/api/games/${gameId}/move`, { cell: 13 });
+  r = await http(alica.token, 'POST', `/api/games/${gameId}/move`, { cell: 4 });
+  check('výherný ťah (5 v rade) → finished, winner x', r.body.status === 'finished' && r.body.winner === 'x', r.body);
+  r = await http(bob.token, 'POST', `/api/games/${gameId}/move`, { cell: 20 });
   check('ťah po konci → 400', r.status === 400, r.status);
 
   r = await http(bob.token, 'POST', `/api/games/${gameId}/rematch`);
@@ -198,6 +202,14 @@ async function main() {
   console.log('\n— Denná otázka + foto výzva (denný job) —');
   // Pondelok vynútime cez now parameter.
   const monday = new Date('2026-07-06T06:00:00Z'); // pondelok
+  // Ladenie 07/2026: bez zapnutých AI funkcií sa nič nevygeneruje.
+  const { setAiEnabled } = await import('../src/modules/settings/service');
+  await setAiEnabled(false);
+  await runGamesDaily(monday);
+  const noneYet = await db.select().from(gameSessions).where(eq(gameSessions.kind, 'daily'));
+  check('bez AI funkcií žiadna otázka dňa', noneYet.length === 0, noneYet.length);
+  // Zapni AI a spusti dvakrát (idempotencia).
+  await setAiEnabled(true);
   await runGamesDaily(monday);
   await runGamesDaily(monday);
   const sessions = await db.select().from(gameSessions).where(eq(gameSessions.kind, 'daily'));
@@ -227,6 +239,16 @@ async function main() {
 
   r = await http(alica.token, 'POST', `/api/games/${dailyId}/move`, { cell: 0 });
   check('ťah na otázku → 400', r.status === 400, r.status);
+
+  console.log('\n— AI funkcie: prepínač (admin-only) —');
+  r = await http(bob.token, 'GET', '/api/settings');
+  check('člen číta nastavenia', r.status === 200 && r.body.aiEnabled === true, r.body);
+  r = await http(bob.token, 'PUT', '/api/settings/ai', { enabled: false });
+  check('člen nemôže meniť AI → 403', r.status === 403, r.status);
+  r = await http(alica.token, 'PUT', '/api/settings/ai', { enabled: false });
+  check('admin vypne AI → 200', r.status === 200 && r.body.aiEnabled === false, r.body);
+  r = await http(bob.token, 'GET', '/api/settings');
+  check('vypnutie sa prejaví všetkým', r.body.aiEnabled === false, r.body);
 
   bobWs.close();
   console.log(`\n══ Výsledok: ${passed} ✓ / ${failed} ✗ ══`);

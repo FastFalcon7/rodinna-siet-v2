@@ -52,7 +52,7 @@ export function AlbumPickerDialog({ mediaIds, onClose }: AlbumPickerDialogProps)
     setBusy(true);
     setError(null);
     try {
-      await albumsApi.create({ title, mediaIds });
+      await albumsApi.create({ title, description: '', mediaIds });
       finish(title);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Album sa nepodarilo vytvoriť');

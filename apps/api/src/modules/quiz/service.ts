@@ -154,6 +154,11 @@ export async function createQuiz(creatorId: string, input: CreateQuizInput): Pro
   if (!llmEnabled) {
     throw new BadRequestError('Kvízy potrebujú LLM server (LLM_BASE_URL) — požiadaj admina');
   }
+  // Ladenie 07/2026: AI funkcie musí zapnúť admin (globálne nastavenie).
+  const { getAiEnabled } = await import('../settings/service');
+  if (!(await getAiEnabled())) {
+    throw new BadRequestError('AI funkcie sú vypnuté — zapne ich admin v časti Viac');
+  }
   if (input.audience === 'room') {
     if (!input.roomId) throw new BadRequestError('Kvíz pre miestnosť potrebuje roomId');
     if (!(await isRoomMember(input.roomId, creatorId))) throw new NotFoundError('Miestnosť nenájdená');

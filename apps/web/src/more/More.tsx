@@ -65,7 +65,8 @@ export function More({ onOpenModule }: { onOpenModule: (name: string) => void })
       <InstallCard />
       <ThemeSettings />
       <FontSizeSettings />
-      <LlmSettings />
+      {/* AI funkcie prepína len admin — bežný člen prepínač nevidí. */}
+      {user.role === 'admin' && <LlmSettings />}
       <NotificationSettings />
       <ProfileCard />
       {user.role === 'admin' && <InvitePanel />}

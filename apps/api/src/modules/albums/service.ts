@@ -98,6 +98,7 @@ async function buildSummaries(rows: AlbumRow[]): Promise<AlbumSummary[]> {
     return {
       id: row.id,
       title: row.title,
+      description: row.description,
       cover: coverId ? (coverMap.get(coverId) ?? null) : null,
       photoCount: stat?.count ?? 0,
       createdBy: authors.get(row.createdBy)!,
@@ -147,7 +148,10 @@ export async function createAlbum(creatorId: string, input: CreateAlbumInput): P
   const mediaIds = [...new Set(input.mediaIds)];
   await verifyMediaExist(mediaIds);
 
-  const inserted = await db.insert(albums).values({ title: input.title, createdBy: creatorId }).returning();
+  const inserted = await db
+    .insert(albums)
+    .values({ title: input.title, description: input.description, createdBy: creatorId })
+    .returning();
   const album = inserted[0]!;
 
   if (mediaIds.length > 0) {
@@ -213,6 +217,7 @@ export async function updateAlbum(
     .update(albums)
     .set({
       ...(input.title !== undefined ? { title: input.title } : {}),
+      ...(input.description !== undefined ? { description: input.description } : {}),
       ...(input.coverMediaId !== undefined ? { coverMediaId: input.coverMediaId } : {}),
     })
     .where(eq(albums.id, albumId));

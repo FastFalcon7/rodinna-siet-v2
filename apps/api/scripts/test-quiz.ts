@@ -140,7 +140,7 @@ async function seedUser(email: string, displayName: string, role: 'admin' | 'mem
 async function main() {
   await runMigrations();
   await db.execute(
-    dsql`truncate table quiz_answers, quizzes, news_items, user_news_prefs, game_moves, game_sessions, diary_embeddings, diary_entries, diary_fragments, event_rsvps, events, note_revisions, note_items, notes, memory_marks, album_photos, albums, poll_votes, poll_options, polls, feed_cards, jobs, push_subs, notifications, reactions, message_media, messages, room_members, chat_rooms, post_media, comments, posts, media, sessions, users restart identity cascade`,
+    dsql`truncate table app_settings, quiz_answers, quizzes, news_items, user_news_prefs, game_moves, game_sessions, diary_embeddings, diary_entries, diary_fragments, event_rsvps, events, note_revisions, note_items, notes, memory_marks, album_photos, albums, poll_votes, poll_options, polls, feed_cards, jobs, push_subs, notifications, reactions, message_media, messages, room_members, chat_rooms, post_media, comments, posts, media, sessions, users restart identity cascade`,
   );
 
   const server = Bun.serve({
@@ -161,6 +161,10 @@ async function main() {
   const alica = await seedUser('alica@rodina.sk', 'Alica', 'admin');
   const bob = await seedUser('bob@rodina.sk', 'Bob', 'member');
   const cyril = await seedUser('cyril@rodina.sk', 'Cyril', 'member');
+
+  // Ladenie 07/2026: kvízy sú AI funkcia — admin ich musí zapnúť.
+  const { setAiEnabled } = await import('../src/modules/settings/service');
+  await setAiEnabled(true);
 
   console.log('\n— Tvorba: validácie —');
   let r = await http(alica.token, 'POST', '/api/quiz', { topic: 'Rím', count: 2, audience: 'private' });

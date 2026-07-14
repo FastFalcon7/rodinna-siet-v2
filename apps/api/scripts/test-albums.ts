@@ -6,11 +6,10 @@
  *   MEDIA_PATH=/tmp/rodinna-test-media bun scripts/test-albums.ts
  *
  * Pokrýva: CRUD albumov + feed kartu, pridávanie/odoberanie fotiek s právami,
- * obálku, Zberač (návrh z fotiek jedného dňa v chate + zánik po vytvorení),
- * spomienky (denný výber, yearsAgo, skrytie) a ZIP download (reálne PK entry).
+ * obálku, popis albumu, Zberač (návrh z fotiek jedného dňa v chate + zánik po
+ * vytvorení) a spomienky (denný výber, yearsAgo, skrytie).
  */
 import sharp from 'sharp';
-import { unzipSync } from 'fflate';
 import { and, eq } from 'drizzle-orm';
 import { sql as dsql } from 'drizzle-orm';
 import { db, sql } from '../src/core/db/client';
@@ -158,15 +157,27 @@ async function main() {
   r = await http(alica.token, 'GET', `/api/albums/${albumId}`);
   check('po odstránení 2 fotky', r.body.photoCount === 2, r.body.photoCount);
 
-  console.log('\n— ZIP download —');
+  console.log('\n— Komentár k albumu (ladenie 07/2026) —');
+  r = await http(alica.token, 'POST', '/api/albums', {
+    title: 'Dovolenka',
+    description: 'Naše najkrajšie leto pri mori 🌊',
+    mediaIds: [],
+  });
+  check('album s popisom → 201', r.status === 201 && r.body.description === 'Naše najkrajšie leto pri mori 🌊', r.body.description);
+  const descAlbumId = r.body.id;
+  r = await http(bob.token, 'PATCH', `/api/albums/${descAlbumId}`, { description: 'Cudzí popis' });
+  check('popis mení len autor/admin → 403', r.status === 403, r.status);
+  r = await http(alica.token, 'PATCH', `/api/albums/${descAlbumId}`, { description: 'Upravený popis' });
+  check('autor upraví popis', r.status === 200 && r.body.description === 'Upravený popis', r.body.description);
+  r = await http(bob.token, 'GET', '/api/albums');
+  const descSummary = r.body.albums?.find((a: any) => a.id === descAlbumId);
+  check('popis je v zozname albumov', descSummary?.description === 'Upravený popis', descSummary?.description);
+
+  console.log('\n— ZIP download zrušený (ladenie 07/2026) —');
   const zipRes = await fetch(`${BASE}/api/albums/${albumId}/download`, {
     headers: { cookie: `rs_session=${bob.token}` },
   });
-  const zipBuf = new Uint8Array(await zipRes.arrayBuffer());
-  check('ZIP → 200 + content-type', zipRes.status === 200 && zipRes.headers.get('content-type') === 'application/zip');
-  check('ZIP magic PK', zipBuf[0] === 0x50 && zipBuf[1] === 0x4b, zipBuf.slice(0, 4));
-  const entries = unzipSync(zipBuf);
-  check('ZIP má 2 fotky s obsahom', Object.keys(entries).length === 2 && Object.values(entries).every((e) => e.length > 0), Object.keys(entries));
+  check('ZIP endpoint už neexistuje → 404', zipRes.status === 404, zipRes.status);
 
   console.log('\n— Zberač (suggestions) —');
   // 6 fotiek poslaných do rodinného chatu dnes (cez API → vzniknú message_media).
