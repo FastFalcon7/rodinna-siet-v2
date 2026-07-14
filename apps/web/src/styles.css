@@ -11,19 +11,40 @@
 }
 
 body {
-  background-color: var(--color-bg);
-  /* Jemné pozadie (ladenie 07/2026): decentné čmáranice psa/mačky/sliepky —
-     len textúra vo viditeľných medzerách, nízka nepriehľadnosť zapečená v SVG. */
-  background-image: url('./assets/pattern-animals-light.svg');
-  background-repeat: repeat;
-  background-size: 260px 240px;
   color: var(--color-text);
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
 }
 
-[data-theme='dark'] body {
+/*
+ * Jemné pozadie (ladenie 07/2026): decentné čmáranice psa/mačky/sliepky —
+ * len textúra vo viditeľných medzerách, nízka nepriehľadnosť zapečená v SVG.
+ * Zdieľaná trieda .app-bg (nielen `body`), aby ju mali aj neopriehľadné
+ * celoobrazovkové panely (napr. mobilný Chat), ktoré inak `body` prekryjú.
+ */
+body,
+.app-bg {
+  background-color: var(--color-bg);
+  background-image: url('./assets/pattern-animals-light.svg');
+  background-repeat: repeat;
+  background-size: 260px 240px;
+}
+
+[data-theme='dark'] body,
+[data-theme='dark'] .app-bg {
   background-image: url('./assets/pattern-animals-dark.svg');
+}
+
+/*
+ * Veľkosť písma (ladenie 07/2026): škáluje root font-size, takže sa spolu
+ * s textom (rem) primerane zväčšia aj odsadenia — pôsobí to harmonicky,
+ * nie len ako „väčšie písmená v malých krabičkách".
+ */
+:root[data-font-size='large'] {
+  font-size: 112.5%;
+}
+:root[data-font-size='xlarge'] {
+  font-size: 125%;
 }
 
 /*

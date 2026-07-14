@@ -6,6 +6,7 @@ import { MembersList } from '../users/MembersList';
 import { InvitePanel } from '../users/InvitePanel';
 import { NotificationSettings } from './NotificationSettings';
 import { ThemeSettings } from './ThemeSettings';
+import { FontSizeSettings } from './FontSizeSettings';
 import { LlmSettings } from './LlmSettings';
 import { InstallCard } from './InstallCard';
 import { webModules, type WebModule } from '../app/registry';
@@ -63,6 +64,7 @@ export function More({ onOpenModule }: { onOpenModule: (name: string) => void })
 
       <InstallCard />
       <ThemeSettings />
+      <FontSizeSettings />
       <LlmSettings />
       <NotificationSettings />
       <ProfileCard />
