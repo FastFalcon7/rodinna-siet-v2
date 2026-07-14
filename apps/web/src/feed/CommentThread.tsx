@@ -35,6 +35,7 @@ function CommentNode({
 }) {
   const { user } = useAuth();
   const [replying, setReplying] = useState(false);
+  const [reactOpen, setReactOpen] = useState(false);
   if (!user) return null;
 
   const canDelete = comment.author.id === user.id || user.role === 'admin';
@@ -84,6 +85,8 @@ function CommentNode({
                 onChange(comments.map((c) => (c.id === comment.id ? { ...c, reactions } : c)));
                 onPostReactions?.(postReactions);
               }}
+              open={reactOpen}
+              onOpenChange={setReactOpen}
             />
             {canReply && (
               <button type="button" onClick={() => setReplying((r) => !r)} className="text-xs text-neutral-500 hover:underline">

@@ -179,6 +179,14 @@ async function main() {
   check('druhý user rovnaká emoji → count 2', r.body.reactions?.[0]?.count === 2, r.body.reactions);
   r = await http(bob.token, 'PUT', '/api/feed/reactions', { targetType: 'post', targetId: postId, emoji: '😂' });
   check('rovnaká emoji = unreact → count 1', r.body.reactions?.[0]?.count === 1, r.body.reactions);
+  // Ladenie 07/2026: ľubovoľné emoji z veľkej palety (nie len 12 základných).
+  // Bob nemá aktuálnu reakciu (vyššie zrušil 😂) → 🦄 pridá bez vplyvu na 😂.
+  r = await http(bob.token, 'PUT', '/api/feed/reactions', { targetType: 'post', targetId: postId, emoji: '🦄' });
+  check('emoji mimo základnej palety (🦄) → 200', r.status === 200 && r.body.reactions?.some((x: any) => x.emoji === '🦄'), r.body.reactions);
+  r = await http(bob.token, 'PUT', '/api/feed/reactions', { targetType: 'post', targetId: postId, emoji: 'abc' });
+  check('reakcia bez emoji (text) → 400', r.status === 400, r.status);
+  // Bob zruší 🦄, nech ostatné počítadlá sedia.
+  await http(bob.token, 'PUT', '/api/feed/reactions', { targetType: 'post', targetId: postId, emoji: '🦄' });
 
   // Agregát vlákna: reakcia na komentár sa počíta do počítadla pod postom.
   r = await http(alica.token, 'PUT', '/api/feed/reactions', { targetType: 'comment', targetId: commentId, emoji: '❤️' });

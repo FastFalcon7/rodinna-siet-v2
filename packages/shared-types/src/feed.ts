@@ -11,9 +11,24 @@ export const PostAuthorSchema = z.object({
 });
 export type PostAuthor = z.infer<typeof PostAuthorSchema>;
 
-/** Fixná sada reakcií (§10 — emoji-mart je Phase 2 polish, zatiaľ stačí toto). */
-export const ALLOWED_REACTION_EMOJIS = ['👍', '❤️', '😂', '😮', '😢', '🙏'] as const;
-export const ReactionEmojiSchema = z.enum(ALLOWED_REACTION_EMOJIS);
+/**
+ * Základná paleta reakcií (ladenie 07/2026): 12 rýchlych emoji zobrazených
+ * hneď; cez „+" sa dá vybrať ľubovoľné iné emoji (validované nižšie). Poradie
+ * riadi aj usporiadanie počítadiel, nech pri zmene reakcie neskáču.
+ */
+export const ALLOWED_REACTION_EMOJIS = [
+  '👍', '❤️', '😂', '😮', '😢', '🙏', '🎉', '👏', '🔥', '😍', '🥰', '🤔',
+] as const;
+/**
+ * Reakcia je ľubovoľné emoji (nie fixný enum) — kontrolujeme len, že reťazec
+ * skutočne obsahuje emoji a má rozumnú dĺžku (aj ZWJ sekvencie ako rodinky).
+ */
+export const ReactionEmojiSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .max(24)
+  .regex(/\p{Extended_Pictographic}/u, 'Musí to byť emoji');
 export type ReactionEmoji = z.infer<typeof ReactionEmojiSchema>;
 
 export const ReactionTargetTypeSchema = z.enum(['post', 'comment', 'message']);

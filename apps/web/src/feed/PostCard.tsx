@@ -15,6 +15,7 @@ import { CommentThread } from './CommentThread';
 import { CommentComposer } from './CommentComposer';
 import { PhotoGallery } from '../shared/PhotoGallery';
 import { useAutoGrow } from '../shared/useAutoGrow';
+import { useLongPress } from '../shared/useLongPress';
 import { UploadPreviews } from '../shared/UploadPreviews';
 import { useMediaUpload } from '../shared/useMediaUpload';
 
@@ -32,6 +33,7 @@ export function PostCard({ post, onChange, onDeleted }: PostCardProps) {
   const { user } = useAuth();
   const [comments, setComments] = useState<CommentPublic[] | null>(null);
   const [commentsOpen, setCommentsOpen] = useState(false);
+  const [reactOpen, setReactOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [editing, setEditing] = useState(false);
   const [editText, setEditText] = useState('');
@@ -44,6 +46,8 @@ export function PostCard({ post, onChange, onDeleted }: PostCardProps) {
   const editRef = useRef<HTMLTextAreaElement>(null);
   useAutoGrow(editRef, editing ? editText : '', 50);
   const swipeRef = useRef<{ x: number; y: number; t: number } | null>(null);
+  // Dlhé podržanie príspevku otvorí paletu reakcií (ako v chate).
+  const longPress = useLongPress(() => setReactOpen(true));
   if (!user) return null;
 
   const isAuthor = post.author.id === user.id;
@@ -108,7 +112,7 @@ export function PostCard({ post, onChange, onDeleted }: PostCardProps) {
   const previewUrl = post.media.length === 0 && !appLink ? extractFirstUrl(post.bodyMd) : null;
 
   return (
-    // Swipe doprava rozbalí vlákno komentárov, doľava zbalí (ladenie 07/2026).
+    // Swipe doľava rozbalí vlákno komentárov, doprava zbalí (ladenie 07/2026).
     <article
       className="px-4 py-3"
       onTouchStart={(e) => {
@@ -123,13 +127,14 @@ export function PostCard({ post, onChange, onDeleted }: PostCardProps) {
         const dx = t.clientX - s.x;
         const dy = t.clientY - s.y;
         if (Math.abs(dx) < 80 || Math.abs(dx) < Math.abs(dy) * 2 || Date.now() - s.t > 800) return;
-        if (dx > 0 && !commentsOpen) void loadComments();
-        if (dx < 0 && commentsOpen) setCommentsOpen(false);
+        if (dx < 0 && !commentsOpen) void loadComments();
+        if (dx > 0 && commentsOpen) setCommentsOpen(false);
       }}
     >
       <div className="flex gap-3">
         <Avatar user={post.author} size={40} />
-        <div className="min-w-0 flex-1">
+        {/* Dlhé podržanie (mimo fotky) otvorí reakcie — len ak nie som autor. */}
+        <div className="min-w-0 flex-1" {...(!isAuthor && !editing ? longPress : {})}>
           <div className="flex items-center gap-1.5">
             <span className="truncate font-semibold" style={nameStyle(post.author)}>
               {post.author.displayName}
@@ -306,6 +311,8 @@ export function PostCard({ post, onChange, onDeleted }: PostCardProps) {
               reactions={post.reactions}
               canReact={!isAuthor}
               onChange={(reactions) => onChange({ ...post, reactions })}
+              open={reactOpen}
+              onOpenChange={setReactOpen}
             />
           </div>
 
@@ -325,7 +332,7 @@ export function PostCard({ post, onChange, onDeleted }: PostCardProps) {
               )}
               <div className="mt-3 flex gap-2">
                 <Avatar user={user} size={28} />
-                <CommentComposer placeholder="Napíš komentár…" onSubmit={submitComment} />
+                <CommentComposer placeholder="Komentár…" onSubmit={submitComment} />
               </div>
             </div>
           )}

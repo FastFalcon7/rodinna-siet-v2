@@ -62,7 +62,7 @@ export function PostComposer({ onCreated, variant = 'card', autoFocus = false }:
           maxLength={4000}
           rows={3}
           autoFocus={autoFocus}
-          placeholder="Čo nové v rodine?"
+          placeholder="Čo nové?"
           className="min-h-20 w-full resize-none rounded-lg border border-neutral-300 bg-transparent px-3 py-2 outline-none focus:border-accent dark:border-neutral-700"
         />
         <UploadPreviews items={uploads.items} onRemove={uploads.remove} onMakeCover={uploads.makeFirst} />

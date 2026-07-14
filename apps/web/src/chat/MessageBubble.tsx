@@ -1,8 +1,9 @@
 import { useState } from 'react';
-import { ALLOWED_REACTION_EMOJIS, type MessagePublic } from '@rodinna/shared-types';
+import { type MessagePublic } from '@rodinna/shared-types';
 import { chatApi } from '../lib/api';
 import { MediaItem } from '../shared/MediaItem';
 import { nameStyle } from '../shared/nameColor';
+import { ReactionPicker } from '../shared/ReactionPicker';
 import { PhotoGallery } from '../shared/PhotoGallery';
 import { LinkPreviewCard } from '../shared/LinkPreviewCard';
 import { extractFirstUrl, RichBody } from '../shared/linkify';
@@ -66,6 +67,8 @@ export function MessageBubble({ message, mine, showAuthor, seen, tail, onReply, 
   const bodyText = appLink ? stripAppLink(message.bodyMd, appLink) : message.bodyMd;
   const previewUrl =
     message.media.length === 0 && !appLink ? extractFirstUrl(message.bodyMd) : null;
+
+  const myReaction = message.reactions.find((r) => r.reactedByMe)?.emoji ?? null;
 
   const react = async (emoji: string) => {
     if (busy) return;
@@ -232,18 +235,7 @@ export function MessageBubble({ message, mine, showAuthor, seen, tail, onReply, 
             <div
               className={`absolute z-20 ${mine ? 'right-0' : 'left-0'} bottom-full mb-1 w-max rounded-2xl border border-neutral-200 bg-white p-1.5 shadow-lg dark:border-neutral-700 dark:bg-neutral-900`}
             >
-              <div className="flex gap-1">
-                {ALLOWED_REACTION_EMOJIS.map((emoji) => (
-                  <button
-                    key={emoji}
-                    type="button"
-                    onClick={() => react(emoji)}
-                    className="rounded-lg px-1 py-0.5 text-lg transition hover:scale-125"
-                  >
-                    {emoji}
-                  </button>
-                ))}
-              </div>
+              <ReactionPicker current={myReaction} onPick={react} />
               <div className="mt-1 flex gap-1 border-t border-neutral-100 pt-1 dark:border-neutral-800">
                 <button
                   type="button"

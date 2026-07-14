@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { ALLOWED_REACTION_EMOJIS, type ReactionSummary, type ReactionTargetType } from '@rodinna/shared-types';
 import { ApiError, feedApi } from '../lib/api';
+import { ReactionPicker } from '../shared/ReactionPicker';
 
 interface ReactionBarProps {
   targetType: ReactionTargetType;
@@ -10,6 +11,18 @@ interface ReactionBarProps {
   canReact: boolean;
   /** Nový súhrn cieľa + agregát vlákna postu (na počítadlo pod hlavným postom). */
   onChange: (reactions: ReactionSummary[], postReactions: ReactionSummary[]) => void;
+  /** Riadené otvorenie palety zvonka (napr. dlhé podržanie na príspevku). */
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}
+
+/** Poradie počítadiel: základná paleta podľa indexu, ostatné emoji za nimi. */
+function orderChips(reactions: ReactionSummary[]): ReactionSummary[] {
+  const idx = (e: string) => {
+    const i = (ALLOWED_REACTION_EMOJIS as readonly string[]).indexOf(e);
+    return i === -1 ? ALLOWED_REACTION_EMOJIS.length : i;
+  };
+  return [...reactions].sort((a, b) => idx(a.emoji) - idx(b.emoji));
 }
 
 /**
@@ -19,21 +32,25 @@ interface ReactionBarProps {
  * reakcia zvýraznená (klik na ňu = zrušenie, iná = výmena). Pod hlavným
  * príspevkom počítadlá agregujú reakcie celého vlákna.
  */
-export function ReactionBar({ targetType, targetId, reactions, canReact, onChange }: ReactionBarProps) {
-  const [open, setOpen] = useState(false);
+export function ReactionBar({
+  targetType,
+  targetId,
+  reactions,
+  canReact,
+  onChange,
+  open,
+  onOpenChange,
+}: ReactionBarProps) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const mine = reactions.find((r) => r.reactedByMe)?.emoji ?? null;
-  // Chipy v stabilnom poradí palety, nech pri zmene reakcie neskáču.
-  const chips = ALLOWED_REACTION_EMOJIS.map((emoji) => reactions.find((r) => r.emoji === emoji)).filter(
-    (r): r is ReactionSummary => !!r,
-  );
+  const chips = orderChips(reactions);
 
   const react = async (emoji: string) => {
     if (busy) return;
     setBusy(true);
-    setOpen(false);
+    onOpenChange(false);
     setError(null);
     try {
       const res = await feedApi.setReaction({ targetType, targetId, emoji: emoji as never });
@@ -63,7 +80,7 @@ export function ReactionBar({ targetType, targetId, reactions, canReact, onChang
       {canReact && (
         <button
           type="button"
-          onClick={() => setOpen((o) => !o)}
+          onClick={() => onOpenChange(!open)}
           disabled={busy}
           className={`grid min-h-8 place-items-center rounded-full px-2 text-sm transition hover:bg-neutral-100 dark:hover:bg-neutral-800 ${
             mine ? 'text-accent' : 'text-neutral-500'
@@ -77,23 +94,11 @@ export function ReactionBar({ targetType, targetId, reactions, canReact, onChang
 
       {error && <span className="text-xs text-red-600">{error}</span>}
 
-      {open && (
+      {open && canReact && (
         <>
-          <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
-          <div className="absolute bottom-full left-0 z-20 mb-1 flex gap-1 rounded-2xl border border-neutral-200 bg-white p-1.5 shadow-lg dark:border-neutral-700 dark:bg-neutral-900">
-            {ALLOWED_REACTION_EMOJIS.map((emoji) => (
-              <button
-                key={emoji}
-                type="button"
-                onClick={() => react(emoji)}
-                title={emoji === mine ? 'Zrušiť reakciu' : undefined}
-                className={`rounded-lg px-1.5 py-1 text-lg transition hover:scale-125 ${
-                  emoji === mine ? 'bg-accent/15 ring-1 ring-accent' : ''
-                }`}
-              >
-                {emoji}
-              </button>
-            ))}
+          <div className="fixed inset-0 z-10" onClick={() => onOpenChange(false)} />
+          <div className="absolute bottom-full left-0 z-20 mb-1 rounded-2xl border border-neutral-200 bg-white p-1.5 shadow-lg dark:border-neutral-700 dark:bg-neutral-900">
+            <ReactionPicker current={mine} onPick={react} />
           </div>
         </>
       )}
