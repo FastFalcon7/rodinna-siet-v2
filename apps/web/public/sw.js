@@ -121,7 +121,7 @@ self.addEventListener('fetch', (event) => {
 });
 
 self.addEventListener('push', (event) => {
-  let data = { title: 'Rodinná sieť', body: '', url: '/', tag: undefined };
+  let data = { title: 'Naša rodina', body: '', url: '/', tag: undefined };
   try {
     data = { ...data, ...event.data.json() };
   } catch {

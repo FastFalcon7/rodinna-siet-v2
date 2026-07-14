@@ -10,6 +10,13 @@
         document.documentElement.dataset.theme = dark ? 'dark' : 'light';
       } catch (e) {}
     </script>
+    <!-- Veľkosť písma pred prvým paint-om (žiadny blik) — voľba v časti Viac. -->
+    <script>
+      try {
+        var fs = localStorage.getItem('rs-font-size');
+        document.documentElement.dataset.fontSize = fs === 'large' || fs === 'xlarge' ? fs : 'normal';
+      } catch (e) {}
+    </script>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="theme-color" content="#ffffff" />
     <!-- PWA/manifest: potrebné pre Add-to-Home-Screen; iOS ≥16.4 vyžaduje
@@ -19,8 +26,8 @@
     <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-    <meta name="apple-mobile-web-app-title" content="Rodina" />
-    <title>Rodinná Sieť</title>
+    <meta name="apple-mobile-web-app-title" content="Naša rodina" />
+    <title>Naša rodina</title>
   </head>
   <body>
     <div id="root"></div>

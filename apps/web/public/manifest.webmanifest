@@ -1,6 +1,6 @@
 {
-  "name": "Rodinná sieť",
-  "short_name": "Rodina",
+  "name": "Naša rodina",
+  "short_name": "Naša rodina",
   "description": "Privátna rodinná sociálna sieť — feed, chat a ďalšie moduly, 100 % self-hosted.",
   "lang": "sk",
   "start_url": "/",
@@ -9,8 +9,21 @@
   "background_color": "#ffffff",
   "theme_color": "#ffffff",
   "icons": [
-    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
-    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
-    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
   ]
 }

@@ -309,6 +309,9 @@ export async function searchEntries(userId: string, query: string): Promise<Diar
  * o 6:00 UTC mu príde push (job 'diary.notify' s odloženým runAt).
  */
 export async function runNightly(now = new Date()): Promise<void> {
+  // Ladenie 07/2026: denník je AI funkcia — bez zapnutia admina žiadne drafty.
+  const { getAiEnabled } = await import('../settings/service');
+  if (!(await getAiEnabled())) return;
   const dateIso = now.toISOString().slice(0, 10);
   const { users } = await import('../../core/db/schema');
   const all = await db.select({ id: users.id }).from(users);

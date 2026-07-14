@@ -1,8 +1,9 @@
-import { useState } from 'react';
-import type { CommentPublic, PostPublic } from '@rodinna/shared-types';
+import { useRef, useState } from 'react';
+import type { CommentPublic, MediaPublic, PostPublic } from '@rodinna/shared-types';
 import { ApiError, feedApi } from '../lib/api';
 import { useAuth } from '../auth/AuthContext';
 import { Avatar } from '../shared/Avatar';
+import { nameStyle } from '../shared/nameColor';
 import { MediaItem } from '../shared/MediaItem';
 import { LinkPreviewCard } from '../shared/LinkPreviewCard';
 import { extractFirstUrl, RichBody } from '../shared/linkify';
@@ -12,7 +13,11 @@ import { fullDateTime, relativeTime } from '../shared/time';
 import { ReactionBar } from './ReactionBar';
 import { CommentThread } from './CommentThread';
 import { CommentComposer } from './CommentComposer';
-import { PostGallery } from './PostGallery';
+import { PhotoGallery } from '../shared/PhotoGallery';
+import { useAutoGrow } from '../shared/useAutoGrow';
+import { useLongPress } from '../shared/useLongPress';
+import { UploadPreviews } from '../shared/UploadPreviews';
+import { useMediaUpload } from '../shared/useMediaUpload';
 
 interface PostCardProps {
   post: PostPublic;
@@ -28,11 +33,21 @@ export function PostCard({ post, onChange, onDeleted }: PostCardProps) {
   const { user } = useAuth();
   const [comments, setComments] = useState<CommentPublic[] | null>(null);
   const [commentsOpen, setCommentsOpen] = useState(false);
+  const [reactOpen, setReactOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [editing, setEditing] = useState(false);
   const [editText, setEditText] = useState('');
+  // Prílohy pri úprave (ladenie 07/2026): existujúce sa dajú odobrať, nové pridať.
+  const [editMedia, setEditMedia] = useState<MediaPublic[]>([]);
+  const editUploads = useMediaUpload(10);
+  const editFileRef = useRef<HTMLInputElement>(null);
   const [editBusy, setEditBusy] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
+  const editRef = useRef<HTMLTextAreaElement>(null);
+  useAutoGrow(editRef, editing ? editText : '', 50);
+  const swipeRef = useRef<{ x: number; y: number; t: number } | null>(null);
+  // Dlhé podržanie príspevku otvorí paletu reakcií (ako v chate).
+  const longPress = useLongPress(() => setReactOpen(true));
   if (!user) return null;
 
   const isAuthor = post.author.id === user.id;
@@ -62,18 +77,23 @@ export function PostCard({ post, onChange, onDeleted }: PostCardProps) {
   const startEdit = () => {
     setMenuOpen(false);
     setEditText(post.bodyMd);
+    setEditMedia(post.media);
+    editUploads.clear();
     setEditError(null);
     setEditing(true);
   };
 
   const saveEdit = async () => {
     const trimmed = editText.trim();
-    if (!trimmed || editBusy) return;
+    const mediaIds = [...editMedia.map((m) => m.id), ...editUploads.mediaIds];
+    if (editBusy || editUploads.uploading) return;
+    if (!trimmed && mediaIds.length === 0) return;
     setEditBusy(true);
     setEditError(null);
     try {
-      const updated = await feedApi.updatePost(post.id, { bodyMd: trimmed });
+      const updated = await feedApi.updatePost(post.id, { bodyMd: trimmed, mediaIds });
       onChange(updated);
+      editUploads.clear();
       setEditing(false);
     } catch (err) {
       setEditError(err instanceof ApiError ? err.message : 'Úprava sa nepodarila');
@@ -92,12 +112,33 @@ export function PostCard({ post, onChange, onDeleted }: PostCardProps) {
   const previewUrl = post.media.length === 0 && !appLink ? extractFirstUrl(post.bodyMd) : null;
 
   return (
-    <article className="px-4 py-3">
+    // Swipe doľava rozbalí vlákno komentárov, doprava zbalí (ladenie 07/2026).
+    <article
+      className="px-4 py-3"
+      onTouchStart={(e) => {
+        const t = e.touches[0]!;
+        swipeRef.current = { x: t.clientX, y: t.clientY, t: Date.now() };
+      }}
+      onTouchEnd={(e) => {
+        const s = swipeRef.current;
+        swipeRef.current = null;
+        if (!s) return;
+        const t = e.changedTouches[0]!;
+        const dx = t.clientX - s.x;
+        const dy = t.clientY - s.y;
+        if (Math.abs(dx) < 80 || Math.abs(dx) < Math.abs(dy) * 2 || Date.now() - s.t > 800) return;
+        if (dx < 0 && !commentsOpen) void loadComments();
+        if (dx > 0 && commentsOpen) setCommentsOpen(false);
+      }}
+    >
       <div className="flex gap-3">
         <Avatar user={post.author} size={40} />
-        <div className="min-w-0 flex-1">
+        {/* Dlhé podržanie (mimo fotky) otvorí reakcie — len ak nie som autor. */}
+        <div className="min-w-0 flex-1" {...(!isAuthor && !editing ? longPress : {})}>
           <div className="flex items-center gap-1.5">
-            <span className="truncate font-semibold">{post.author.displayName}</span>
+            <span className="truncate font-semibold" style={nameStyle(post.author)}>
+              {post.author.displayName}
+            </span>
             <span
               className="shrink-0 text-sm text-neutral-500"
               title={fullDateTime(post.createdAt)}
@@ -145,28 +186,80 @@ export function PostCard({ post, onChange, onDeleted }: PostCardProps) {
           {editing ? (
             <div className="mt-1 space-y-2">
               <textarea
+                ref={editRef}
                 value={editText}
                 onChange={(e) => setEditText(e.target.value)}
                 maxLength={4000}
                 rows={3}
                 autoFocus
-                className="w-full resize-none rounded-lg border border-neutral-300 bg-transparent px-3 py-2 text-[15px] outline-none focus:border-accent dark:border-neutral-700"
+                className="min-h-20 w-full resize-none rounded-lg border border-neutral-300 bg-transparent px-3 py-2 text-[15px] outline-none focus:border-accent dark:border-neutral-700"
               />
-              <div className="flex gap-2">
+              {/* Existujúce prílohy — ✕ odoberie z príspevku. */}
+              {editMedia.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  {editMedia.map((m) => (
+                    <div key={m.id} className="relative">
+                      {m.kind === 'image' ? (
+                        <img src={m.url} alt="" className="h-16 w-16 rounded-lg object-cover" />
+                      ) : (
+                        <div className="grid h-16 w-16 place-items-center rounded-lg bg-neutral-100 text-xl dark:bg-neutral-800">
+                          {m.kind === 'video' ? '🎬' : '📄'}
+                        </div>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => setEditMedia((cur) => cur.filter((x) => x.id !== m.id))}
+                        aria-label="Odstrániť prílohu"
+                        className="absolute -right-1.5 -top-1.5 grid h-5 w-5 place-items-center rounded-full bg-neutral-800 text-xs text-white"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <UploadPreviews items={editUploads.items} onRemove={editUploads.remove} />
+              {/* „+" vľavo, Uložiť/Zrušiť vpravo (ladenie 07/2026). */}
+              <div className="flex items-center gap-2">
                 <button
                   type="button"
-                  onClick={() => void saveEdit()}
-                  disabled={editBusy || !editText.trim()}
-                  className="rounded-lg bg-accent px-3 py-1.5 text-sm font-medium text-white disabled:opacity-40"
+                  onClick={() => editFileRef.current?.click()}
+                  disabled={editBusy || editMedia.length + editUploads.items.length >= 10}
+                  title="Pridať prílohu"
+                  aria-label="Pridať prílohu"
+                  className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-2xl leading-none text-neutral-500 transition hover:bg-neutral-100 disabled:opacity-40 dark:hover:bg-neutral-800"
                 >
-                  Uložiť
+                  +
                 </button>
+                <input
+                  ref={editFileRef}
+                  type="file"
+                  multiple
+                  hidden
+                  onChange={(e) => {
+                    const files = Array.from(e.target.files ?? []);
+                    e.target.value = '';
+                    if (files.length > 0) editUploads.addFiles(files);
+                  }}
+                />
                 <button
                   type="button"
                   onClick={() => setEditing(false)}
-                  className="rounded-lg px-3 py-1.5 text-sm text-neutral-500 hover:bg-neutral-100 dark:hover:bg-neutral-800"
+                  className="ml-auto rounded-lg px-3 py-1.5 text-sm text-neutral-500 hover:bg-neutral-100 dark:hover:bg-neutral-800"
                 >
                   Zrušiť
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void saveEdit()}
+                  disabled={
+                    editBusy ||
+                    editUploads.uploading ||
+                    (!editText.trim() && editMedia.length + editUploads.mediaIds.length === 0)
+                  }
+                  className="rounded-lg bg-accent px-3 py-1.5 text-sm font-medium text-white disabled:opacity-40"
+                >
+                  Uložiť
                 </button>
               </div>
               {editError && <p className="text-sm text-red-600">{editError}</p>}
@@ -195,7 +288,7 @@ export function PostCard({ post, onChange, onDeleted }: PostCardProps) {
 
           {post.media.length > 0 && (
             <div className="mt-2 space-y-2">
-              <PostGallery images={images} />
+              <PhotoGallery images={images} />
               {rest.map((m) => (
                 <MediaItem key={m.id} media={m} />
               ))}
@@ -218,6 +311,8 @@ export function PostCard({ post, onChange, onDeleted }: PostCardProps) {
               reactions={post.reactions}
               canReact={!isAuthor}
               onChange={(reactions) => onChange({ ...post, reactions })}
+              open={reactOpen}
+              onOpenChange={setReactOpen}
             />
           </div>
 
@@ -237,7 +332,7 @@ export function PostCard({ post, onChange, onDeleted }: PostCardProps) {
               )}
               <div className="mt-3 flex gap-2">
                 <Avatar user={user} size={28} />
-                <CommentComposer placeholder="Napíš komentár…" onSubmit={submitComment} />
+                <CommentComposer placeholder="Komentár…" onSubmit={submitComment} />
               </div>
             </div>
           )}

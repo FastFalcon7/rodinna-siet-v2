@@ -34,7 +34,7 @@ async function fetchAuthors(userIds: string[]): Promise<Map<string, PostAuthor>>
   const ids = [...new Set(userIds)];
   if (ids.length === 0) return new Map();
   const rows = await db
-    .select({ id: users.id, displayName: users.displayName, avatarUrl: users.avatarUrl })
+    .select({ id: users.id, displayName: users.displayName, avatarUrl: users.avatarUrl, nameColor: users.nameColor })
     .from(users)
     .where(inArray(users.id, ids));
   return new Map(rows.map((r) => [r.id, r]));
@@ -153,6 +153,11 @@ export async function listQuizzes(viewerId: string): Promise<QuizPublic[]> {
 export async function createQuiz(creatorId: string, input: CreateQuizInput): Promise<QuizPublic> {
   if (!llmEnabled) {
     throw new BadRequestError('Kvízy potrebujú LLM server (LLM_BASE_URL) — požiadaj admina');
+  }
+  // Ladenie 07/2026: AI funkcie musí zapnúť admin (globálne nastavenie).
+  const { getAiEnabled } = await import('../settings/service');
+  if (!(await getAiEnabled())) {
+    throw new BadRequestError('AI funkcie sú vypnuté — zapne ich admin v časti Viac');
   }
   if (input.audience === 'room') {
     if (!input.roomId) throw new BadRequestError('Kvíz pre miestnosť potrebuje roomId');

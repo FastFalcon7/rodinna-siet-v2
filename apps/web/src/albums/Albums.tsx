@@ -3,11 +3,16 @@ import type { AlbumDetail, AlbumSuggestion, AlbumSummary } from '@rodinna/shared
 import { ApiError, albumsApi, mediaApi } from '../lib/api';
 import { useAuth } from '../auth/AuthContext';
 import { consumePendingNav } from '../app/navigate';
+import { useSwipeBack } from '../shared/useSwipeBack';
+import { AlbumPickerDialog } from './AlbumPickerDialog';
+import { NotePickerDialog } from '../notes/NotePickerDialog';
+import { EventPickerDialog } from '../events/EventPickerDialog';
+import { MediaTargetButtons, type MediaTargetKind } from '../shared/MediaTargetButtons';
 
 /**
  * Modul Albumy (M2): zoznam albumov + Zberač banner, detail s fotkami,
- * upload, lightbox, ZIP download. Bez routera — detail je in-tab stav;
- * karta vo Feede sem naviguje cez app/navigate.
+ * upload, lightbox. Bez routera — detail je in-tab stav; karta vo Feede
+ * sem naviguje cez app/navigate.
  */
 export function Albums() {
   const [albums, setAlbums] = useState<AlbumSummary[] | null>(null);
@@ -105,7 +110,7 @@ function SuggestionBanner({
         month: '2-digit',
         year: '2-digit',
       });
-      const album = await albumsApi.create({ title, mediaIds: suggestion.mediaIds });
+      const album = await albumsApi.create({ title, description: '', mediaIds: suggestion.mediaIds });
       onCreated(album.id);
     } finally {
       setBusy(false);
@@ -146,15 +151,17 @@ function SuggestionBanner({
 function NewAlbumButton({ onCreated }: { onCreated: (albumId: string) => void }) {
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState('');
+  const [description, setDescription] = useState('');
   const [busy, setBusy] = useState(false);
 
   const create = async () => {
     if (!title.trim() || busy) return;
     setBusy(true);
     try {
-      const album = await albumsApi.create({ title: title.trim(), mediaIds: [] });
+      const album = await albumsApi.create({ title: title.trim(), description: description.trim(), mediaIds: [] });
       setOpen(false);
       setTitle('');
+      setDescription('');
       onCreated(album.id);
     } finally {
       setBusy(false);
@@ -172,7 +179,7 @@ function NewAlbumButton({ onCreated }: { onCreated: (albumId: string) => void })
     );
   }
   return (
-    <div className="flex gap-2 rounded-2xl border border-neutral-200 bg-white p-3 dark:border-neutral-800 dark:bg-neutral-900">
+    <div className="space-y-2 rounded-2xl border border-neutral-200 bg-white p-3 dark:border-neutral-800 dark:bg-neutral-900">
       <input
         value={title}
         onChange={(e) => setTitle(e.target.value)}
@@ -180,15 +187,28 @@ function NewAlbumButton({ onCreated }: { onCreated: (albumId: string) => void })
         autoFocus
         maxLength={120}
         placeholder="Názov albumu (napr. Leto 2026)"
-        className="min-w-0 flex-1 rounded-lg border border-neutral-300 bg-transparent px-3 py-1.5 text-sm outline-none focus:border-accent dark:border-neutral-700"
+        className="w-full rounded-lg border border-neutral-300 bg-transparent px-3 py-1.5 text-sm outline-none focus:border-accent dark:border-neutral-700"
       />
-      <button
-        onClick={() => void create()}
-        disabled={!title.trim() || busy}
-        className="rounded-lg bg-accent px-3 py-1.5 text-sm font-medium text-white disabled:opacity-40"
-      >
-        Vytvoriť
-      </button>
+      <textarea
+        value={description}
+        onChange={(e) => setDescription(e.target.value)}
+        rows={2}
+        maxLength={2000}
+        placeholder="Komentár k albumu (voliteľné)"
+        className="w-full resize-none rounded-lg border border-neutral-300 bg-transparent px-3 py-1.5 text-sm outline-none focus:border-accent dark:border-neutral-700"
+      />
+      <div className="flex gap-2">
+        <button onClick={() => setOpen(false)} className="ml-auto rounded-lg px-3 py-1.5 text-sm text-neutral-500">
+          Zrušiť
+        </button>
+        <button
+          onClick={() => void create()}
+          disabled={!title.trim() || busy}
+          className="rounded-lg bg-accent px-3 py-1.5 text-sm font-medium text-white disabled:opacity-40"
+        >
+          Vytvoriť
+        </button>
+      </div>
     </div>
   );
 }
@@ -201,7 +221,15 @@ function AlbumDetailView({ albumId, onBack }: { albumId: string; onBack: () => v
   const [uploading, setUploading] = useState(false);
   const [renaming, setRenaming] = useState(false);
   const [newTitle, setNewTitle] = useState('');
+  const [newDesc, setNewDesc] = useState('');
+  // Hromadný výber fotiek (ladenie 07/2026): kopírovanie do albumu / odstránenie.
+  const [selecting, setSelecting] = useState(false);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [picker, setPicker] = useState<MediaTargetKind | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  // Swipe doprava = späť na zoznam albumov; lightbox si gestá rieši sám.
+  const swipeBack = useSwipeBack(onBack);
+  const lightboxTouch = useRef<{ x: number; y: number } | null>(null);
 
   const load = () =>
     albumsApi
@@ -244,19 +272,47 @@ function AlbumDetailView({ albumId, onBack }: { albumId: string; onBack: () => v
     onBack();
   };
 
+  const toggleSelected = (mediaId: string) =>
+    setSelected((cur) => {
+      const next = new Set(cur);
+      if (next.has(mediaId)) next.delete(mediaId);
+      else next.add(mediaId);
+      return next;
+    });
+
+  const exitSelecting = () => {
+    setSelecting(false);
+    setSelected(new Set());
+  };
+
+  const allSelected = !!album && album.photos.length > 0 && selected.size === album.photos.length;
+  const toggleSelectAll = () =>
+    setSelected(allSelected ? new Set() : new Set(album!.photos.map((p) => p.media.id)));
+
   const isOwner = album && user ? album.createdBy.id === user.id || user.role === 'admin' : false;
+
+  const startEdit = () => {
+    setNewTitle(album?.title ?? '');
+    setNewDesc(album?.description ?? '');
+    setRenaming(true);
+  };
 
   const saveTitle = async () => {
     const title = newTitle.trim();
-    if (!title || title === album?.title) {
+    const description = newDesc.trim();
+    if (!title) {
+      setRenaming(false);
+      return;
+    }
+    if (title === album?.title && description === (album?.description ?? '')) {
       setRenaming(false);
       return;
     }
     try {
-      setAlbum(await albumsApi.update(albumId, { title }));
+      setAlbum(await albumsApi.update(albumId, { title, description }));
       setRenaming(false);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Premenovanie zlyhalo');
+      setError(err instanceof ApiError ? err.message : 'Úprava zlyhala');
     }
   };
 
@@ -271,14 +327,14 @@ function AlbumDetailView({ albumId, onBack }: { albumId: string; onBack: () => v
   if (!album) return <p className="px-4 py-6 text-sm text-neutral-500">Načítavam album…</p>;
 
   return (
-    <div className="px-4 py-4">
+    <div className="px-4 py-4" {...swipeBack}>
       <div className="mb-3 flex items-center gap-2">
         <button onClick={onBack} aria-label="Späť na albumy" className="grid h-8 w-8 place-items-center rounded-full text-lg hover:bg-neutral-100 dark:hover:bg-neutral-800">
           ←
         </button>
         <div className="min-w-0 flex-1">
           {renaming ? (
-            <div className="flex gap-2">
+            <div className="space-y-2">
               <input
                 value={newTitle}
                 onChange={(e) => setNewTitle(e.target.value)}
@@ -288,47 +344,56 @@ function AlbumDetailView({ albumId, onBack }: { albumId: string; onBack: () => v
                 }}
                 autoFocus
                 maxLength={120}
-                className="min-w-0 flex-1 rounded-lg border border-neutral-300 bg-transparent px-2 py-1 text-sm font-semibold outline-none focus:border-accent dark:border-neutral-700"
+                placeholder="Názov albumu"
+                className="w-full rounded-lg border border-neutral-300 bg-transparent px-2 py-1 text-sm font-semibold outline-none focus:border-accent dark:border-neutral-700"
               />
-              <button
-                onClick={() => void saveTitle()}
-                disabled={!newTitle.trim()}
-                className="shrink-0 rounded-lg bg-accent px-2.5 py-1 text-sm font-medium text-white disabled:opacity-40"
-              >
-                Uložiť
-              </button>
+              <textarea
+                value={newDesc}
+                onChange={(e) => setNewDesc(e.target.value)}
+                rows={2}
+                maxLength={2000}
+                placeholder="Komentár k albumu (voliteľné)"
+                className="w-full resize-none rounded-lg border border-neutral-300 bg-transparent px-2 py-1 text-sm outline-none focus:border-accent dark:border-neutral-700"
+              />
+              <div className="flex gap-2">
+                <button onClick={() => setRenaming(false)} className="ml-auto rounded-lg px-2.5 py-1 text-sm text-neutral-500">
+                  Zrušiť
+                </button>
+                <button
+                  onClick={() => void saveTitle()}
+                  disabled={!newTitle.trim()}
+                  className="shrink-0 rounded-lg bg-accent px-2.5 py-1 text-sm font-medium text-white disabled:opacity-40"
+                >
+                  Uložiť
+                </button>
+              </div>
             </div>
           ) : (
-            <h2 className="flex min-w-0 items-center gap-1.5 font-semibold">
-              <span className="truncate">{album.title}</span>
-              {isOwner && (
-                <button
-                  onClick={() => {
-                    setNewTitle(album.title);
-                    setRenaming(true);
-                  }}
-                  aria-label="Premenovať album"
-                  title="Premenovať album"
-                  className="shrink-0 rounded-full px-1 text-sm text-neutral-400 transition hover:text-neutral-600 dark:hover:text-neutral-200"
-                >
-                  ✏️
-                </button>
+            <>
+              <h2 className="flex min-w-0 items-center gap-1.5 font-semibold">
+                <span className="truncate">{album.title}</span>
+                {isOwner && (
+                  <button
+                    onClick={startEdit}
+                    aria-label="Upraviť album"
+                    title="Upraviť názov a komentár"
+                    className="shrink-0 rounded-full px-1 text-sm text-neutral-400 transition hover:text-neutral-600 dark:hover:text-neutral-200"
+                  >
+                    ✏️
+                  </button>
+                )}
+              </h2>
+              {album.description && (
+                <p className="mt-0.5 whitespace-pre-wrap text-sm text-neutral-600 dark:text-neutral-300">
+                  {album.description}
+                </p>
               )}
-            </h2>
+              <p className="mt-0.5 text-xs text-neutral-500">
+                {album.photoCount} fotiek · založil {album.createdBy.displayName}
+              </p>
+            </>
           )}
-          <p className="text-xs text-neutral-500">
-            {album.photoCount} fotiek · založil {album.createdBy.displayName}
-          </p>
         </div>
-        {album.photoCount > 0 && (
-          <a
-            href={albumsApi.downloadUrl(albumId)}
-            download
-            className="shrink-0 rounded-lg border border-neutral-300 px-3 py-1.5 text-sm transition hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-800"
-          >
-            ⬇ ZIP
-          </a>
-        )}
         {isOwner && (
           <button
             onClick={() => void removeAlbum()}
@@ -340,13 +405,27 @@ function AlbumDetailView({ albumId, onBack }: { albumId: string; onBack: () => v
         )}
       </div>
 
-      <button
-        onClick={() => fileRef.current?.click()}
-        disabled={uploading}
-        className="mb-3 w-full rounded-xl border border-dashed border-neutral-300 px-4 py-2.5 text-sm text-neutral-500 transition hover:border-accent hover:text-accent disabled:opacity-50 dark:border-neutral-700"
-      >
-        {uploading ? 'Nahrávam…' : '+ Pridať fotky'}
-      </button>
+      <div className="mb-3 flex gap-2">
+        <button
+          onClick={() => fileRef.current?.click()}
+          disabled={uploading || selecting}
+          className="shrink-0 rounded-xl border border-dashed border-neutral-300 px-4 py-2.5 text-sm text-neutral-500 transition hover:border-accent hover:text-accent disabled:opacity-50 dark:border-neutral-700"
+        >
+          {uploading ? 'Nahrávam…' : '+ Fotky'}
+        </button>
+        {album.photos.length > 0 && (
+          <button
+            onClick={() => (selecting ? exitSelecting() : setSelecting(true))}
+            className={`ml-auto shrink-0 rounded-xl border px-4 py-2.5 text-sm transition ${
+              selecting
+                ? 'border-accent bg-accent/10 text-accent'
+                : 'border-neutral-300 text-neutral-500 hover:border-accent hover:text-accent dark:border-neutral-700'
+            }`}
+          >
+            {selecting ? 'Zrušiť výber' : 'Vybrať'}
+          </button>
+        )}
+      </div>
       <input
         ref={fileRef}
         type="file"
@@ -365,15 +444,110 @@ function AlbumDetailView({ albumId, onBack }: { albumId: string; onBack: () => v
       ) : (
         <div className="grid grid-cols-3 gap-0.5 overflow-hidden rounded-xl sm:grid-cols-4">
           {album.photos.map((p, i) => (
-            <button key={p.media.id} onClick={() => setLightbox(i)} className="relative aspect-square">
+            <button
+              key={p.media.id}
+              onClick={() => (selecting ? toggleSelected(p.media.id) : setLightbox(i))}
+              className="relative aspect-square"
+            >
               <img src={p.media.url} alt="" loading="lazy" className="h-full w-full object-cover" />
+              {selecting && (
+                <span
+                  className={`absolute right-1.5 top-1.5 grid h-6 w-6 place-items-center rounded-full text-xs font-bold ${
+                    selected.has(p.media.id)
+                      ? 'bg-accent text-white'
+                      : 'border-2 border-white/90 bg-black/25 text-transparent'
+                  }`}
+                >
+                  ✓
+                </span>
+              )}
             </button>
           ))}
         </div>
       )}
 
+      {/* Akčná lišta hromadného výberu — len ikony (Album / Poznámka / Udalosť). */}
+      {selecting && (
+        <div
+          className="fixed inset-x-0 bottom-0 z-40 flex items-center gap-2 border-t border-neutral-200 bg-white/95 px-4 py-3 backdrop-blur-xl dark:border-neutral-800 dark:bg-neutral-900/95"
+          style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}
+        >
+          <button
+            type="button"
+            onClick={toggleSelectAll}
+            className="flex min-w-0 items-center gap-1.5 text-sm text-neutral-600 dark:text-neutral-300"
+          >
+            <span
+              className={`grid h-6 w-6 shrink-0 place-items-center rounded-md border text-xs font-bold ${
+                allSelected ? 'border-accent bg-accent text-white' : 'border-neutral-400 text-transparent dark:border-neutral-600'
+              }`}
+            >
+              ✓
+            </span>
+            <span className="truncate">{selected.size > 0 ? `${selected.size} vybraných` : 'Vybrať všetko'}</span>
+          </button>
+          <div className="ml-auto flex shrink-0 items-center gap-2">
+            <MediaTargetButtons disabled={selected.size === 0} onPick={setPicker} />
+          </div>
+        </div>
+      )}
+
+      {picker === 'album' && selected.size > 0 && (
+        <AlbumPickerDialog
+          mediaIds={[...selected]}
+          onClose={() => {
+            setPicker(null);
+            exitSelecting();
+          }}
+        />
+      )}
+      {picker === 'note' && selected.size > 0 && (
+        <NotePickerDialog
+          mediaIds={[...selected]}
+          onClose={() => {
+            setPicker(null);
+            exitSelecting();
+          }}
+        />
+      )}
+      {picker === 'event' && selected.size > 0 && (
+        <EventPickerDialog
+          mediaIds={[...selected]}
+          onClose={() => {
+            setPicker(null);
+            exitSelecting();
+          }}
+        />
+      )}
+
       {lightbox !== null && album.photos[lightbox] && (
-        <div className="fixed inset-0 z-50 flex flex-col bg-black/95" onClick={() => setLightbox(null)}>
+        <div
+          className="fixed inset-0 z-50 flex touch-none flex-col bg-black/95"
+          onClick={() => setLightbox(null)}
+          onTouchStart={(e) => {
+            e.stopPropagation(); // neprepúšťaj gesto do swipe-back detailu
+            const t = e.touches[0]!;
+            lightboxTouch.current = { x: t.clientX, y: t.clientY };
+          }}
+          onTouchEnd={(e) => {
+            e.stopPropagation();
+            const s = lightboxTouch.current;
+            lightboxTouch.current = null;
+            if (!s) return;
+            const t = e.changedTouches[0]!;
+            const dx = t.clientX - s.x;
+            const dy = t.clientY - s.y;
+            // Swipe hore/dole = ďalšia/predchádzajúca fotka.
+            if (Math.abs(dy) > 60 && Math.abs(dy) > Math.abs(dx) * 1.5) {
+              setLightbox((i) =>
+                i === null ? null : dy < 0 ? Math.min(album.photos.length - 1, i + 1) : Math.max(0, i - 1),
+              );
+              return;
+            }
+            // Swipe doprava = späť do mriežky albumu.
+            if (dx > 70 && Math.abs(dx) > Math.abs(dy) * 1.5) setLightbox(null);
+          }}
+        >
           <div className="flex items-center justify-between p-3 text-white" onClick={(e) => e.stopPropagation()}>
             <span className="text-sm text-white/70">
               {lightbox + 1} / {album.photos.length}

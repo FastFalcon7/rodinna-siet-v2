@@ -3,6 +3,7 @@ import type { CreatePollInput, PollPublic, PostAuthor } from '@rodinna/shared-ty
 import { db } from '../../core/db/client';
 import {
   feedCards,
+  media,
   pollOptions,
   polls,
   pollVotes,
@@ -13,6 +14,7 @@ import { APP_TOPIC } from '../../core/realtime';
 import { publishCrossProcess } from '../../core/events';
 import { enqueueJob } from '../../core/jobs/queue';
 import { notifyUsers } from '../notifications/service';
+import { toMediaPublic } from '../media/service';
 
 export class NotFoundError extends Error {}
 export class ForbiddenError extends Error {}
@@ -38,7 +40,7 @@ export async function getPoll(pollId: string, viewerId: string): Promise<PollPub
 async function hydratePoll(poll: PollRow, viewerId: string): Promise<PollPublic> {
   const [authorRows, optionRows, voteRows] = await Promise.all([
     db
-      .select({ id: users.id, displayName: users.displayName, avatarUrl: users.avatarUrl })
+      .select({ id: users.id, displayName: users.displayName, avatarUrl: users.avatarUrl, nameColor: users.nameColor })
       .from(users)
       .where(eq(users.id, poll.authorId)),
     db.select().from(pollOptions).where(eq(pollOptions.pollId, poll.id)).orderBy(asc(pollOptions.order)),
@@ -61,6 +63,13 @@ async function hydratePoll(poll: PollRow, viewerId: string): Promise<PollPublic>
     votesByOption.set(v.optionId, list);
   }
 
+  // Fotky možností (ladenie 07/2026) — obrázkové ankety.
+  const mediaIds = [...new Set(optionRows.map((o) => o.mediaId).filter((v): v is string => v !== null))];
+  const mediaRows = mediaIds.length
+    ? await db.select().from(media).where(inArray(media.id, mediaIds))
+    : [];
+  const mediaMap = new Map(mediaRows.map((m) => [m.id, toMediaPublic(m)]));
+
   return {
     id: poll.id,
     author: authorRows[0] ?? { id: poll.authorId, displayName: '—', avatarUrl: null },
@@ -74,6 +83,7 @@ async function hydratePoll(poll: PollRow, viewerId: string): Promise<PollPublic>
       return {
         id: o.id,
         label: o.label,
+        media: o.mediaId ? (mediaMap.get(o.mediaId) ?? null) : null,
         votes: votes.length,
         votedByMe: votes.some((v) => v.userId === viewerId),
         voters: poll.anonymous
@@ -94,6 +104,15 @@ export async function createPoll(author: PostAuthor, input: CreatePollInput): Pr
     throw new BadRequestError('Deadline musí byť v budúcnosti');
   }
 
+  // Fotky možností musia existovať (family-wide, ako albumy).
+  const optMediaIds = [...new Set(input.options.map((o) => o.mediaId).filter((v): v is string => !!v))];
+  if (optMediaIds.length > 0) {
+    const found = await db.select({ id: media.id }).from(media).where(inArray(media.id, optMediaIds));
+    if (found.length !== optMediaIds.length) {
+      throw new BadRequestError('Niektoré fotky možností neexistujú');
+    }
+  }
+
   const inserted = await db
     .insert(polls)
     .values({
@@ -108,7 +127,9 @@ export async function createPoll(author: PostAuthor, input: CreatePollInput): Pr
 
   await db
     .insert(pollOptions)
-    .values(input.options.map((label, order) => ({ pollId: poll.id, label, order })));
+    .values(
+      input.options.map((o, order) => ({ pollId: poll.id, label: o.label, mediaId: o.mediaId ?? null, order })),
+    );
 
   if (input.toFeed) {
     await db.insert(feedCards).values({ module: 'polls', entityId: poll.id, authorId: author.id });

@@ -1,11 +1,18 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { NoteDetail, NoteRevision, NoteSummary } from '@rodinna/shared-types';
-import { ApiError, chatApi, notesApi, usersApi } from '../lib/api';
+import { ApiError, chatApi, mediaApi, notesApi, usersApi } from '../lib/api';
 import { useAuth } from '../auth/AuthContext';
 import { useChat } from '../chat/ChatProvider';
 import { consumePendingNav } from '../app/navigate';
 import { buildAppLink } from '../shared/appLink';
 import { relativeTime } from '../shared/time';
+import { PhotoGallery } from '../shared/PhotoGallery';
+import { UploadPreviews } from '../shared/UploadPreviews';
+import { useMediaUpload } from '../shared/useMediaUpload';
+import { useSwipeBack } from '../shared/useSwipeBack';
+import { useAutoGrow } from '../shared/useAutoGrow';
+import { TitleInput } from '../shared/TitleInput';
+import { VisibilityPicker, type ShareVisibility } from '../shared/VisibilityPicker';
 
 /**
  * Modul Zoznamy & Poznámky (M3): rodinne zdieľané zoznamy s odškrtávaním
@@ -58,6 +65,8 @@ export function Notes() {
               <span className="flex items-center gap-2">
                 <span className="min-w-0 flex-1 truncate text-sm font-medium">
                   {n.pinned && '📌 '}
+                  {n.visibility === 'private' && '🔒 '}
+                  {n.visibility === 'rooms' && '👥 '}
                   {n.kind === 'list' ? '✅' : '📝'} {n.title}
                 </span>
                 {n.kind === 'list' && (
@@ -89,15 +98,30 @@ export function Notes() {
 function NewNoteButtons({ onCreated }: { onCreated: (id: string) => void }) {
   const [mode, setMode] = useState<'list' | 'note' | null>(null);
   const [title, setTitle] = useState('');
+  // Nové poznámky sú predvolene súkromné (ladenie 07/2026) — vidí ich len autor.
+  const [visibility, setVisibility] = useState<ShareVisibility>('private');
+  const [roomIds, setRoomIds] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
+  const uploads = useMediaUpload(20);
+  const fileRef = useRef<HTMLInputElement>(null);
 
   const create = async () => {
-    if (!title.trim() || busy || !mode) return;
+    if (!title.trim() || busy || !mode || uploads.uploading) return;
+    if (visibility === 'rooms' && roomIds.length === 0) return;
     setBusy(true);
     try {
-      const n = await notesApi.create({ kind: mode, title: title.trim(), bodyMd: '', items: [] });
+      const n = await notesApi.create({
+        kind: mode,
+        visibility,
+        title: title.trim(),
+        bodyMd: '',
+        items: [],
+        mediaIds: uploads.mediaIds,
+        roomIds: visibility === 'rooms' ? roomIds : [],
+      });
       setMode(null);
       setTitle('');
+      uploads.clear();
       onCreated(n.id);
     } finally {
       setBusy(false);
@@ -123,24 +147,53 @@ function NewNoteButtons({ onCreated }: { onCreated: (id: string) => void }) {
     );
   }
   return (
-    <div className="flex gap-2 rounded-2xl border border-neutral-200 bg-white p-3 dark:border-neutral-800 dark:bg-neutral-900">
-      <input
-        value={title}
-        onChange={(e) => setTitle(e.target.value)}
-        onKeyDown={(e) => e.key === 'Enter' && void create()}
-        autoFocus
-        maxLength={120}
-        placeholder={mode === 'list' ? 'Názov zoznamu (napr. Nákup)' : 'Názov poznámky'}
-        className="min-w-0 flex-1 rounded-lg border border-neutral-300 bg-transparent px-3 py-1.5 text-sm outline-none focus:border-accent dark:border-neutral-700"
+    <div className="space-y-2 rounded-2xl border border-neutral-200 bg-white p-3 dark:border-neutral-800 dark:bg-neutral-900">
+      <UploadPreviews items={uploads.items} onRemove={uploads.remove} onMakeCover={uploads.makeFirst} />
+      <div className="flex gap-2">
+        <TitleInput
+          value={title}
+          onChange={setTitle}
+          onSubmit={() => void create()}
+          autoFocus
+          placeholder={mode === 'list' ? 'Názov zoznamu (napr. Nákup)' : 'Názov poznámky'}
+          className="min-w-0 flex-1"
+        />
+        <button
+          onClick={() => fileRef.current?.click()}
+          title="Pridať prílohu"
+          aria-label="Pridať prílohu"
+          className="grid h-8 w-8 shrink-0 place-items-center self-center rounded-full text-xl leading-none text-neutral-500 hover:bg-neutral-100 dark:hover:bg-neutral-800"
+        >
+          +
+        </button>
+        <button onClick={() => setMode(null)} className="text-sm text-neutral-400">Zrušiť</button>
+        <button
+          onClick={() => void create()}
+          disabled={!title.trim() || busy || uploads.uploading}
+          className="rounded-lg bg-accent px-3 py-1.5 text-sm font-medium text-white disabled:opacity-40"
+        >
+          Vytvoriť
+        </button>
+      </div>
+      <VisibilityPicker
+        visibility={visibility}
+        roomIds={roomIds}
+        onChange={(v, r) => {
+          setVisibility(v);
+          setRoomIds(r);
+        }}
       />
-      <button onClick={() => setMode(null)} className="text-sm text-neutral-400">Zrušiť</button>
-      <button
-        onClick={() => void create()}
-        disabled={!title.trim() || busy}
-        className="rounded-lg bg-accent px-3 py-1.5 text-sm font-medium text-white disabled:opacity-40"
-      >
-        Vytvoriť
-      </button>
+      <input
+        ref={fileRef}
+        type="file"
+        multiple
+        hidden
+        onChange={(e) => {
+          const files = Array.from(e.target.files ?? []);
+          e.target.value = '';
+          if (files.length > 0) uploads.addFiles(files);
+        }}
+      />
     </div>
   );
 }
@@ -157,6 +210,14 @@ function NoteDetailView({ noteId, onBack }: { noteId: string; onBack: () => void
   const [sharePick, setSharePick] = useState(false);
   const [revisions, setRevisions] = useState<NoteRevision[] | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+  const [uploadingMedia, setUploadingMedia] = useState(false);
+  const [locating, setLocating] = useState(false);
+  const [visPick, setVisPick] = useState(false);
+  const [visDraft, setVisDraft] = useState<{ visibility: ShareVisibility; roomIds: string[] } | null>(null);
+  const mediaFileRef = useRef<HTMLInputElement>(null);
+  const bodyRef = useRef<HTMLTextAreaElement>(null);
+  useAutoGrow(bodyRef, body ?? '', 60);
+  const swipeBack = useSwipeBack(onBack);
 
   const load = () =>
     notesApi
@@ -206,18 +267,70 @@ function NoteDetailView({ noteId, onBack }: { noteId: string; onBack: () => void
 
   const shareTo = async (roomId: string) => {
     setSharePick(false);
+    // Zdieľanie do miestnosti: súkromná → 'rooms' s touto miestnosťou;
+    // pri 'rooms' sa miestnosť pridá; rodinná ostáva rodinnou.
+    if (note && note.createdBy.id === user?.id && note.visibility !== 'family') {
+      const nextRooms = [...new Set([...(note.roomIds ?? []), roomId])];
+      setNote(await notesApi.update(noteId, { visibility: 'rooms', roomIds: nextRooms }));
+      flash('Poslané do chatu ✓ (vidí ju táto skupina)');
+    } else {
+      flash('Poslané do chatu ✓');
+    }
     await chatApi.sendMessage(roomId, { bodyMd: buildAppLink('notes', noteId), mediaIds: [] });
-    flash('Poslané do chatu ✓');
   };
 
   const saveBody = async () => {
-    if (body === null || body === note.bodyMd) return;
-    setNote(await notesApi.update(noteId, { bodyMd: body }));
+    if (body === null) return;
+    if (body !== note.bodyMd) setNote(await notesApi.update(noteId, { bodyMd: body }));
     flash('Uložené ✓');
   };
 
+  const uploadMedia = async (files: File[]) => {
+    if (files.length === 0) return;
+    setUploadingMedia(true);
+    try {
+      const ids: string[] = [];
+      for (const f of files) ids.push((await mediaApi.upload(f)).id);
+      setNote(await notesApi.addMedia(noteId, ids));
+      flash('Prílohy pridané ✓');
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Nahrávanie zlyhalo');
+    } finally {
+      setUploadingMedia(false);
+    }
+  };
+
+  /** 📍 Poloha: do poznámky ako riadok textu, do zoznamu ako položka. */
+  const insertLocation = () => {
+    if (!navigator.geolocation) {
+      flash('Zariadenie nepodporuje polohu');
+      return;
+    }
+    setLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setLocating(false);
+        const { latitude, longitude } = pos.coords;
+        const text = `📍 Poloha: https://maps.google.com/?q=${latitude.toFixed(6)},${longitude.toFixed(6)}`;
+        if (note.kind === 'note') {
+          setBody((cur) => (cur?.trim() ? `${cur}\n${text}` : text));
+          flash('Poloha vložená — nezabudni Uložiť');
+        } else {
+          void notesApi.addItem(noteId, text).then(setNote);
+        }
+      },
+      () => {
+        setLocating(false);
+        flash('Polohu sa nepodarilo zistiť');
+      },
+      { enableHighAccuracy: true, timeout: 10_000 },
+    );
+  };
+
+  const noteImages = note.media.filter((m) => m.kind === 'image');
+
   return (
-    <div className="px-4 py-4">
+    <div className="px-4 py-4" {...swipeBack}>
       <div className="mb-3 flex items-center gap-2">
         <button onClick={onBack} aria-label="Späť na zoznamy" className="grid h-8 w-8 place-items-center rounded-full text-lg hover:bg-neutral-100 dark:hover:bg-neutral-800">
           ←
@@ -231,6 +344,15 @@ function NoteDetailView({ noteId, onBack }: { noteId: string; onBack: () => void
             {relativeTime(note.updatedAt)}
           </p>
         </div>
+        {user && note.createdBy.id === user.id && (
+          <button
+            onClick={() => setVisPick(true)}
+            title="Zmeniť viditeľnosť"
+            className="shrink-0 rounded-lg px-2 py-1.5 text-sm"
+          >
+            {note.visibility === 'private' ? '🔒' : note.visibility === 'rooms' ? '👥' : '👪'}
+          </button>
+        )}
         <button
           onClick={() => void notesApi.update(noteId, { pinned: !note.pinned }).then(setNote)}
           title={note.pinned ? 'Odopnúť' : 'Pripnúť hore'}
@@ -246,6 +368,46 @@ function NoteDetailView({ noteId, onBack }: { noteId: string; onBack: () => void
           💬 Zdieľať
         </button>
       </div>
+
+      {/* Fotky poznámky (ladenie 07/2026) + pridávanie príloh a polohy. */}
+      {noteImages.length > 0 && (
+        <div className="mb-3">
+          <PhotoGallery
+            images={noteImages}
+            onRemove={async (ids) => {
+              for (const id of ids) await notesApi.removeMedia(noteId, id).catch(() => {});
+              void load();
+            }}
+          />
+        </div>
+      )}
+      <div className="mb-3 flex gap-2 text-sm">
+        <button
+          onClick={() => mediaFileRef.current?.click()}
+          disabled={uploadingMedia}
+          className="rounded-lg border border-neutral-300 px-3 py-1.5 text-neutral-500 transition hover:border-accent hover:text-accent disabled:opacity-50 dark:border-neutral-700"
+        >
+          {uploadingMedia ? 'Nahrávam…' : '📎 Príloha'}
+        </button>
+        <button
+          onClick={insertLocation}
+          disabled={locating}
+          className="rounded-lg border border-neutral-300 px-3 py-1.5 text-neutral-500 transition hover:border-accent hover:text-accent disabled:opacity-50 dark:border-neutral-700"
+        >
+          {locating ? 'Zisťujem…' : '📍 Poloha'}
+        </button>
+      </div>
+      <input
+        ref={mediaFileRef}
+        type="file"
+        multiple
+        hidden
+        onChange={(e) => {
+          const files = Array.from(e.target.files ?? []);
+          e.target.value = '';
+          void uploadMedia(files);
+        }}
+      />
 
       {note.kind === 'list' ? (
         <>
@@ -346,16 +508,17 @@ function NoteDetailView({ noteId, onBack }: { noteId: string; onBack: () => void
       ) : (
         <>
           <textarea
+            ref={bodyRef}
             value={body ?? ''}
             onChange={(e) => setBody(e.target.value)}
-            rows={12}
+            rows={6}
             placeholder="Píš sem…"
-            className="w-full resize-y rounded-2xl border border-neutral-200 bg-white px-4 py-3 text-sm leading-relaxed outline-none focus:border-accent dark:border-neutral-800 dark:bg-neutral-900"
+            className="min-h-40 w-full resize-none rounded-2xl border border-neutral-200 bg-white px-4 py-3 text-sm leading-relaxed outline-none focus:border-accent dark:border-neutral-800 dark:bg-neutral-900"
           />
           <div className="mt-2 flex items-center gap-3">
             <button
               onClick={() => void saveBody()}
-              disabled={body === null || body === note.bodyMd}
+              disabled={body === null}
               className="rounded-lg bg-accent px-4 py-1.5 text-sm font-medium text-white disabled:opacity-40"
             >
               Uložiť
@@ -425,6 +588,45 @@ function NoteDetailView({ noteId, onBack }: { noteId: string; onBack: () => void
           </button>
         )}
       </div>
+
+      {visPick && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 md:items-center" onClick={() => setVisPick(false)}>
+          <div
+            className="w-full max-w-md space-y-3 rounded-t-2xl bg-white p-4 md:rounded-2xl dark:bg-neutral-900"
+            style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="font-semibold">Kto poznámku vidí</h3>
+            <VisibilityPicker
+              visibility={(visDraft ?? { visibility: note.visibility, roomIds: note.roomIds }).visibility}
+              roomIds={(visDraft ?? { visibility: note.visibility, roomIds: note.roomIds }).roomIds}
+              onChange={(v, r) => setVisDraft({ visibility: v, roomIds: r })}
+            />
+            <div className="flex justify-end gap-2">
+              <button onClick={() => { setVisPick(false); setVisDraft(null); }} className="rounded-lg px-3 py-1.5 text-sm text-neutral-500">
+                Zrušiť
+              </button>
+              <button
+                onClick={() => {
+                  const d = visDraft ?? { visibility: note.visibility, roomIds: note.roomIds };
+                  if (d.visibility === 'rooms' && d.roomIds.length === 0) return;
+                  void notesApi
+                    .update(noteId, { visibility: d.visibility, roomIds: d.visibility === 'rooms' ? d.roomIds : [] })
+                    .then((n) => {
+                      setNote(n);
+                      setVisPick(false);
+                      setVisDraft(null);
+                      flash('Viditeľnosť zmenená ✓');
+                    });
+                }}
+                className="rounded-lg bg-accent px-3 py-1.5 text-sm font-medium text-white"
+              >
+                Uložiť
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {sharePick && (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 md:items-center" onClick={() => setSharePick(false)}>

@@ -35,6 +35,8 @@ export interface WebModule {
   /** Voliteľný badge na ikone (napr. neprečítané správy). Hook — navigácia
    *  ho volá pri renderi, poradie modulov je stabilné. */
   useBadge?: () => number;
+  /** Modul postavený na LLM — zobrazuje sa len keď je AI zapnutá (Viac → AI). */
+  llm?: boolean;
 }
 
 function FeedScreen() {
@@ -81,12 +83,12 @@ export const webModules: WebModule[] = [
     layout: 'scroll',
     Component: Albums,
   },
-  // Slot 'more': bottom nav má 4 sloty plné — Zoznamy a Kalendár žijú vo „Viac".
+  // Ladenie 07/2026: Zoznamy a Kalendár povýšené do bottom navu (len ikony).
   {
     name: 'notes',
     label: 'Zoznamy a poznámky',
     icon: ChecklistIcon,
-    slot: 'more',
+    slot: 'bar',
     layout: 'scroll',
     Component: Notes,
   },
@@ -94,7 +96,7 @@ export const webModules: WebModule[] = [
     name: 'calendar',
     label: 'Kalendár',
     icon: CalendarIcon,
-    slot: 'more',
+    slot: 'bar',
     layout: 'scroll',
     Component: Calendar,
   },
@@ -105,6 +107,7 @@ export const webModules: WebModule[] = [
     slot: 'more',
     layout: 'scroll',
     Component: Diary,
+    llm: true,
   },
   {
     name: 'quiz',
@@ -113,6 +116,7 @@ export const webModules: WebModule[] = [
     slot: 'more',
     layout: 'scroll',
     Component: Quizzes,
+    llm: true,
   },
   {
     name: 'games-practice',

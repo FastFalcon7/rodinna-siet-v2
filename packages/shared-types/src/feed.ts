@@ -6,12 +6,29 @@ export const PostAuthorSchema = z.object({
   id: z.string().uuid(),
   displayName: z.string(),
   avatarUrl: z.string().nullable(),
+  /** Farba mena (hex) pre vizuálnu orientáciu; nepovinné (staršie výrezy). */
+  nameColor: z.string().nullable().optional(),
 });
 export type PostAuthor = z.infer<typeof PostAuthorSchema>;
 
-/** Fixná sada reakcií (§10 — emoji-mart je Phase 2 polish, zatiaľ stačí toto). */
-export const ALLOWED_REACTION_EMOJIS = ['👍', '❤️', '😂', '😮', '😢', '🙏'] as const;
-export const ReactionEmojiSchema = z.enum(ALLOWED_REACTION_EMOJIS);
+/**
+ * Základná paleta reakcií (ladenie 07/2026): 12 rýchlych emoji zobrazených
+ * hneď; cez „+" sa dá vybrať ľubovoľné iné emoji (validované nižšie). Poradie
+ * riadi aj usporiadanie počítadiel, nech pri zmene reakcie neskáču.
+ */
+export const ALLOWED_REACTION_EMOJIS = [
+  '👍', '❤️', '😂', '😮', '😢', '🙏', '🎉', '👏', '🔥', '😍', '🥰', '🤔',
+] as const;
+/**
+ * Reakcia je ľubovoľné emoji (nie fixný enum) — kontrolujeme len, že reťazec
+ * skutočne obsahuje emoji a má rozumnú dĺžku (aj ZWJ sekvencie ako rodinky).
+ */
+export const ReactionEmojiSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .max(24)
+  .regex(/\p{Extended_Pictographic}/u, 'Musí to byť emoji');
 export type ReactionEmoji = z.infer<typeof ReactionEmojiSchema>;
 
 export const ReactionTargetTypeSchema = z.enum(['post', 'comment', 'message']);
@@ -58,9 +75,16 @@ export const CreatePostInputSchema = z
   });
 export type CreatePostInput = z.infer<typeof CreatePostInputSchema>;
 
-export const UpdatePostInputSchema = z.object({
-  bodyMd: z.string().trim().min(1, 'Príspevok nemôže byť prázdny').max(4000),
-});
+export const UpdatePostInputSchema = z
+  .object({
+    bodyMd: z.string().trim().max(4000),
+    /** Kompletná množina príloh po úprave (ladenie 07/2026) — pridanie aj mazanie. */
+    mediaIds: z.array(z.string().uuid()).max(10).optional(),
+  })
+  .refine((v) => v.bodyMd.length > 0 || (v.mediaIds?.length ?? 0) > 0, {
+    message: 'Príspevok nemôže byť prázdny',
+    path: ['bodyMd'],
+  });
 export type UpdatePostInput = z.infer<typeof UpdatePostInputSchema>;
 
 export const PostPublicSchema = z.object({

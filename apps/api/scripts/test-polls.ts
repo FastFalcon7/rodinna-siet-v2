@@ -125,18 +125,18 @@ async function main() {
   const bob = await seedUser('bob@rodina.sk', 'Bob', 'member');
 
   console.log('\n— Tvorba ankety —');
-  let r = await http(alica.token, 'POST', '/api/polls', { question: 'X', options: ['iba jedna'] });
+  let r = await http(alica.token, 'POST', '/api/polls', { question: 'X', options: [{ label: 'iba jedna' }] });
   check('1 možnosť → 400', r.status === 400, r.status);
   r = await http(alica.token, 'POST', '/api/polls', {
     question: 'X',
-    options: ['a', 'b'],
+    options: [{ label: 'a' }, { label: 'b' }],
     closesAt: new Date(Date.now() - 1000).toISOString(),
   });
   check('deadline v minulosti → 400', r.status === 400, r.body);
 
   r = await http(alica.token, 'POST', '/api/polls', {
     question: 'Kde bude nedeľný obed?',
-    options: ['U nás', 'U babky', 'Reštaurácia'],
+    options: [{ label: 'U nás' }, { label: 'U babky' }, { label: 'Reštaurácia' }],
     toFeed: true,
   });
   check('vytvorenie ankety → 201', r.status === 201 && r.body.options.length === 3, r.body);
@@ -179,7 +179,7 @@ async function main() {
     question: 'Čo baliť na výlet?',
     kind: 'multi',
     anonymous: true,
-    options: ['Stan', 'Spacák', 'Gitara'],
+    options: [{ label: 'Stan' }, { label: 'Spacák' }, { label: 'Gitara' }],
   });
   const multiId = r.body.id;
   const mOpts = r.body.options;
@@ -208,7 +208,7 @@ async function main() {
   console.log('\n— Auto-close po deadline —');
   r = await http(alica.token, 'POST', '/api/polls', {
     question: 'Deadline test',
-    options: ['a', 'b'],
+    options: [{ label: 'a' }, { label: 'b' }],
     closesAt: new Date(Date.now() + 3600_000).toISOString(),
   });
   const dlId = r.body.id;

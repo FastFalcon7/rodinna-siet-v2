@@ -53,7 +53,7 @@ async function fetchAuthors(userIds: (string | null)[]): Promise<Map<string, Pos
   const ids = [...new Set(userIds.filter((v): v is string => v !== null))];
   if (ids.length === 0) return new Map();
   const rows = await db
-    .select({ id: users.id, displayName: users.displayName, avatarUrl: users.avatarUrl })
+    .select({ id: users.id, displayName: users.displayName, avatarUrl: users.avatarUrl, nameColor: users.nameColor })
     .from(users)
     .where(inArray(users.id, ids));
   return new Map(rows.map((r) => [r.id, r]));

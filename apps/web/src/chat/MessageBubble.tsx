@@ -1,7 +1,10 @@
 import { useState } from 'react';
-import { ALLOWED_REACTION_EMOJIS, type MessagePublic } from '@rodinna/shared-types';
+import { type MessagePublic } from '@rodinna/shared-types';
 import { chatApi } from '../lib/api';
 import { MediaItem } from '../shared/MediaItem';
+import { nameStyle } from '../shared/nameColor';
+import { ReactionPicker } from '../shared/ReactionPicker';
+import { PhotoGallery } from '../shared/PhotoGallery';
 import { LinkPreviewCard } from '../shared/LinkPreviewCard';
 import { extractFirstUrl, RichBody } from '../shared/linkify';
 import { parseAppLink, stripAppLink } from '../shared/appLink';
@@ -39,19 +42,12 @@ function ReplyQuote({ message, mine }: { message: NonNullable<MessagePublic['rep
 
 function MediaGrid({ message }: { message: MessagePublic }) {
   if (message.media.length === 0) return null;
-  // Obrázky do mriežky; video a súbory pod nimi na plnú šírku bubliny.
+  // Úvodná fotka + „+N fotiek" badge (PhotoGallery); video a súbory na plnú šírku.
   const images = message.media.filter((m) => m.kind === 'image');
   const rest = message.media.filter((m) => m.kind !== 'image');
-  const cols = images.length === 1 ? 'grid-cols-1' : 'grid-cols-2';
   return (
     <div className="mt-1 space-y-1">
-      {images.length > 0 && (
-        <div className={`grid ${cols} gap-1 overflow-hidden rounded-lg`}>
-          {images.map((m) => (
-            <MediaItem key={m.id} media={m} className="max-h-72 rounded-none" />
-          ))}
-        </div>
-      )}
+      <PhotoGallery images={images} compact />
       {rest.map((m) => (
         <MediaItem key={m.id} media={m} className="max-h-72" />
       ))}
@@ -71,6 +67,8 @@ export function MessageBubble({ message, mine, showAuthor, seen, tail, onReply, 
   const bodyText = appLink ? stripAppLink(message.bodyMd, appLink) : message.bodyMd;
   const previewUrl =
     message.media.length === 0 && !appLink ? extractFirstUrl(message.bodyMd) : null;
+
+  const myReaction = message.reactions.find((r) => r.reactedByMe)?.emoji ?? null;
 
   const react = async (emoji: string) => {
     if (busy) return;
@@ -120,7 +118,9 @@ export function MessageBubble({ message, mine, showAuthor, seen, tail, onReply, 
         style={swipe.dx > 0 ? { transform: `translateX(${swipe.dx * 0.9}px)`, transition: 'none' } : { transition: 'transform 150ms' }}
       >
         {showAuthor && !mine && (
-          <span className="mb-0.5 ml-1 text-xs font-medium text-accent">{message.author.displayName}</span>
+          <span className="mb-0.5 ml-1 text-xs font-medium text-accent" style={nameStyle(message.author)}>
+            {message.author.displayName}
+          </span>
         )}
 
         <div
@@ -235,18 +235,7 @@ export function MessageBubble({ message, mine, showAuthor, seen, tail, onReply, 
             <div
               className={`absolute z-20 ${mine ? 'right-0' : 'left-0'} bottom-full mb-1 w-max rounded-2xl border border-neutral-200 bg-white p-1.5 shadow-lg dark:border-neutral-700 dark:bg-neutral-900`}
             >
-              <div className="flex gap-1">
-                {ALLOWED_REACTION_EMOJIS.map((emoji) => (
-                  <button
-                    key={emoji}
-                    type="button"
-                    onClick={() => react(emoji)}
-                    className="rounded-lg px-1 py-0.5 text-lg transition hover:scale-125"
-                  >
-                    {emoji}
-                  </button>
-                ))}
-              </div>
+              <ReactionPicker current={myReaction} onPick={react} />
               <div className="mt-1 flex gap-1 border-t border-neutral-100 pt-1 dark:border-neutral-800">
                 <button
                   type="button"

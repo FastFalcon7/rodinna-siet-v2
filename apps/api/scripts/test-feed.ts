@@ -127,6 +127,15 @@ async function main() {
   r = await http(alica.token, 'POST', '/api/feed', { bodyMd: 'X', mediaIds: [cudzia] });
   check('cudzie médium v poste → 403', r.status === 403, r.status);
 
+  // Ladenie 07/2026: farba mena z profilu preteká cez autora príspevku.
+  r = await http(alica.token, 'PATCH', '/api/users/me', { nameColor: '#3b82f6' });
+  check('nastavenie farby mena → 200', r.status === 200 && r.body.user.nameColor === '#3b82f6', r.body.user?.nameColor);
+  r = await http(alica.token, 'PATCH', '/api/users/me', { nameColor: '#123456' });
+  check('farba mimo palety → 400', r.status === 400, r.status);
+  r = await http(bob.token, 'GET', `/api/feed`);
+  const seen = r.body.items?.find((it: any) => it.type === 'post' && it.post.id === postId);
+  check('autor príspevku nesie farbu mena', seen?.post.author.nameColor === '#3b82f6', seen?.post.author);
+
   console.log('\n— Komentáre s prílohami (bod 3) —');
   r = await http(bob.token, 'POST', `/api/feed/${postId}/comments`, { bodyMd: '', mediaIds: [] });
   check('prázdny komentár → 400', r.status === 400, r.status);
@@ -170,6 +179,14 @@ async function main() {
   check('druhý user rovnaká emoji → count 2', r.body.reactions?.[0]?.count === 2, r.body.reactions);
   r = await http(bob.token, 'PUT', '/api/feed/reactions', { targetType: 'post', targetId: postId, emoji: '😂' });
   check('rovnaká emoji = unreact → count 1', r.body.reactions?.[0]?.count === 1, r.body.reactions);
+  // Ladenie 07/2026: ľubovoľné emoji z veľkej palety (nie len 12 základných).
+  // Bob nemá aktuálnu reakciu (vyššie zrušil 😂) → 🦄 pridá bez vplyvu na 😂.
+  r = await http(bob.token, 'PUT', '/api/feed/reactions', { targetType: 'post', targetId: postId, emoji: '🦄' });
+  check('emoji mimo základnej palety (🦄) → 200', r.status === 200 && r.body.reactions?.some((x: any) => x.emoji === '🦄'), r.body.reactions);
+  r = await http(bob.token, 'PUT', '/api/feed/reactions', { targetType: 'post', targetId: postId, emoji: 'abc' });
+  check('reakcia bez emoji (text) → 400', r.status === 400, r.status);
+  // Bob zruší 🦄, nech ostatné počítadlá sedia.
+  await http(bob.token, 'PUT', '/api/feed/reactions', { targetType: 'post', targetId: postId, emoji: '🦄' });
 
   // Agregát vlákna: reakcia na komentár sa počíta do počítadla pod postom.
   r = await http(alica.token, 'PUT', '/api/feed/reactions', { targetType: 'comment', targetId: commentId, emoji: '❤️' });
@@ -236,6 +253,70 @@ async function main() {
   check('bez cookie a bez tokenu → 401', mr.status === 401, mr.status);
   mr = await fetch(`${BASE}/api/media/${uploaded.id}?mt=${'0'.repeat(32)}`);
   check('nesprávny token → 401', mr.status === 401, mr.status);
+
+  console.log('\n— Fotky v poznámkach a udalostiach (ladenie, 5. kolo) —');
+  const n1 = await seedImage(alica.id);
+  const n2 = await seedImage(bob.id); // cudzia fotka — family-wide je OK
+  r = await http(alica.token, 'POST', '/api/notes', {
+    kind: 'note',
+    visibility: 'family',
+    title: 'Recept',
+    bodyMd: 'Babkin koláč',
+    items: [],
+    mediaIds: [n1],
+  });
+  check('poznámka s fotkou → 201', r.status === 201 && r.body.media?.length === 1, r.body.media);
+  const noteId = r.body.id;
+  r = await http(bob.token, 'POST', `/api/notes/${noteId}/media`, { mediaIds: [n2] });
+  check('pridanie cudzej fotky do poznámky → 200 (family-wide)', r.status === 200 && r.body.media?.length === 2, r.body.media?.length);
+  r = await http(bob.token, 'DELETE', `/api/notes/${noteId}/media/${n1}`);
+  check('odstránenie fotky z poznámky → 200', r.status === 200 && r.body.media?.length === 1, r.body.media?.length);
+
+  r = await http(alica.token, 'POST', '/api/events', {
+    title: 'Oslava',
+    startsAt: new Date(Date.now() + 48 * 3600_000).toISOString(),
+    allDay: true,
+    mediaIds: [n1],
+  });
+  check('udalosť s fotkou → 201', r.status === 201 && r.body.media?.length === 1, r.body.media);
+  const evId = r.body.id;
+  r = await http(bob.token, 'POST', `/api/events/${evId}/media`, { mediaIds: [n2] });
+  check('pridanie fotky do udalosti → 200', r.status === 200 && r.body.media?.length === 2, r.body.media?.length);
+  r = await http(bob.token, 'DELETE', `/api/events/${evId}/media/${n2}`);
+  check('fotku z udalosti odstráni len autor/admin → 403', r.status === 403, r.status);
+  r = await http(alica.token, 'DELETE', `/api/events/${evId}/media/${n2}`);
+  check('autor odstránil fotku udalosti → 200', r.status === 200 && r.body.media?.length === 1, r.body.media?.length);
+
+  console.log('\n— Editácia postu s prílohami (ladenie, 8. kolo) —');
+  const e1 = await seedImage(alica.id);
+  r = await http(alica.token, 'PATCH', `/api/feed/${postId}`, { bodyMd: 'Ahoj rodina! (upravené)', mediaIds: [p1, e1] });
+  check(
+    'edit: odobratá p2, pridaná e1 → media = [p1, e1]',
+    r.status === 200 && r.body.media?.length === 2 && r.body.media[0].id === p1 && r.body.media[1].id === e1,
+    r.body.media,
+  );
+  const cudzia2 = await seedImage(bob.id);
+  r = await http(alica.token, 'PATCH', `/api/feed/${postId}`, { bodyMd: 'X', mediaIds: [p1, cudzia2] });
+  check('edit: nová cudzia fotka → 403', r.status === 403, r.status);
+  r = await http(bob.token, 'PATCH', `/api/feed/${postId}`, { bodyMd: 'Hack', mediaIds: [] });
+  check('edit cudzieho postu → 403', r.status === 403, r.status);
+
+  console.log('\n— Anketa s fotkami možností (ladenie, 6. kolo) —');
+  const p1img = await seedImage(alica.id);
+  r = await http(alica.token, 'POST', '/api/polls', {
+    question: 'Ktorá fotka na obálku?',
+    options: [{ label: 'Táto', mediaId: p1img }, { label: 'Bez fotky' }],
+  });
+  check(
+    'anketa s fotkou možnosti → 201 + option.media',
+    r.status === 201 && r.body.options?.[0]?.media?.id === p1img && r.body.options?.[1]?.media === null,
+    r.body.options,
+  );
+  r = await http(alica.token, 'POST', '/api/polls', {
+    question: 'X',
+    options: [{ label: 'a', mediaId: crypto.randomUUID() }, { label: 'b' }],
+  });
+  check('neexistujúca fotka možnosti → 400', r.status === 400, r.status);
 
   console.log('\n— Mazanie —');
   r = await http(bob.token, 'DELETE', `/api/feed/${postId}`);

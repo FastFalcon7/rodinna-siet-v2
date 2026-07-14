@@ -1,7 +1,12 @@
 import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
-import { CreateEventInputSchema, SetRsvpInputSchema, UpdateEventInputSchema } from '@rodinna/shared-types';
+import {
+  AddEventMediaInputSchema,
+  CreateEventInputSchema,
+  SetRsvpInputSchema,
+  UpdateEventInputSchema,
+} from '@rodinna/shared-types';
 import type { AppEnv } from '../../core/types';
 import type { AppModule } from '../../core/module';
 import { requireAuth } from '../auth/middleware';
@@ -12,12 +17,14 @@ import {
   BadRequestError,
   ForbiddenError,
   NotFoundError,
+  addEventMedia,
   buildIcs,
   createEvent,
   deleteEvent,
   getEvent,
   icsToken,
   listAgenda,
+  removeEventMedia,
   setRsvp,
   updateEvent,
 } from './service';
@@ -106,6 +113,35 @@ router.put('/:id/rsvp', requireAuth, zValidator('json', SetRsvpInputSchema), asy
   const me = c.get('user')!;
   try {
     return c.json(await setRsvp(c.req.param('id'), me.id, c.req.valid('json').status));
+  } catch (err) {
+    const m = mapError(err);
+    if (m) return c.json({ error: m.message }, m.status);
+    throw err;
+  }
+});
+
+/** POST /api/events/:id/media — pridať fotky (z composera alebo výberu vo feede). */
+router.post('/:id/media', requireAuth, zValidator('json', AddEventMediaInputSchema), async (c) => {
+  const me = c.get('user')!;
+  if (!rateLimit(`eventmedia:${me.id}`, 30, 60_000)) {
+    return c.json({ error: 'Príliš veľa úprav, skús o chvíľu' }, 429);
+  }
+  try {
+    return c.json(await addEventMedia(c.req.param('id'), me.id, c.req.valid('json').mediaIds));
+  } catch (err) {
+    const m = mapError(err);
+    if (m) return c.json({ error: m.message }, m.status);
+    throw err;
+  }
+});
+
+/** DELETE /api/events/:id/media/:mediaId — odstrániť fotku (autor/admin). */
+router.delete('/:id/media/:mediaId', requireAuth, async (c) => {
+  const me = c.get('user')!;
+  try {
+    return c.json(
+      await removeEventMedia(c.req.param('id'), me.id, me.role === 'admin', c.req.param('mediaId')),
+    );
   } catch (err) {
     const m = mapError(err);
     if (m) return c.json({ error: m.message }, m.status);

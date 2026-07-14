@@ -24,7 +24,6 @@ import {
   removePhoto,
   updateAlbum,
 } from './service';
-import { albumZipStream } from './zip';
 
 const router = new Hono<AppEnv>();
 
@@ -82,25 +81,6 @@ router.post('/', requireAuth, zValidator('json', CreateAlbumInputSchema), async 
 router.get('/:id', requireAuth, async (c) => {
   try {
     return c.json(await getAlbum(c.req.param('id')));
-  } catch (err) {
-    const m = mapError(err);
-    if (m) return c.json({ error: m.message }, m.status);
-    throw err;
-  }
-});
-
-/** GET /api/albums/:id/download — ZIP celého albumu (stream). */
-router.get('/:id/download', requireAuth, async (c) => {
-  try {
-    const album = await getAlbum(c.req.param('id'));
-    const stream = await albumZipStream(album.id);
-    const filename = encodeURIComponent(`${album.title}.zip`.replace(/"/g, ''));
-    return new Response(stream, {
-      headers: {
-        'content-type': 'application/zip',
-        'content-disposition': `attachment; filename*=UTF-8''${filename}`,
-      },
-    });
   } catch (err) {
     const m = mapError(err);
     if (m) return c.json({ error: m.message }, m.status);

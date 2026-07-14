@@ -1,12 +1,16 @@
 import { useAuth } from '../auth/AuthContext';
 import { Avatar } from '../shared/Avatar';
+import { nameStyle } from '../shared/nameColor';
 import { ProfileCard } from '../users/ProfileCard';
 import { MembersList } from '../users/MembersList';
 import { InvitePanel } from '../users/InvitePanel';
 import { NotificationSettings } from './NotificationSettings';
 import { ThemeSettings } from './ThemeSettings';
+import { FontSizeSettings } from './FontSizeSettings';
+import { LlmSettings } from './LlmSettings';
 import { InstallCard } from './InstallCard';
 import { webModules, type WebModule } from '../app/registry';
+import { useLlmEnabled } from '../shared/llm';
 
 /**
  * „Viac" (DESIGN_REVIEW_FEED_CHAT.md §2.1): identita + profil + nastavenia
@@ -15,16 +19,19 @@ import { webModules, type WebModule } from '../app/registry';
  */
 export function More({ onOpenModule }: { onOpenModule: (name: string) => void }) {
   const { user, logout } = useAuth();
+  const llmEnabled = useLlmEnabled();
   if (!user) return null;
 
-  const extraModules = webModules.filter((m: WebModule) => m.slot === 'more');
+  const extraModules = webModules.filter((m: WebModule) => m.slot === 'more' && (!m.llm || llmEnabled));
 
   return (
     <>
       <section className="flex items-center gap-4 rounded-2xl border border-neutral-200 bg-white p-6 dark:border-neutral-800 dark:bg-neutral-900">
         <Avatar user={user} size={56} />
         <div className="min-w-0 flex-1">
-          <p className="truncate font-semibold">{user.displayName}</p>
+          <p className="truncate font-semibold" style={nameStyle(user)}>
+            {user.displayName}
+          </p>
           <p className="truncate text-sm text-neutral-500">
             {user.email} · {user.role === 'admin' ? 'admin' : 'člen'}
           </p>
@@ -57,6 +64,9 @@ export function More({ onOpenModule }: { onOpenModule: (name: string) => void })
 
       <InstallCard />
       <ThemeSettings />
+      <FontSizeSettings />
+      {/* AI funkcie prepína len admin — bežný člen prepínač nevidí. */}
+      {user.role === 'admin' && <LlmSettings />}
       <NotificationSettings />
       <ProfileCard />
       {user.role === 'admin' && <InvitePanel />}

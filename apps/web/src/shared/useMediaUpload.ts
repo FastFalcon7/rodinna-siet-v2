@@ -60,6 +60,14 @@ export function useMediaUpload(max = 10) {
       return cur.filter((i) => i.key !== key);
     });
 
+  /** Presunie prílohu na začiatok — úvodná fotka príspevku (ladenie 07/2026). */
+  const makeFirst = (key: string) =>
+    setItems((cur) => {
+      const idx = cur.findIndex((i) => i.key === key);
+      if (idx <= 0) return cur;
+      return [cur[idx]!, ...cur.slice(0, idx), ...cur.slice(idx + 1)];
+    });
+
   const clear = () =>
     setItems((cur) => {
       for (const i of cur) if (i.localUrl) URL.revokeObjectURL(i.localUrl);
@@ -69,5 +77,5 @@ export function useMediaUpload(max = 10) {
   const uploading = items.some((i) => !i.media && !i.error);
   const mediaIds = items.filter((i) => i.media).map((i) => i.media!.id);
 
-  return { items, addFiles, remove, clear, uploading, mediaIds };
+  return { items, addFiles, remove, makeFirst, clear, uploading, mediaIds };
 }

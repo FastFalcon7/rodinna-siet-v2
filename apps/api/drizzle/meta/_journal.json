@@ -141,6 +141,62 @@
       "when": 1783744327998,
       "tag": "0019_glorious_giant_girl",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1783878190182,
+      "tag": "0020_stale_rawhide_kid",
+      "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1783913810753,
+      "tag": "0021_serious_marvex",
+      "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1783931628863,
+      "tag": "0022_serious_meteorite",
+      "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1783949949788,
+      "tag": "0023_lazy_mulholland_black",
+      "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1783954591545,
+      "tag": "0024_sloppy_gorilla_man",
+      "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1783956174682,
+      "tag": "0025_smiling_amphibian",
+      "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1784016318517,
+      "tag": "0026_parched_whizzer",
+      "breakpoints": true
+    },
+    {
+      "idx": 27,
+      "version": "7",
+      "when": 1784016810261,
+      "tag": "0027_orange_harpoon",
+      "breakpoints": true
     }
   ]
 }

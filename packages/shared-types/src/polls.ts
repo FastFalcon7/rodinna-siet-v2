@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { PostAuthorSchema } from './feed';
+import { MediaPublicSchema } from './media';
 
 /**
  * Ankety (plán §M1) — prvý Phase 2 modul a testovací balón integračného
@@ -24,7 +25,13 @@ export const CreatePollInputSchema = z.object({
   /** ISO deadline; po ňom worker anketu uzavrie a notifikuje. Null = bez konca. */
   closesAt: z.string().datetime().nullable().optional(),
   options: z
-    .array(z.string().trim().min(1, 'Možnosť nemôže byť prázdna').max(MAX_POLL_OPTION))
+    .array(
+      z.object({
+        label: z.string().trim().min(1, 'Možnosť nemôže byť prázdna').max(MAX_POLL_OPTION),
+        /** Fotka možnosti (ladenie 07/2026) — anketa s obrázkovými voľbami. */
+        mediaId: z.string().uuid().nullable().optional(),
+      }),
+    )
     .min(MIN_POLL_OPTIONS)
     .max(MAX_POLL_OPTIONS),
   /** Vložiť kartu ankety do Feedu (K1). Zdieľanie do chatu rieši klient app:// správou. */
@@ -35,6 +42,8 @@ export type CreatePollInput = z.infer<typeof CreatePollInputSchema>;
 export const PollOptionPublicSchema = z.object({
   id: z.string().uuid(),
   label: z.string(),
+  /** Fotka možnosti — null pri čisto textovej voľbe. */
+  media: MediaPublicSchema.nullable(),
   votes: z.number().int(),
   votedByMe: z.boolean(),
   /** Kto hlasoval — len pri neanonymnej ankete, inak prázdne. */

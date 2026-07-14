@@ -6,8 +6,10 @@ import { AttachmentSheet } from '../shared/AttachmentSheet';
 import { UploadPreviews } from '../shared/UploadPreviews';
 import { useMediaUpload } from '../shared/useMediaUpload';
 import { buildAppLink } from '../shared/appLink';
+import { useAutoGrow } from '../shared/useAutoGrow';
 import { PollComposerDialog } from '../polls/PollComposerDialog';
 import { EventComposerDialog } from '../events/EventComposerDialog';
+import { NoteComposerDialog } from '../notes/NoteComposerDialog';
 
 interface MessageComposerProps {
   roomId: string;
@@ -32,6 +34,7 @@ export function MessageComposer({
   const [sheet, setSheet] = useState(false);
   const [pollDialog, setPollDialog] = useState(false);
   const [eventDialog, setEventDialog] = useState(false);
+  const [noteDialog, setNoteDialog] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const taRef = useRef<HTMLTextAreaElement>(null);
@@ -45,13 +48,8 @@ export function MessageComposer({
     }
   }, [editing]);
 
-  // Autogrow textarea.
-  useEffect(() => {
-    const ta = taRef.current;
-    if (!ta) return;
-    ta.style.height = 'auto';
-    ta.style.height = `${Math.min(ta.scrollHeight, 160)}px`;
-  }, [text]);
+  // Autogrow textarea — strop 40 % výšky okna (ladenie 07/2026).
+  useAutoGrow(taRef, text, 40);
 
   const emitTyping = () => {
     if (editing) return;
@@ -147,7 +145,7 @@ export function MessageComposer({
 
       {uploads.items.length > 0 && (
         <div className="mb-2">
-          <UploadPreviews items={uploads.items} onRemove={uploads.remove} />
+          <UploadPreviews items={uploads.items} onRemove={uploads.remove} onMakeCover={uploads.makeFirst} />
         </div>
       )}
 
@@ -175,7 +173,7 @@ export function MessageComposer({
           onKeyDown={onKeyDown}
           rows={1}
           placeholder="Napíš správu…"
-          className="max-h-40 flex-1 resize-none rounded-2xl border border-neutral-300 bg-neutral-50 px-3 py-2 text-sm outline-none focus:border-accent dark:border-neutral-700 dark:bg-neutral-800"
+          className="flex-1 resize-none rounded-2xl border border-neutral-300 bg-neutral-50 px-3 py-2 text-sm outline-none focus:border-accent dark:border-neutral-700 dark:bg-neutral-800"
         />
         <button
           type="button"
@@ -202,7 +200,22 @@ export function MessageComposer({
               .catch(() => setError('Piškvorky sa nepodarilo založiť'));
           }}
           onEvent={() => setEventDialog(true)}
+          onNote={() => setNoteDialog(true)}
           onClose={() => setSheet(false)}
+        />
+      )}
+      {noteDialog && (
+        <NoteComposerDialog
+          roomId={roomId}
+          onCreated={(note) => {
+            setNoteDialog(false);
+            // Zoznam/poznámka ide do miestnosti ako živá karta (K2).
+            void chatApi
+              .sendMessage(roomId, { bodyMd: buildAppLink('notes', note.id), mediaIds: [] })
+              .then(onSent)
+              .catch(() => setError('Zoznam sa nepodarilo poslať do chatu'));
+          }}
+          onClose={() => setNoteDialog(false)}
         />
       )}
       {pollDialog && (
@@ -221,6 +234,7 @@ export function MessageComposer({
       )}
       {eventDialog && (
         <EventComposerDialog
+          roomId={roomId}
           onCreated={(event) => {
             setEventDialog(false);
             // Udalosť sa do miestnosti pošle ako app:// správa → RSVP karta (K2),

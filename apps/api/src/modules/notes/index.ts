@@ -3,6 +3,7 @@ import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import {
   AddNoteItemInputSchema,
+  AddNoteMediaInputSchema,
   CreateNoteInputSchema,
   UpdateNoteInputSchema,
   UpdateNoteItemInputSchema,
@@ -16,6 +17,7 @@ import {
   ForbiddenError,
   NotFoundError,
   addItem,
+  addNoteMedia,
   createNote,
   deleteItem,
   deleteNote,
@@ -23,6 +25,7 @@ import {
   getNote,
   listNotes,
   listRevisions,
+  removeNoteMedia,
   restoreRevision,
   updateItem,
   updateNote,
@@ -39,7 +42,7 @@ function mapError(err: unknown): { message: string; status: 400 | 403 | 404 } | 
 
 /** GET /api/notes — zoznamy a poznámky (pripnuté hore, potom podľa aktivity). */
 router.get('/', requireAuth, async (c) => {
-  return c.json({ notes: await listNotes() });
+  return c.json({ notes: await listNotes(c.get('user')!.id) });
 });
 
 /** POST /api/notes — nový zoznam/poznámka. */
@@ -60,7 +63,7 @@ router.post('/', requireAuth, zValidator('json', CreateNoteInputSchema), async (
 /** GET /api/notes/:id — detail s položkami. */
 router.get('/:id', requireAuth, async (c) => {
   try {
-    return c.json(await getNote(c.req.param('id')));
+    return c.json(await getNote(c.req.param('id'), c.get('user')!.id));
   } catch (err) {
     const m = mapError(err);
     if (m) return c.json({ error: m.message }, m.status);
@@ -137,6 +140,33 @@ router.delete('/items/:itemId', requireAuth, async (c) => {
   }
 });
 
+/** POST /api/notes/:id/media — pridať fotky (z composera alebo výberu vo feede). */
+router.post('/:id/media', requireAuth, zValidator('json', AddNoteMediaInputSchema), async (c) => {
+  const me = c.get('user')!;
+  if (!rateLimit(`notesedit:${me.id}`, 30, 60_000)) {
+    return c.json({ error: 'Príliš veľa úprav, skús o chvíľu' }, 429);
+  }
+  try {
+    return c.json(await addNoteMedia(c.req.param('id'), me.id, c.req.valid('json').mediaIds));
+  } catch (err) {
+    const m = mapError(err);
+    if (m) return c.json({ error: m.message }, m.status);
+    throw err;
+  }
+});
+
+/** DELETE /api/notes/:id/media/:mediaId — odstrániť fotku z poznámky. */
+router.delete('/:id/media/:mediaId', requireAuth, async (c) => {
+  const me = c.get('user')!;
+  try {
+    return c.json(await removeNoteMedia(c.req.param('id'), me.id, c.req.param('mediaId')));
+  } catch (err) {
+    const m = mapError(err);
+    if (m) return c.json({ error: m.message }, m.status);
+    throw err;
+  }
+});
+
 /** POST /api/notes/:id/duplicate — kópia ako šablóna (odškrtnutie zmizne). */
 router.post(
   '/:id/duplicate',
@@ -161,7 +191,7 @@ router.post(
 /** GET /api/notes/:id/revisions — história verzií textu. */
 router.get('/:id/revisions', requireAuth, async (c) => {
   try {
-    return c.json({ revisions: await listRevisions(c.req.param('id')) });
+    return c.json({ revisions: await listRevisions(c.req.param('id'), c.get('user')!.id) });
   } catch (err) {
     const m = mapError(err);
     if (m) return c.json({ error: m.message }, m.status);

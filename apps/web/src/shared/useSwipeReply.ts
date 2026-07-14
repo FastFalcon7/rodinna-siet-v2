@@ -32,6 +32,8 @@ export function useSwipeReply(onTrigger: () => void) {
   const handlers = {
     onPointerDown: (e: React.PointerEvent) => {
       if (e.pointerType !== 'touch') return;
+      // Ľavá edge zóna patrí swipe-back gestu (useSwipeBack, edgeOnly).
+      if (e.clientX <= 32) return;
       state.current = { x: e.clientX, y: e.clientY, captured: false };
     },
     onPointerMove: (e: React.PointerEvent) => {

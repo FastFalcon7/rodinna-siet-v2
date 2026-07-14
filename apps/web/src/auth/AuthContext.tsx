@@ -6,6 +6,7 @@ import type {
   UpdateProfileInput,
 } from '@rodinna/shared-types';
 import { authApi, usersApi } from '../lib/api';
+import { loadAiSettings } from '../shared/llm';
 
 interface AuthState {
   user: UserPublic | null;
@@ -31,6 +32,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .catch(() => setUser(null))
       .finally(() => setLoading(false));
   }, []);
+
+  // Po prihlásení načítaj globálne AI nastavenie (server je zdroj pravdy).
+  useEffect(() => {
+    if (user) void loadAiSettings();
+  }, [user?.id]);
 
   const login = async (input: LoginInput) => {
     const r = await authApi.login(input);

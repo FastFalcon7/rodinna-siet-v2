@@ -33,6 +33,7 @@ router.patch('/me', requireAuth, zValidator('json', UpdateProfileSchema), async 
     .set({
       ...(input.displayName !== undefined ? { displayName: input.displayName } : {}),
       ...(input.birthday !== undefined ? { birthday: input.birthday } : {}),
+      ...(input.nameColor !== undefined ? { nameColor: input.nameColor } : {}),
     })
     .where(eq(users.id, me.id))
     .returning();

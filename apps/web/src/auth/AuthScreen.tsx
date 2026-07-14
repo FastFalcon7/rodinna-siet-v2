@@ -51,7 +51,7 @@ export function AuthScreen() {
     <main className="min-h-dvh grid place-items-center px-4">
       <div className="w-full max-w-sm">
         <header className="mb-6 text-center">
-          <h1 className="text-2xl font-semibold tracking-tight">Rodinná Sieť</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">Naša rodina</h1>
           <p className="text-sm text-neutral-500 dark:text-neutral-400">
             {mode === 'login' ? 'Prihlás sa' : 'Dokonči registráciu'}
           </p>

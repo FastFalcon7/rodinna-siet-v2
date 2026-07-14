@@ -202,7 +202,6 @@ export const albumsApi = {
   removePhoto: (id: string, mediaId: string) =>
     request<void>(`/albums/${id}/photos/${mediaId}`, { method: 'DELETE' }),
   suggestions: () => request<AlbumSuggestionsResponse>('/albums/suggestions'),
-  downloadUrl: (id: string) => `${API_URL}/albums/${id}/download`,
   getMemory: (mediaId: string) => request<MemoryPublic>(`/albums/memories/${mediaId}`),
   hideMemory: (mediaId: string) =>
     request<{ ok: boolean }>(`/albums/memories/${mediaId}/hide`, { method: 'POST' }),
@@ -278,6 +277,10 @@ export const eventsApi = {
   remove: (id: string) => request<void>(`/events/${id}`, { method: 'DELETE' }),
   rsvp: (id: string, status: RsvpStatus) =>
     request<EventPublic>(`/events/${id}/rsvp`, { method: 'PUT', body: JSON.stringify({ status }) }),
+  addMedia: (id: string, mediaIds: string[]) =>
+    request<EventPublic>(`/events/${id}/media`, { method: 'POST', body: JSON.stringify({ mediaIds }) }),
+  removeMedia: (id: string, mediaId: string) =>
+    request<EventPublic>(`/events/${id}/media/${mediaId}`, { method: 'DELETE' }),
   icsUrl: () => request<IcsUrlResponse>('/events/ics-url'),
 };
 
@@ -294,6 +297,10 @@ export const notesApi = {
   updateItem: (itemId: string, input: UpdateNoteItemInput) =>
     request<NoteDetail>(`/notes/items/${itemId}`, { method: 'PATCH', body: JSON.stringify(input) }),
   removeItem: (itemId: string) => request<NoteDetail>(`/notes/items/${itemId}`, { method: 'DELETE' }),
+  addMedia: (id: string, mediaIds: string[]) =>
+    request<NoteDetail>(`/notes/${id}/media`, { method: 'POST', body: JSON.stringify({ mediaIds }) }),
+  removeMedia: (id: string, mediaId: string) =>
+    request<NoteDetail>(`/notes/${id}/media/${mediaId}`, { method: 'DELETE' }),
   duplicate: (id: string, title?: string) =>
     request<NoteDetail>(`/notes/${id}/duplicate`, { method: 'POST', body: JSON.stringify({ title }) }),
   revisions: (id: string) => request<NoteRevisionsResponse>(`/notes/${id}/revisions`),

@@ -37,7 +37,7 @@ const MAX_PAGE_SIZE = 50;
 async function fetchAuthors(userIds: string[]): Promise<Map<string, PostAuthor>> {
   if (userIds.length === 0) return new Map();
   const rows = await db
-    .select({ id: users.id, displayName: users.displayName, avatarUrl: users.avatarUrl })
+    .select({ id: users.id, displayName: users.displayName, avatarUrl: users.avatarUrl, nameColor: users.nameColor })
     .from(users)
     .where(inArray(users.id, userIds));
   return new Map(rows.map((r) => [r.id, r]));
@@ -315,14 +315,44 @@ async function getOwnPost(postId: string): Promise<PostRow | null> {
   return rows[0] ?? null;
 }
 
-export async function updatePost(postId: string, userId: string, bodyMd: string, viewerId: string): Promise<PostPublic> {
+export async function updatePost(
+  postId: string,
+  userId: string,
+  input: { bodyMd: string; mediaIds?: string[] },
+  viewerId: string,
+): Promise<PostPublic> {
   const post = await getOwnPost(postId);
   if (!post) throw new NotFoundError('Príspevok nenájdený');
   if (post.authorId !== userId) throw new ForbiddenError('Môžeš upraviť len svoj príspevok');
 
+  // Úprava príloh (ladenie 07/2026): mediaIds = kompletná množina po úprave.
+  // Ponechané prílohy prejdú vždy; NOVÉ musia patriť autorovi (ako pri tvorbe).
+  if (input.mediaIds !== undefined) {
+    const next = [...new Set(input.mediaIds)];
+    const current = await db
+      .select({ mediaId: postMedia.mediaId })
+      .from(postMedia)
+      .where(eq(postMedia.postId, postId));
+    const kept = new Set(current.map((c) => c.mediaId));
+    const added = next.filter((id) => !kept.has(id));
+    if (added.length > 0) {
+      const owned = await db
+        .select({ id: media.id })
+        .from(media)
+        .where(and(inArray(media.id, added), eq(media.ownerId, userId)));
+      if (owned.length !== added.length) {
+        throw new ForbiddenError('Niektoré médiá neexistujú alebo nie sú tvoje');
+      }
+    }
+    await db.delete(postMedia).where(eq(postMedia.postId, postId));
+    if (next.length > 0) {
+      await db.insert(postMedia).values(next.map((mediaId, order) => ({ postId, mediaId, order })));
+    }
+  }
+
   const updated = await db
     .update(posts)
-    .set({ bodyMd, editedAt: new Date() })
+    .set({ bodyMd: input.bodyMd, editedAt: new Date() })
     .where(eq(posts.id, postId))
     .returning();
   const [hydrated] = await hydratePosts([updated[0]!], viewerId);

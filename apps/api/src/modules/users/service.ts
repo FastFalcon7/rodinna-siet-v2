@@ -8,6 +8,7 @@ export function toPublicUser(u: UserRow): UserPublic {
     email: u.email,
     displayName: u.displayName,
     avatarUrl: u.avatarUrl,
+    nameColor: u.nameColor,
     role: u.role,
     birthday: u.birthday,
     createdAt: u.createdAt.toISOString(),

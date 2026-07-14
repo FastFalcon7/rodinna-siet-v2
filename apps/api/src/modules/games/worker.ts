@@ -91,6 +91,9 @@ async function pickQuestion(dateIso: string): Promise<string> {
 }
 
 export async function runGamesDaily(now = new Date()): Promise<void> {
+  // Ladenie 07/2026: otázka dňa/týždňa je AI funkcia — bez zapnutia admina nič.
+  const { getAiEnabled } = await import('../settings/service');
+  if (!(await getAiEnabled())) return;
   const author = await systemAuthor();
   if (!author) return;
   const dateIso = now.toISOString().slice(0, 10);

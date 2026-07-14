@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 260 240" width="260" height="240">
+  <g fill="none" stroke="#3f3f46" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" opacity="0.06">
+    <!-- Pes: oválne telo, dlhé visiace uši (slučky), malý čumáčik, mávajúci chvost -->
+    <g transform="translate(20,22) rotate(-6)">
+      <path d="M6 44 Q1 25 20 19 Q40 10 57 21 Q70 29 65 44 Q69 57 53 61 Q34 66 17 60 Q0 56 6 44 Z"/>
+      <circle cx="20" cy="15" r="11"/>
+      <circle cx="8" cy="21" r="5.5"/>
+      <circle cx="6" cy="21" r="1.2" fill="#3f3f46"/>
+      <path d="M12 6 Q-6 10 -8 28 Q-2 27 6 12 Z"/>
+      <path d="M28 6 Q44 12 40 30 Q34 27 26 12 Z"/>
+      <circle cx="18" cy="11" r="1.5" fill="#3f3f46"/>
+      <path d="M20 63 L18 76"/>
+      <path d="M50 61 L53 74"/>
+      <path d="M65 44 Q82 43 86 30 Q90 40 80 46"/>
+    </g>
+    <!-- Macka: trojuholnikove usi, fuziky, stocany chvost -->
+    <g transform="translate(150,10) rotate(5)">
+      <circle cx="22" cy="22" r="15"/>
+      <path d="M8 11 L3 -5 L15 7 Z"/>
+      <path d="M36 11 L41 -5 L29 7 Z"/>
+      <circle cx="17" cy="21" r="1.5" fill="#3f3f46"/>
+      <circle cx="27" cy="21" r="1.5" fill="#3f3f46"/>
+      <path d="M11 26 L2 24 M11 28 L1 30 M33 26 L42 24 M33 28 L43 30"/>
+      <path d="M9 37 Q22 50 35 37 Q37 55 22 59 Q6 55 9 37 Z"/>
+      <path d="M35 48 Q50 44 52 28"/>
+    </g>
+    <!-- Sliepka: hrebienok, zobak, krídlo, chvostove perie, jedna noha -->
+    <g transform="translate(70,148) rotate(-4)">
+      <path d="M10 46 Q2 26 20 16 Q38 6 52 20 Q64 32 56 46 Q61 60 42 65 Q20 68 8 58 Q0 52 10 46 Z"/>
+      <path d="M18 34 Q30 30 34 42 Q26 46 16 42 Z"/>
+      <path d="M50 22 Q62 20 60 28 Q54 28 50 24 Z"/>
+      <path d="M30 8 Q28 -2 33 2 Q35 -4 39 2 Q42 -3 44 4"/>
+      <circle cx="42" cy="18" r="1.6" fill="#3f3f46"/>
+      <path d="M8 44 Q-6 34 -10 20"/>
+      <path d="M6 50 Q-8 44 -14 32"/>
+      <path d="M28 66 L24 80 M24 80 L18 84 M24 80 L30 84"/>
+    </g>
+  </g>
+</svg>

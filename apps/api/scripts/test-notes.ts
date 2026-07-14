@@ -98,7 +98,7 @@ async function seedUser(email: string, displayName: string, role: 'admin' | 'mem
 async function main() {
   await runMigrations();
   await db.execute(
-    dsql`truncate table note_revisions, note_items, notes, memory_marks, album_photos, albums, poll_votes, poll_options, polls, feed_cards, jobs, push_subs, notifications, reactions, message_media, messages, room_members, chat_rooms, post_media, comments, posts, media, sessions, users restart identity cascade`,
+    dsql`truncate table note_rooms, note_revisions, note_items, notes, memory_marks, album_photos, albums, poll_votes, poll_options, polls, feed_cards, jobs, push_subs, notifications, reactions, message_media, messages, room_members, chat_rooms, post_media, comments, posts, media, sessions, users restart identity cascade`,
   );
 
   const server = Bun.serve({
@@ -128,12 +128,66 @@ async function main() {
 
   r = await http(bob.token, 'POST', '/api/notes', {
     kind: 'list',
+    visibility: 'family',
     title: 'Nákup',
     items: ['Mlieko', 'Chlieb', 'Vajcia'],
   });
   check('zoznam s 3 položkami → 201', r.status === 201 && r.body.items.length === 3, r.body.items?.length);
   const listId = r.body.id;
   const [i1, i2] = r.body.items;
+
+  console.log('\n— Viditeľnosť: private/family (ladenie, 7. kolo) —');
+  r = await http(bob.token, 'POST', '/api/notes', { kind: 'note', title: 'Tajný denníček' });
+  check('default viditeľnosť je private', r.status === 201 && r.body.visibility === 'private', r.body.visibility);
+  const privId = r.body.id;
+  r = await http(alica.token, 'GET', `/api/notes/${privId}`);
+  check('cudzia súkromná poznámka → 404 (aj pre admina)', r.status === 404, r.status);
+  r = await http(alica.token, 'GET', '/api/notes');
+  check('súkromná nie je v zozname iných', !r.body.notes.some((n: any) => n.id === privId), r.body.notes?.length);
+  r = await http(bob.token, 'GET', '/api/notes');
+  check('autor svoju súkromnú vidí', r.body.notes.some((n: any) => n.id === privId), r.body.notes?.length);
+  r = await http(alica.token, 'PATCH', `/api/notes/${privId}`, { visibility: 'family' });
+  check('viditeľnosť cudzej poznámky nezmeníš → 404', r.status === 404, r.status);
+  r = await http(bob.token, 'PATCH', `/api/notes/${privId}`, { visibility: 'family' });
+  check('autor prepne na family', r.status === 200 && r.body.visibility === 'family', r.body.visibility);
+  r = await http(alica.token, 'GET', `/api/notes/${privId}`);
+  check('po prepnutí ju vidia ostatní', r.status === 200, r.status);
+  r = await http(alica.token, 'PATCH', `/api/notes/${privId}`, { visibility: 'private' });
+  check('ne-autor neprepne rodinnú na súkromnú → 403', r.status === 403, r.status);
+
+  console.log('\n— Zdieľanie s podskupinou (ladenie, 8. kolo) —');
+  r = await http(alica.token, 'POST', '/api/chat/rooms', {
+    kind: 'group',
+    title: 'Výletníci',
+    memberIds: [bob.id],
+  });
+  check('skupina alica+bob → 201', r.status === 201, r.status);
+  const groupId = r.body.id;
+
+  r = await http(alica.token, 'POST', '/api/notes', {
+    kind: 'list',
+    visibility: 'rooms',
+    roomIds: [groupId],
+    title: 'Zoznam pre výletníkov',
+    items: ['Mapa'],
+  });
+  check('poznámka pre podskupinu → 201', r.status === 201 && r.body.visibility === 'rooms', r.body.visibility);
+  const roomNoteId = r.body.id;
+  r = await http(bob.token, 'GET', `/api/notes/${roomNoteId}`);
+  check('člen skupiny ju vidí', r.status === 200, r.status);
+  r = await http(cyril.token, 'GET', `/api/notes/${roomNoteId}`);
+  check('nečlen ju nevidí → 404', r.status === 404, r.status);
+  r = await http(cyril.token, 'GET', '/api/notes');
+  check('nečlen ju nemá v zozname', !r.body.notes.some((n: any) => n.id === roomNoteId), r.body.notes?.length);
+  r = await http(cyril.token, 'POST', '/api/notes', {
+    kind: 'note',
+    visibility: 'rooms',
+    roomIds: [groupId],
+    title: 'X',
+  });
+  check('zdieľanie s cudzou skupinou → 400', r.status === 400, r.status);
+  r = await http(alica.token, 'POST', '/api/notes', { kind: 'note', visibility: 'rooms', title: 'X' });
+  check("visibility='rooms' bez skupín → 400", r.status === 400, r.status);
 
   const aliceWs = connectWs(alica.token);
   await aliceWs.opened;
@@ -164,7 +218,7 @@ async function main() {
   check('odznačenie (checkedBy zmizne)', r.body.items[0].checkedBy === null, r.body.items[0]);
 
   console.log('\n— Poznámka: revízie —');
-  r = await http(alica.token, 'POST', '/api/notes', { kind: 'note', title: 'Recept', bodyMd: 'verzia 1' });
+  r = await http(alica.token, 'POST', '/api/notes', { kind: 'note', visibility: 'family', title: 'Recept', bodyMd: 'verzia 1' });
   const noteId = r.body.id;
   r = await http(bob.token, 'PATCH', `/api/notes/${noteId}`, { bodyMd: 'verzia 2' });
   check('úprava textu (updatedBy=Bob)', r.body.updatedBy?.displayName === 'Bob' && r.body.bodyMd === 'verzia 2', r.body.updatedBy);

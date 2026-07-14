@@ -5,6 +5,7 @@ import { useAuth } from '../auth/AuthContext';
 import { Avatar } from '../shared/Avatar';
 import { UploadPreviews } from '../shared/UploadPreviews';
 import { useMediaUpload } from '../shared/useMediaUpload';
+import { useAutoGrow } from '../shared/useAutoGrow';
 
 interface PostComposerProps {
   onCreated: (post: PostPublic) => void;
@@ -26,6 +27,8 @@ export function PostComposer({ onCreated, variant = 'card', autoFocus = false }:
   const [error, setError] = useState<string | null>(null);
   const taRef = useRef<HTMLTextAreaElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  // Okno rastie s textom až do polovice obrazovky (ladenie 07/2026).
+  useAutoGrow(taRef, body, 50);
 
   if (!user) return null;
 
@@ -59,10 +62,10 @@ export function PostComposer({ onCreated, variant = 'card', autoFocus = false }:
           maxLength={4000}
           rows={3}
           autoFocus={autoFocus}
-          placeholder="Čo nové v rodine?"
-          className="w-full resize-none rounded-lg border border-neutral-300 bg-transparent px-3 py-2 outline-none focus:border-accent dark:border-neutral-700"
+          placeholder="Čo nové?"
+          className="min-h-20 w-full resize-none rounded-lg border border-neutral-300 bg-transparent px-3 py-2 outline-none focus:border-accent dark:border-neutral-700"
         />
-        <UploadPreviews items={uploads.items} onRemove={uploads.remove} />
+        <UploadPreviews items={uploads.items} onRemove={uploads.remove} onMakeCover={uploads.makeFirst} />
         <div className="flex items-center gap-3">
           <button
             type="button"

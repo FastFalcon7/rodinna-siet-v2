@@ -26,7 +26,7 @@ export function Chat({ initialRoomId = null }: { initialRoomId?: string | null }
   }, [rooms, selectedId]);
 
   return (
-    <div className="flex h-full flex-col bg-white dark:bg-neutral-900">
+    <div className="flex h-full flex-col">
       {!connected && (
         <div className="shrink-0 bg-amber-100 px-3 py-1 text-center text-xs text-amber-800 dark:bg-amber-900/40 dark:text-amber-200">
           Pripájam sa…
@@ -53,7 +53,7 @@ export function Chat({ initialRoomId = null }: { initialRoomId?: string | null }
         <div
           className={
             selectedRoom
-              ? 'fixed inset-0 z-40 bg-white md:static md:z-auto md:min-h-0 dark:bg-neutral-900'
+              ? 'fixed inset-0 z-40 app-bg md:static md:z-auto md:min-h-0'
               : 'hidden min-h-0 md:block'
           }
           style={selectedRoom ? { paddingTop: 'env(safe-area-inset-top)' } : undefined}
