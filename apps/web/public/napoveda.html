@@ -1,0 +1,389 @@
+<!doctype html>
+<html lang="cs">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="robots" content="noindex" />
+  <title>Rodinná síť — nápověda a průvodce</title>
+  <style>
+    :root {
+      --bg: #f6f7f9;
+      --card: #ffffff;
+      --text: #1a1d21;
+      --muted: #5c6570;
+      --border: #e4e7eb;
+      --accent: #2f6f4f;
+      --accent-soft: #e7f1ec;
+      --code-bg: #f0f2f4;
+      --radius: 16px;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #0f1114;
+        --card: #171a1f;
+        --text: #e8eaed;
+        --muted: #9aa3ad;
+        --border: #2a2f36;
+        --accent: #5cba8a;
+        --accent-soft: #17271f;
+        --code-bg: #21262d;
+      }
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font: 16px/1.65 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+    .wrap { max-width: 760px; margin: 0 auto; padding: 24px 20px 96px; }
+    header.hero {
+      background: linear-gradient(135deg, var(--accent) 0%, #234f3a 100%);
+      color: #fff;
+      border-radius: var(--radius);
+      padding: 32px 28px;
+      margin-bottom: 28px;
+    }
+    header.hero h1 { margin: 0 0 6px; font-size: 26px; line-height: 1.2; }
+    header.hero p { margin: 0; opacity: .92; font-size: 15px; }
+    .badge {
+      display: inline-block; font-size: 12px; font-weight: 600;
+      background: rgba(255,255,255,.18); padding: 4px 10px; border-radius: 999px;
+      margin-bottom: 14px; letter-spacing: .02em;
+    }
+    nav.toc {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 18px 22px; margin-bottom: 28px;
+    }
+    nav.toc h2 { margin: 0 0 10px; font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+    nav.toc ol { margin: 0; padding-left: 20px; columns: 2; column-gap: 28px; }
+    @media (max-width: 520px) { nav.toc ol { columns: 1; } }
+    nav.toc li { margin: 4px 0; break-inside: avoid; }
+    nav.toc a { color: var(--text); text-decoration: none; }
+    nav.toc a:hover { color: var(--accent); text-decoration: underline; }
+    section.card {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 24px 26px; margin-bottom: 20px;
+    }
+    section.card > h2 {
+      margin: 0 0 14px; font-size: 20px; scroll-margin-top: 16px;
+      display: flex; align-items: center; gap: 10px;
+    }
+    section.card h3 { margin: 22px 0 8px; font-size: 16px; }
+    p { margin: 10px 0; }
+    ul, ol.steps { margin: 10px 0; padding-left: 22px; }
+    li { margin: 6px 0; }
+    a { color: var(--accent); }
+    strong { font-weight: 650; }
+    code, kbd {
+      background: var(--code-bg); border-radius: 6px; padding: 2px 6px;
+      font: 13px/1.4 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    }
+    .emoji { font-size: 20px; line-height: 1; }
+    .callout {
+      display: flex; gap: 12px; align-items: flex-start;
+      background: var(--accent-soft); border-radius: 12px;
+      padding: 14px 16px; margin: 16px 0; font-size: 15px;
+    }
+    .callout .ico { font-size: 20px; line-height: 1.4; flex-shrink: 0; }
+    .callout.warn { background: #fdf0e4; }
+    @media (prefers-color-scheme: dark) { .callout.warn { background: #2a2015; } }
+    ol.steps { counter-reset: step; list-style: none; padding-left: 0; }
+    ol.steps > li {
+      position: relative; padding-left: 42px; margin: 14px 0;
+    }
+    ol.steps > li::before {
+      counter-increment: step; content: counter(step);
+      position: absolute; left: 0; top: 0;
+      width: 28px; height: 28px; border-radius: 50%;
+      background: var(--accent); color: #fff; font-size: 14px; font-weight: 700;
+      display: grid; place-items: center;
+    }
+    .platform-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 16px 0; }
+    @media (max-width: 560px) { .platform-grid { grid-template-columns: 1fr; } }
+    .platform {
+      border: 1px solid var(--border); border-radius: 12px; padding: 16px;
+    }
+    .platform h4 { margin: 0 0 8px; font-size: 15px; display: flex; align-items: center; gap: 8px; }
+    .platform ol { padding-left: 20px; margin: 0; font-size: 14.5px; }
+    footer { text-align: center; color: var(--muted); font-size: 13px; margin-top: 32px; }
+    .top-link { display: inline-block; margin-top: 10px; font-size: 13px; color: var(--muted); text-decoration: none; }
+    .top-link:hover { color: var(--accent); }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header class="hero" id="top">
+      <span class="badge">Průvodce pro nové členy</span>
+      <h1>Rodinná síť — vítejte doma</h1>
+      <p>Naše soukromá rodinná síť. Žádné reklamy, žádní cizí lidé, nic se nesdílí ven. Jen my. Tady je vše, co potřebujete vědět, abyste se přihlásili a začali.</p>
+    </header>
+
+    <nav class="toc">
+      <h2>Obsah</h2>
+      <ol>
+        <li><a href="#start">Rychlý start (5 minut)</a></li>
+        <li><a href="#instalace">Přidání na plochu</a></li>
+        <li><a href="#notifikace">Notifikace</a></li>
+        <li><a href="#ovladani">Ovládání aplikace</a></li>
+        <li><a href="#feed">Feed</a></li>
+        <li><a href="#chat">Chat</a></li>
+        <li><a href="#alba">Alba</a></li>
+        <li><a href="#seznamy">Seznamy a poznámky</a></li>
+        <li><a href="#kalendar">Kalendář</a></li>
+        <li><a href="#denik">Deník</a></li>
+        <li><a href="#ankety">Ankety a denní obsah</a></li>
+        <li><a href="#kvizy">Kvízy</a></li>
+        <li><a href="#hry">Hry</a></li>
+        <li><a href="#svet">Svět okolo</a></li>
+        <li><a href="#profil">Profil a nastavení</a></li>
+        <li><a href="#problemy">Řešení problémů</a></li>
+      </ol>
+    </nav>
+
+    <!-- RYCHLÝ START -->
+    <section class="card">
+      <h2 id="start"><span class="emoji">🚀</span> Rychlý start (5 minut)</h2>
+      <p>Do rodinné sítě se dostanete přes <strong>pozvánku</strong> — jednorázový odkaz, který jste dostali e-mailem. Aplikace se nestahuje z App Store ani Google Play; běží přímo v prohlížeči a dá se přidat na plochu jako běžná aplikace.</p>
+      <div class="callout"><span class="ico">🇸🇰</span><div>Aplikace je <strong>ve slovenštině</strong> (tlačítka jako „Viac", „Zoznamy a poznámky", „Veľkosť písma"). Tento průvodce je česky, ale názvy tlačítek najdete na obrazovce ve slovenském znění.</div></div>
+      <ol class="steps">
+        <li><strong>Otevřete odkaz z e-mailu</strong> na telefonu, tabletu nebo počítači. Odkaz vypadá jako <code>rodina-sm.synology.me/register?token=…</code></li>
+        <li><strong>Vyplňte registraci.</strong> E-mail je už předvyplněný. Doplňte <strong>jméno, které uvidí ostatní</strong> (např. „Babička Jana") a zvolte si <strong>heslo (alespoň 10 znaků)</strong>.</li>
+        <li><strong>Potvrďte</strong> — a jste uvnitř. Rovnou uvidíte rodinný Feed.</li>
+        <li><strong>Přidejte aplikaci na plochu</strong> (viz níže) — ať ji máte po ruce jako ikonu a chodí vám notifikace.</li>
+        <li><strong>Povolte notifikace</strong> — ať vám neuteče nová fotka, zpráva ani gratulace k narozeninám.</li>
+      </ol>
+      <div class="callout warn">
+        <span class="ico">⏳</span>
+        <div>Pozvánkový odkaz platí <strong>7 dní</strong> a dá se použít <strong>jen jednou</strong>. Je osobní — <strong>neposílejte ho dál</strong>. Pokud vám vyprší, řekněte o novou tomu, kdo síť spravuje (správci rodiny).</div>
+      </div>
+      <a class="top-link" href="#top">↑ nahoru</a>
+    </section>
+
+    <!-- INSTALACE -->
+    <section class="card">
+      <h2 id="instalace"><span class="emoji">📱</span> Přidání na plochu</h2>
+      <p>Tímto krokem se z webu stane ikona na ploše telefonu — otevírá se na celou obrazovku jako opravdová aplikace a umožní notifikace. Udělejte to hned po prvním přihlášení.</p>
+      <div class="platform-grid">
+        <div class="platform">
+          <h4><span class="emoji">🍎</span> iPhone / iPad (Safari)</h4>
+          <ol>
+            <li>Otevřete síť v prohlížeči <strong>Safari</strong>.</li>
+            <li>Ťukněte dole na ikonu <strong>Sdílet</strong> (čtvereček se šipkou nahoru).</li>
+            <li>Vyberte <strong>Přidat na plochu</strong>.</li>
+            <li>Potvrďte <strong>Přidat</strong>.</li>
+          </ol>
+        </div>
+        <div class="platform">
+          <h4><span class="emoji">🤖</span> Android (Chrome)</h4>
+          <ol>
+            <li>Otevřete síť v prohlížeči <strong>Chrome</strong>.</li>
+            <li>Ťukněte na <strong>⋮</strong> vpravo nahoře (nebo na nabídku „Instalovat aplikaci").</li>
+            <li>Vyberte <strong>Nainstalovat aplikaci</strong> / <strong>Přidat na plochu</strong>.</li>
+            <li>Potvrďte.</li>
+          </ol>
+        </div>
+      </div>
+      <div class="callout">
+        <span class="ico">💡</span>
+        <div>Na počítači to není potřeba — stačí si stránku uložit do záložek. V aplikaci najdete tlačítko <strong>„Nainstalovat appku"</strong> i v sekci <strong>Více</strong>.</div>
+      </div>
+      <a class="top-link" href="#top">↑ nahoru</a>
+    </section>
+
+    <!-- NOTIFIKACE -->
+    <section class="card">
+      <h2 id="notifikace"><span class="emoji">🔔</span> Notifikace</h2>
+      <p>Notifikace vás upozorní na nové zprávy v chatu, příspěvky, reakce, gratulace k narozeninám nebo výzvu do hry — i když aplikaci zrovna nemáte otevřenou.</p>
+      <ol class="steps">
+        <li>Otevřete sekci <strong>Více</strong> (vpravo dole).</li>
+        <li>Najděte <strong>Notifikace</strong> a povolte je.</li>
+        <li>Prohlížeč se zeptá na svolení — ťukněte <strong>Povolit</strong>.</li>
+      </ol>
+      <div class="callout warn">
+        <span class="ico">🍎</span>
+        <div>Na iPhonu/iPadu fungují notifikace <strong>až poté, co si aplikaci přidáte na plochu</strong> (viz krok výše) a otevřete ji z té ikony. To je vlastnost systému iOS, ne chyba.</div>
+      </div>
+      <p>V nastavení Notifikací si můžete vybrat, o čem chcete být informováni, a co vás naopak nemá rušit.</p>
+      <a class="top-link" href="#top">↑ nahoru</a>
+    </section>
+
+    <!-- OVLÁDÁNÍ -->
+    <section class="card">
+      <h2 id="ovladani"><span class="emoji">🧭</span> Ovládání aplikace</h2>
+      <p>Celá aplikace se ovládá <strong>spodní lištou</strong> (ikony). Většina věcí je na dva klepnutí.</p>
+      <ul>
+        <li><strong>Spodní lišta</strong> — hlavní části: <strong>Feed</strong>, <strong>Chat</strong>, <strong>Alba</strong>, <strong>Seznamy</strong>, <strong>Kalendář</strong> a <strong>Více</strong> (slovensky „Viac").</li>
+        <li><strong>Více</strong> — sem se schovává zbytek: Deník, Kvízy, Hry a všechna nastavení — profil, vzhled, velikost písma, notifikace a (pro správce) pozvánky a přepínač AI funkcí.</li>
+        <li><strong>Reakce</strong> — na příspěvek nebo zprávu reagujete emotikonem. Na výběr je <span class="emoji">👍 ❤️ 😂 😮 😢 🙏 🎉 👏 🔥 😍 🥰 🤔</span>. Klepnutím na jiný emotikon reakci změníte, klepnutím na stejný ji zrušíte.</li>
+        <li><strong>Rychlá reakce</strong> — ve Feedu <strong>podržte</strong> příspěvek a vyberte emotikon.</li>
+        <li><strong>Odpověď v chatu</strong> — <strong>přejeďte prstem</strong> po zprávě doprava (swipe), nebo ji podržte a zvolte <strong>Odpovědět</strong>.</li>
+        <li><strong>Fotky a přílohy</strong> — u psaní příspěvku či zprávy je ikona pro přidání fotky, videa, souboru nebo polohy.</li>
+        <li><strong>Tmavý režim</strong> — Více → <strong>Vzhled</strong>. Přizpůsobí se i systému telefonu.</li>
+        <li><strong>Velikost písma</strong> — Více → <strong>Veľkosť písma</strong>: Normální / Větší / Největší. Zvětší celou aplikaci — praktické pro babičky a dědečky.</li>
+      </ul>
+      <a class="top-link" href="#top">↑ nahoru</a>
+    </section>
+
+    <!-- FEED -->
+    <section class="card">
+      <h2 id="feed"><span class="emoji">🏠</span> Feed</h2>
+      <p>Domovská nástěnka rodiny — sem se píše, co je nového. Jako zeď na sociální síti, ale jen pro nás.</p>
+      <ul>
+        <li><strong>Napsat příspěvek</strong> — text a až <strong>10 fotek</strong> najednou.</li>
+        <li><strong>Komentáře</strong> — dá se odpovídat i na komentáře (do několika úrovní).</li>
+        <li><strong>Reakce</strong> — rychlé emoji bez psaní.</li>
+        <li><strong>Úpravy</strong> — svůj příspěvek můžete kdykoli upravit nebo smazat.</li>
+        <li><strong>Starší příspěvky</strong> — tlačítkem <strong>„Načíst starší"</strong> dole.</li>
+      </ul>
+      <div class="callout"><span class="ico">✨</span><div>Ve Feedu se objevují i „živé karty" z ostatních částí — třeba anketa, nové album nebo připomínka narozenin. Dají se rovnou odbavit přímo z Feedu.</div></div>
+      <a class="top-link" href="#top">↑ nahoru</a>
+    </section>
+
+    <!-- CHAT -->
+    <section class="card">
+      <h2 id="chat"><span class="emoji">💬</span> Chat</h2>
+      <p>Zprávy v reálném čase — na úrovni WhatsAppu, ale soukromě u nás.</p>
+      <ul>
+        <li><strong>Rodina</strong> — společná místnost, kde jsou všichni členové.</li>
+        <li><strong>Soukromé zprávy</strong> — jeden na jednoho s kýmkoli z rodiny.</li>
+        <li><strong>Skupiny</strong> — vlastní konverzace pro část rodiny.</li>
+        <li><strong>Přílohy</strong> — fotky, videa, soubory i poloha.</li>
+        <li><strong>Odpovědi</strong> — swipe po zprávě doprava.</li>
+        <li><strong>Signály</strong> — vidíte, kdo je online, kdo právě píše (<em>…píše</em>) a že zpráva byla přečtena (✓✓).</li>
+      </ul>
+      <a class="top-link" href="#top">↑ nahoru</a>
+    </section>
+
+    <!-- ALBA -->
+    <section class="card">
+      <h2 id="alba"><span class="emoji">🖼️</span> Alba</h2>
+      <p>Společné fotoalbum rodiny — tady zůstávají vzpomínky pohromadě, ne roztroušené v chatu.</p>
+      <ul>
+        <li><strong>Vytvořit album</strong> (např. „Léto 2026", „Vánoce") a nahrát do něj fotky.</li>
+        <li><strong>Přispívat</strong> může více lidí do jednoho alba.</li>
+        <li><strong>Reakce</strong> u jednotlivých fotek.</li>
+        <li>Nové album se ohlásí i ve <strong>Feedu</strong> jako karta s náhledem.</li>
+      </ul>
+      <a class="top-link" href="#top">↑ nahoru</a>
+    </section>
+
+    <!-- SEZNAMY -->
+    <section class="card">
+      <h2 id="seznamy"><span class="emoji">✅</span> Seznamy a poznámky</h2>
+      <p>Společný nákupní seznam, seznam úkolů nebo sdílené poznámky. Ve spodní liště, ikona <strong>Seznamy a poznámky</strong> („Zoznamy a poznámky").</p>
+      <ul>
+        <li><strong>Odškrtávací seznamy</strong> — nákup, co zabalit na výlet, úkoly.</li>
+        <li><strong>Sdílené v reálném čase</strong> — když někdo odškrtne položku, hned to vidí i ostatní.</li>
+        <li>Seznam se dá <strong>poslat do chatu</strong> jako živá karta, kde se dá rovnou odškrtávat.</li>
+      </ul>
+      <a class="top-link" href="#top">↑ nahoru</a>
+    </section>
+
+    <!-- KALENDÁŘ -->
+    <section class="card">
+      <h2 id="kalendar"><span class="emoji">📅</span> Kalendář</h2>
+      <p>Rodinné události a narozeniny na jednom místě. Ve spodní liště, ikona <strong>Kalendář</strong> („Kalendár").</p>
+      <ul>
+        <li><strong>Události</strong> — sraz, oslava, výlet; ostatní je uvidí.</li>
+        <li><strong>Narozeniny</strong> — připomenou se automaticky.</li>
+        <li><strong>Napojení do vlastního kalendáře</strong> (ICS) — události rodiny se dají zobrazit i v telefonním kalendáři. Pokud tuhle možnost správce zapnul, najdete odkaz u kalendáře.</li>
+      </ul>
+      <a class="top-link" href="#top">↑ nahoru</a>
+    </section>
+
+    <!-- DENÍK -->
+    <section class="card">
+      <h2 id="denik"><span class="emoji">📔</span> Deník</h2>
+      <p>Osobní zápisky — <strong>soukromé, jen pro vás</strong>. Ve <strong>Více → Denník</strong>.</p>
+      <ul>
+        <li>Zapisujte si, jak šel den, nálady, myšlenky.</li>
+        <li>Je to <strong>váš prostor</strong> — ostatní členové vaše zápisky nevidí.</li>
+        <li>Aplikace umí zápisky chytře propojit a pomoct se v nich vyznat (chytrý pomocník).</li>
+      </ul>
+      <div class="callout warn"><span class="ico">🤖</span><div>Deník je jednou z <strong>AI funkcí</strong>. Zobrazí se, jen když je správce rodiny zapne (Více → <strong>AI funkcie</strong>). Pokud ho v nabídce nevidíte, nejsou AI funkce zatím zapnuté.</div></div>
+      <a class="top-link" href="#top">↑ nahoru</a>
+    </section>
+
+    <!-- ANKETY -->
+    <section class="card">
+      <h2 id="ankety"><span class="emoji">🗳️</span> Ankety a denní obsah</h2>
+      <h3>Ankety</h3>
+      <p>Rychlé hlasování rodiny — „Kam na výlet?", „Kdy se sejdeme?". Anketa se objeví přímo ve <strong>Feedu</strong> a hlasuje se na jedno klepnutí.</p>
+      <h3>Denní otázka</h3>
+      <p>Každý den jedna vtipná či milá otázka pro celou rodinu — jednoduchý způsob, jak se něco dozvědět i o těch, které vídáte málo. Patří mezi <strong>AI funkce</strong> (zapíná správce).</p>
+      <h3>Foto výzva</h3>
+      <p>Společné téma na fotku („ukaž svůj oběd", „výhled z okna") — každý přidá svou a je z toho hezká koláž.</p>
+      <a class="top-link" href="#top">↑ nahoru</a>
+    </section>
+
+    <!-- KVÍZY -->
+    <section class="card">
+      <h2 id="kvizy"><span class="emoji">🧠</span> Kvízy</h2>
+      <p>Zábavné kvízy na libovolné téma. Ve <strong>Více → Kvízy</strong>.</p>
+      <ul>
+        <li><strong>Zadáte téma</strong> a aplikace k němu připraví otázky.</li>
+        <li>Kvíz vyplní více členů — hodí se na společné večery.</li>
+      </ul>
+      <div class="callout warn"><span class="ico">🤖</span><div>Kvízy jsou <strong>AI funkce</strong> — v nabídce se objeví, až je správce rodiny zapne (Více → <strong>AI funkcie</strong>).</div></div>
+      <a class="top-link" href="#top">↑ nahoru</a>
+    </section>
+
+    <!-- HRY -->
+    <section class="card">
+      <h2 id="hry"><span class="emoji">🎮</span> Hry</h2>
+      <ul>
+        <li><strong>Piškvorky</strong> (10×10) — zahrajte si proti někomu z rodiny nebo <strong>proti počítači</strong> (Více → Piškvorky proti počítači).</li>
+        <li><strong>Výzvy</strong> — vyzvěte konkrétního člena; přijde mu notifikace „vyzval tě na piškvorky".</li>
+      </ul>
+      <a class="top-link" href="#top">↑ nahoru</a>
+    </section>
+
+    <!-- SVĚT OKOLO -->
+    <section class="card">
+      <h2 id="svet"><span class="emoji">🌍</span> Svět okolo</h2>
+      <p>Vybrané novinky a zajímavosti z okolního světa na jednom místě, ať máte o čem povídat. Obsah se aktualizuje sám.</p>
+      <a class="top-link" href="#top">↑ nahoru</a>
+    </section>
+
+    <!-- PROFIL -->
+    <section class="card">
+      <h2 id="profil"><span class="emoji">⚙️</span> Profil a nastavení</h2>
+      <p>Vše ve <strong>Více</strong>:</p>
+      <ul>
+        <li><strong>Profil</strong> — změna zobrazovaného jména a <strong>profilové fotky</strong>.</li>
+        <li><strong>Vzhled</strong> — světlý / tmavý režim.</li>
+        <li><strong>Velikost písma</strong> („Veľkosť písma") — Normální / Větší / Největší.</li>
+        <li><strong>Notifikace</strong> — co a jak vás upozorní.</li>
+        <li><strong>Odhlásit</strong> — nahoře v sekci Více.</li>
+        <li><strong>AI funkce</strong> — vidí jen <strong>správce</strong>: společný přepínač pro celou rodinu, který zapíná Deník, Kvízy a otázku dne/týdne.</li>
+        <li><strong>Pozvat člena</strong> — vidí jen <strong>správce</strong>. Vytvoří odkaz, který pošlete novému členovi.</li>
+      </ul>
+      <div class="callout"><span class="ico">🔒</span><div><strong>Soukromí:</strong> síť je jen pro pozvané (max 10 lidí), běží na vlastním rodinném úložišti (NAS), nic se nesdílí s reklamními firmami a z fotek se odstraňují údaje o poloze.</div></div>
+      <a class="top-link" href="#top">↑ nahoru</a>
+    </section>
+
+    <!-- PROBLÉMY -->
+    <section class="card">
+      <h2 id="problemy"><span class="emoji">🛟</span> Řešení problémů</h2>
+      <h3>Odkaz z pozvánky nefunguje / hlásí neplatný</h3>
+      <p>Pozvánka platí 7 dní a jde použít jen jednou. Pokud vypršela nebo už byla použita, požádejte správce rodiny o novou.</p>
+      <h3>Nechodí mi notifikace</h3>
+      <p>Zkontrolujte, že máte aplikaci <strong>přidanou na plochu</strong> a otevíráte ji z té ikony (hlavně na iPhonu), a že jsou notifikace <strong>povolené ve Více → Notifikace</strong> i v nastavení telefonu.</p>
+      <h3>Zapomněl(a) jsem heslo</h3>
+      <p>Kontaktujte správce rodiny — pomůže vám s obnovením přístupu.</p>
+      <h3>Nejde nahrát fotka nebo video</h3>
+      <p>Velmi velké soubory mohou překročit limit. Zkuste kratší video nebo počkejte na lepší připojení; aplikace velká videa sama zmenšuje, chvíli to může trvat.</p>
+      <h3>Aplikace se tváří „postaru" / něco nesedí</h3>
+      <p>Zavřete a znovu otevřete aplikaci. Když běží z plochy, občas pomůže ji úplně ukončit a spustit znovu, aby se načetla nejnovější verze.</p>
+      <a class="top-link" href="#top">↑ nahoru</a>
+    </section>
+
+    <footer>
+      <p>Rodinná síť · soukromá rodinná aplikace · tato nápověda je dostupná i uvnitř aplikace ve <strong>Více → Nápověda</strong>.</p>
+    </footer>
+  </div>
+</body>
+</html>

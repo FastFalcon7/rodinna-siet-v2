@@ -45,3 +45,7 @@ coverage/
 
 # Synology junk
 @eaDir/
+
+# Vygenerované pozývacie e-maily (obsahujú živé tokeny) — create-invite.ts
+invite-*.html
+!invite-email.template.html
