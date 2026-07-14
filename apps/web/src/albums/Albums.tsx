@@ -151,15 +151,17 @@ function SuggestionBanner({
 function NewAlbumButton({ onCreated }: { onCreated: (albumId: string) => void }) {
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState('');
+  const [description, setDescription] = useState('');
   const [busy, setBusy] = useState(false);
 
   const create = async () => {
     if (!title.trim() || busy) return;
     setBusy(true);
     try {
-      const album = await albumsApi.create({ title: title.trim(), description: '', mediaIds: [] });
+      const album = await albumsApi.create({ title: title.trim(), description: description.trim(), mediaIds: [] });
       setOpen(false);
       setTitle('');
+      setDescription('');
       onCreated(album.id);
     } finally {
       setBusy(false);
@@ -177,7 +179,7 @@ function NewAlbumButton({ onCreated }: { onCreated: (albumId: string) => void })
     );
   }
   return (
-    <div className="flex gap-2 rounded-2xl border border-neutral-200 bg-white p-3 dark:border-neutral-800 dark:bg-neutral-900">
+    <div className="space-y-2 rounded-2xl border border-neutral-200 bg-white p-3 dark:border-neutral-800 dark:bg-neutral-900">
       <input
         value={title}
         onChange={(e) => setTitle(e.target.value)}
@@ -185,15 +187,28 @@ function NewAlbumButton({ onCreated }: { onCreated: (albumId: string) => void })
         autoFocus
         maxLength={120}
         placeholder="Názov albumu (napr. Leto 2026)"
-        className="min-w-0 flex-1 rounded-lg border border-neutral-300 bg-transparent px-3 py-1.5 text-sm outline-none focus:border-accent dark:border-neutral-700"
+        className="w-full rounded-lg border border-neutral-300 bg-transparent px-3 py-1.5 text-sm outline-none focus:border-accent dark:border-neutral-700"
       />
-      <button
-        onClick={() => void create()}
-        disabled={!title.trim() || busy}
-        className="rounded-lg bg-accent px-3 py-1.5 text-sm font-medium text-white disabled:opacity-40"
-      >
-        Vytvoriť
-      </button>
+      <textarea
+        value={description}
+        onChange={(e) => setDescription(e.target.value)}
+        rows={2}
+        maxLength={2000}
+        placeholder="Komentár k albumu (voliteľné)"
+        className="w-full resize-none rounded-lg border border-neutral-300 bg-transparent px-3 py-1.5 text-sm outline-none focus:border-accent dark:border-neutral-700"
+      />
+      <div className="flex gap-2">
+        <button onClick={() => setOpen(false)} className="ml-auto rounded-lg px-3 py-1.5 text-sm text-neutral-500">
+          Zrušiť
+        </button>
+        <button
+          onClick={() => void create()}
+          disabled={!title.trim() || busy}
+          className="rounded-lg bg-accent px-3 py-1.5 text-sm font-medium text-white disabled:opacity-40"
+        >
+          Vytvoriť
+        </button>
+      </div>
     </div>
   );
 }
@@ -457,14 +472,21 @@ function AlbumDetailView({ albumId, onBack }: { albumId: string; onBack: () => v
           className="fixed inset-x-0 bottom-0 z-40 flex items-center gap-2 border-t border-neutral-200 bg-white/95 px-4 py-3 backdrop-blur-xl dark:border-neutral-800 dark:bg-neutral-900/95"
           style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}
         >
-          <span className="shrink-0 text-sm text-neutral-500">Vybraté: {selected.size}</span>
           <button
+            type="button"
             onClick={toggleSelectAll}
-            className="shrink-0 rounded-lg border border-neutral-300 px-2.5 py-1 text-sm transition hover:border-accent hover:text-accent dark:border-neutral-700"
+            className="flex min-w-0 items-center gap-1.5 text-sm text-neutral-600 dark:text-neutral-300"
           >
-            {allSelected ? 'Zrušiť všetko' : 'Vybrať všetko'}
+            <span
+              className={`grid h-6 w-6 shrink-0 place-items-center rounded-md border text-xs font-bold ${
+                allSelected ? 'border-accent bg-accent text-white' : 'border-neutral-400 text-transparent dark:border-neutral-600'
+              }`}
+            >
+              ✓
+            </span>
+            <span className="truncate">{selected.size > 0 ? `${selected.size} vybraných` : 'Vybrať všetko'}</span>
           </button>
-          <div className="ml-auto">
+          <div className="ml-auto flex shrink-0 items-center gap-2">
             <MediaTargetButtons disabled={selected.size === 0} onPick={setPicker} />
           </div>
         </div>

@@ -16,6 +16,7 @@ interface AlbumPickerDialogProps {
 export function AlbumPickerDialog({ mediaIds, onClose }: AlbumPickerDialogProps) {
   const [albums, setAlbums] = useState<AlbumSummary[] | null>(null);
   const [newTitle, setNewTitle] = useState('');
+  const [newDesc, setNewDesc] = useState('');
   const [creating, setCreating] = useState(false);
   const [busy, setBusy] = useState(false);
   const [savedTo, setSavedTo] = useState<string | null>(null);
@@ -52,7 +53,7 @@ export function AlbumPickerDialog({ mediaIds, onClose }: AlbumPickerDialogProps)
     setBusy(true);
     setError(null);
     try {
-      await albumsApi.create({ title, description: '', mediaIds });
+      await albumsApi.create({ title, description: newDesc.trim(), mediaIds });
       finish(title);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Album sa nepodarilo vytvoriť');
@@ -107,7 +108,7 @@ export function AlbumPickerDialog({ mediaIds, onClose }: AlbumPickerDialogProps)
             )}
 
             {creating ? (
-              <div className="mt-3 flex gap-2">
+              <div className="mt-3 space-y-2">
                 <input
                   value={newTitle}
                   onChange={(e) => setNewTitle(e.target.value)}
@@ -115,15 +116,23 @@ export function AlbumPickerDialog({ mediaIds, onClose }: AlbumPickerDialogProps)
                   autoFocus
                   maxLength={120}
                   placeholder="Názov albumu (napr. Leto 2026)"
-                  className="min-w-0 flex-1 rounded-lg border border-neutral-300 bg-transparent px-3 py-1.5 text-sm outline-none focus:border-accent dark:border-neutral-700"
+                  className="w-full rounded-lg border border-neutral-300 bg-transparent px-3 py-1.5 text-sm outline-none focus:border-accent dark:border-neutral-700"
+                />
+                <textarea
+                  value={newDesc}
+                  onChange={(e) => setNewDesc(e.target.value)}
+                  rows={2}
+                  maxLength={2000}
+                  placeholder="Komentár k albumu (voliteľné)"
+                  className="w-full resize-none rounded-lg border border-neutral-300 bg-transparent px-3 py-1.5 text-sm outline-none focus:border-accent dark:border-neutral-700"
                 />
                 <button
                   type="button"
                   onClick={() => void createAndSave()}
                   disabled={!newTitle.trim() || busy}
-                  className="rounded-lg bg-accent px-3 py-1.5 text-sm font-medium text-white disabled:opacity-40"
+                  className="w-full rounded-lg bg-accent px-3 py-1.5 text-sm font-medium text-white disabled:opacity-40"
                 >
-                  Vytvoriť
+                  Vytvoriť album
                 </button>
               </div>
             ) : (

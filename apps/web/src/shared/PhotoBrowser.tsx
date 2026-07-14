@@ -38,6 +38,10 @@ export function PhotoBrowser({ images, onClose, onRemove }: PhotoBrowserProps) {
       return next;
     });
 
+  const allSelected = images.length > 0 && selected.size === images.length;
+  const toggleSelectAll = () =>
+    setSelected(allSelected ? new Set() : new Set(images.map((m) => m.id)));
+
   const openPicker = (kind: Exclude<PickerKind, null>) => {
     setPickerIds([...selected]);
     setPicker(kind);
@@ -134,26 +138,41 @@ export function PhotoBrowser({ images, onClose, onRemove }: PhotoBrowserProps) {
         </div>
       </div>
 
-      {/* Akčná lišta výberu */}
+      {/* Akčná lišta výberu — jeden riadok: vľavo výber všetkého + počet, vpravo ikony. */}
       {selecting && (
         <div
-          className="flex shrink-0 flex-wrap items-center gap-2 border-t border-neutral-200 bg-white/95 px-3 py-2.5 dark:border-neutral-800 dark:bg-neutral-900/95"
+          className="flex shrink-0 items-center gap-2 border-t border-neutral-200 bg-white/95 px-3 py-2.5 dark:border-neutral-800 dark:bg-neutral-900/95"
           style={{ paddingBottom: 'max(0.625rem, env(safe-area-inset-bottom))' }}
         >
-          <span className="min-w-0 flex-1 truncate text-sm text-neutral-500">Vybraté: {selected.size}</span>
-          <MediaTargetButtons disabled={selected.size === 0 || busy} onPick={openPicker} />
-          {onRemove && (
-            <button
-              type="button"
-              onClick={() => void bulkRemove()}
-              disabled={selected.size === 0 || busy}
-              title="Odstrániť vybrané"
-              aria-label="Odstrániť vybrané"
-              className="grid h-10 w-10 place-items-center rounded-xl border border-red-300 text-red-600 disabled:opacity-40 dark:border-red-900"
+          <button
+            type="button"
+            onClick={toggleSelectAll}
+            className="flex min-w-0 items-center gap-1.5 text-sm text-neutral-600 dark:text-neutral-300"
+          >
+            <span
+              className={`grid h-6 w-6 shrink-0 place-items-center rounded-md border text-xs font-bold ${
+                allSelected ? 'border-accent bg-accent text-white' : 'border-neutral-400 text-transparent dark:border-neutral-600'
+              }`}
             >
-              🗑
-            </button>
-          )}
+              ✓
+            </span>
+            <span className="truncate">{selected.size > 0 ? `${selected.size} vybraných` : 'Vybrať všetko'}</span>
+          </button>
+          <div className="ml-auto flex shrink-0 items-center gap-2">
+            <MediaTargetButtons disabled={selected.size === 0 || busy} onPick={openPicker} />
+            {onRemove && (
+              <button
+                type="button"
+                onClick={() => void bulkRemove()}
+                disabled={selected.size === 0 || busy}
+                title="Odstrániť vybrané"
+                aria-label="Odstrániť vybrané"
+                className="grid h-10 w-10 place-items-center rounded-xl border border-red-300 text-red-600 disabled:opacity-40 dark:border-red-900"
+              >
+                🗑
+              </button>
+            )}
+          </div>
         </div>
       )}
 
