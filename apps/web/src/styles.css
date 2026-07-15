@@ -7,6 +7,7 @@
 @theme inline {
   --color-accent: var(--color-accent);
   --color-accent-teal: var(--color-accent-teal);
+  --color-bubble-mine: var(--color-bubble-mine);
   --font-sans: var(--font-sans);
 }
 
