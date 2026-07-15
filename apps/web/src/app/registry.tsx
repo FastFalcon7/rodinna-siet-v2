@@ -60,7 +60,7 @@ function useChatBadge(): number {
 export const webModules: WebModule[] = [
   {
     name: 'feed',
-    label: 'Feed',
+    label: 'Novinky',
     icon: HomeIcon,
     slot: 'bar',
     layout: 'scroll',
@@ -68,7 +68,7 @@ export const webModules: WebModule[] = [
   },
   {
     name: 'chat',
-    label: 'Chat',
+    label: 'Správy',
     icon: ChatIcon,
     slot: 'bar',
     layout: 'full',
