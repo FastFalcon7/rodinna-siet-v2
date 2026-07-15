@@ -25,13 +25,9 @@ interface MessageBubbleProps {
 }
 
 /** Náhľad citovanej správy nad bublinou. */
-function ReplyQuote({ message, mine }: { message: NonNullable<MessagePublic['replyTo']>; mine: boolean }) {
+function ReplyQuote({ message }: { message: NonNullable<MessagePublic['replyTo']>; mine: boolean }) {
   return (
-    <div
-      className={`mb-1 rounded-lg border-l-2 px-2 py-1 text-xs ${
-        mine ? 'border-white/60 bg-white/15 text-white/90' : 'border-accent bg-neutral-200/60 dark:bg-neutral-700/60'
-      }`}
-    >
+    <div className="mb-1 rounded-lg border-l-2 border-accent bg-neutral-200/60 px-2 py-1 text-xs dark:bg-neutral-700/60">
       <span className="font-medium">{message.authorName}</span>
       <div className="truncate opacity-90">
         {message.deleted ? 'Správa bola zmazaná' : message.hasMedia && !message.preview ? '📷 Fotka' : message.preview}
@@ -127,7 +123,7 @@ export function MessageBubble({ message, mine, showAuthor, seen, tail, onReply, 
           {...longPress}
           className={`relative rounded-2xl px-3 py-2 text-sm leading-relaxed shadow-sm ${
             mine
-              ? `${tail ? 'rounded-br-md' : ''} bg-accent text-white`
+              ? `${tail ? 'rounded-br-md' : ''} bg-bubble-mine text-neutral-900 dark:text-neutral-100`
               : `${tail ? 'rounded-bl-md' : ''} bg-neutral-100 text-neutral-900 dark:bg-neutral-800 dark:text-neutral-100`
           }`}
         >
@@ -136,9 +132,7 @@ export function MessageBubble({ message, mine, showAuthor, seen, tail, onReply, 
             <RichBody
               text={bodyText}
               className="whitespace-pre-wrap [overflow-wrap:anywhere]"
-              linkClassName={`underline decoration-1 underline-offset-2 hover:opacity-80 ${
-                mine ? 'text-white' : 'text-accent'
-              }`}
+              linkClassName="text-accent underline decoration-1 underline-offset-2 hover:opacity-80"
             />
           )}
           {appLink && (
@@ -155,11 +149,7 @@ export function MessageBubble({ message, mine, showAuthor, seen, tail, onReply, 
 
           {/* Čas + doručenky len na poslednej správe skupiny (§4.1). */}
           {tail && (
-            <span
-              className={`mt-1 flex items-center justify-end gap-1 text-[10px] ${
-                mine ? 'text-white/70' : 'text-neutral-400'
-              }`}
-            >
+            <span className="mt-1 flex items-center justify-end gap-1 text-[10px] text-neutral-400">
               {message.editedAt && <span>upravené</span>}
               {formatTime(message.createdAt)}
               {mine && <span title={seen ? 'Videné' : 'Doručené'}>{seen ? '✓✓' : '✓'}</span>}

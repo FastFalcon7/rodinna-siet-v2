@@ -29,6 +29,9 @@
   --color-text: oklch(0.22 0.01 260);
   --color-text-muted: oklch(0.52 0.01 260);
   --color-border: oklch(0.92 0.005 260);
+  /* Bublina vlastnej správy v Chate (ladenie 07/2026) — jemná svetlozelená
+     namiesto plnej --color-accent na veľkej ploche (pôsobilo agresívne). */
+  --color-bubble-mine: oklch(0.94 0.035 155);
 }
 
 /* Tmavá téma */
@@ -39,6 +42,7 @@
   --color-text: oklch(0.96 0.005 260);
   --color-text-muted: oklch(0.68 0.01 260);
   --color-border: oklch(0.30 0.01 260);
+  --color-bubble-mine: oklch(0.28 0.045 155);
 }
 
 /* Auto podľa systému, ak nie je manuálny override */
@@ -50,5 +54,6 @@
     --color-text: oklch(0.96 0.005 260);
     --color-text-muted: oklch(0.68 0.01 260);
     --color-border: oklch(0.30 0.01 260);
+    --color-bubble-mine: oklch(0.28 0.045 155);
   }
 }

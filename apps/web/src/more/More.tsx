@@ -9,6 +9,7 @@ import { ThemeSettings } from './ThemeSettings';
 import { FontSizeSettings } from './FontSizeSettings';
 import { LlmSettings } from './LlmSettings';
 import { InstallCard } from './InstallCard';
+import { HelpCard } from './HelpCard';
 import { webModules, type WebModule } from '../app/registry';
 import { useLlmEnabled } from '../shared/llm';
 
@@ -62,6 +63,7 @@ export function More({ onOpenModule }: { onOpenModule: (name: string) => void })
         </section>
       )}
 
+      <HelpCard />
       <InstallCard />
       <ThemeSettings />
       <FontSizeSettings />

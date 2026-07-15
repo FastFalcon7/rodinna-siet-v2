@@ -1,0 +1,62 @@
+<!--
+  Šablóna pozývacieho e-mailu (generuje create-invite.ts).
+  Placeholdery nahrádza skript: {{REGISTRATION_URL}} {{EMAIL}} {{EXPIRES}}
+  {{MANUAL_URL}} {{APP_ORIGIN}}. Inline štýly + table layout kvôli kompatibilite
+  s e-mailovými klientmi (Gmail strip-uje <style>). Jazyk: čeština.
+-->
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f6f7f9;margin:0;padding:24px 0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+  <tr>
+    <td align="center">
+      <table role="presentation" width="520" cellpadding="0" cellspacing="0" style="max-width:520px;width:100%;background:#ffffff;border-radius:16px;overflow:hidden;border:1px solid #e4e7eb;">
+        <tr>
+          <td style="background:linear-gradient(135deg,#2f6f4f 0%,#234f3a 100%);padding:28px 28px 24px;">
+            <div style="color:#ffffff;font-size:13px;font-weight:600;opacity:.9;letter-spacing:.02em;">POZVÁNKA DO RODINY</div>
+            <div style="color:#ffffff;font-size:23px;font-weight:700;margin-top:6px;line-height:1.25;">Vítejte v naší rodinné síti</div>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:26px 28px 8px;color:#1a1d21;font-size:15px;line-height:1.6;">
+            <p style="margin:0 0 14px;">Dostáváte přístup do naší <strong>soukromé rodinné sítě</strong> — místa jen pro nás: sdílené fotky, zprávy, události a vzpomínky. Žádné reklamy, žádní cizí lidé.</p>
+            <p style="margin:0 0 4px;">Přihlašovací e-mail: <strong>{{EMAIL}}</strong></p>
+            <p style="margin:0 0 20px;color:#5c6570;font-size:14px;">Klikněte na tlačítko, zvolte si jméno a heslo (alespoň 10 znaků) — a jste uvnitř.</p>
+          </td>
+        </tr>
+        <tr>
+          <td align="center" style="padding:0 28px 8px;">
+            <table role="presentation" cellpadding="0" cellspacing="0">
+              <tr>
+                <td align="center" bgcolor="#2f6f4f" style="border-radius:10px;">
+                  <a href="{{REGISTRATION_URL}}" target="_blank" style="display:inline-block;padding:14px 32px;color:#ffffff;font-size:16px;font-weight:700;text-decoration:none;border-radius:10px;">Spustit a přihlásit se →</a>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:8px 28px 4px;">
+            <p style="margin:0;color:#5c6570;font-size:12px;line-height:1.5;">Kdyby tlačítko nefungovalo, otevřete tento odkaz v prohlížeči:<br><a href="{{REGISTRATION_URL}}" target="_blank" style="color:#2f6f4f;word-break:break-all;">{{REGISTRATION_URL}}</a></p>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:16px 28px 4px;">
+            <div style="background:#e7f1ec;border-radius:12px;padding:14px 16px;color:#1a1d21;font-size:14px;line-height:1.55;">
+              <strong>📱 Tip:</strong> Po přihlášení na telefonu si aplikaci <strong>přidejte na plochu</strong> (na iPhonu: Sdílet → Přidat na plochu; na Androidu: nabídka ⋮ → Nainstalovat aplikaci). Otevírá se pak jako běžná aplikace a chodí notifikace.
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:14px 28px 4px;color:#5c6570;font-size:13px;line-height:1.55;">
+            <p style="margin:0 0 6px;">📖 Podrobný návod ke všem funkcím: <a href="{{MANUAL_URL}}" target="_blank" style="color:#2f6f4f;">{{MANUAL_URL}}</a></p>
+            <p style="margin:0;">⏳ Odkaz je osobní, platí <strong>do {{EXPIRES}}</strong> a lze ho použít jednou — prosím neposílejte ho dál.</p>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:18px 28px 24px;">
+            <hr style="border:none;border-top:1px solid #e4e7eb;margin:0 0 12px;">
+            <p style="margin:0;color:#9aa3ad;font-size:12px;line-height:1.5;">Rodinná síť · soukromá aplikace běžící na našem rodinném úložišti ({{APP_ORIGIN}}). Tento e-mail jste dostali, protože vás někdo z rodiny pozval.</p>
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+</table>
