@@ -442,7 +442,12 @@ export async function buildIcs(): Promise<string> {
     'BEGIN:VCALENDAR',
     'VERSION:2.0',
     'PRODID:-//Rodinna siet//SK',
+    'CALSCALE:GREGORIAN',
     'X-WR-CALNAME:Rodinná sieť',
+    // Hint pre Apple/Google Calendar, ako často obnovovať odber (ladenie, bod 5).
+    // Bez toho iOS cachuje feed veľmi dlho → nové udalosti sa objavia neskoro.
+    'REFRESH-INTERVAL;VALUE=DURATION:PT1H',
+    'X-PUBLISHED-TTL:PT1H',
   ];
   for (const e of rows) {
     lines.push(
