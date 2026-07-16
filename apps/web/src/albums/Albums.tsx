@@ -9,6 +9,7 @@ import { NotePickerDialog } from '../notes/NotePickerDialog';
 import { EventPickerDialog } from '../events/EventPickerDialog';
 import { MediaTargetButtons, type MediaTargetKind } from '../shared/MediaTargetButtons';
 import { ZoomableImage } from '../shared/ZoomableImage';
+import { VisibilityPicker, type ShareVisibility } from '../shared/VisibilityPicker';
 
 /**
  * Modul Albumy (M2): zoznam albumov + Zberač banner, detail s fotkami,
@@ -75,7 +76,11 @@ export function Albums() {
               <div className="grid aspect-square w-full place-items-center bg-neutral-100 text-3xl dark:bg-neutral-800">📷</div>
             )}
             <div className="px-3 py-2">
-              <p className="truncate text-sm font-medium">{a.title}</p>
+              <p className="truncate text-sm font-medium">
+                {a.visibility === 'private' && <span title="Len pre mňa">🔒 </span>}
+                {a.visibility === 'rooms' && <span title="Podskupiny">👥 </span>}
+                {a.title}
+              </p>
               <p className="text-xs text-neutral-500">{a.photoCount} fotiek</p>
             </div>
           </button>
@@ -111,7 +116,7 @@ function SuggestionBanner({
         month: '2-digit',
         year: '2-digit',
       });
-      const album = await albumsApi.create({ title, description: '', mediaIds: suggestion.mediaIds });
+      const album = await albumsApi.create({ title, description: '', mediaIds: suggestion.mediaIds, visibility: 'family', roomIds: [] });
       onCreated(album.id);
     } finally {
       setBusy(false);
@@ -153,16 +158,27 @@ function NewAlbumButton({ onCreated }: { onCreated: (albumId: string) => void })
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
+  const [visibility, setVisibility] = useState<ShareVisibility>('family');
+  const [roomIds, setRoomIds] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
 
   const create = async () => {
     if (!title.trim() || busy) return;
+    if (visibility === 'rooms' && roomIds.length === 0) return;
     setBusy(true);
     try {
-      const album = await albumsApi.create({ title: title.trim(), description: description.trim(), mediaIds: [] });
+      const album = await albumsApi.create({
+        title: title.trim(),
+        description: description.trim(),
+        mediaIds: [],
+        visibility,
+        roomIds: visibility === 'rooms' ? roomIds : [],
+      });
       setOpen(false);
       setTitle('');
       setDescription('');
+      setVisibility('family');
+      setRoomIds([]);
       onCreated(album.id);
     } finally {
       setBusy(false);
@@ -198,13 +214,21 @@ function NewAlbumButton({ onCreated }: { onCreated: (albumId: string) => void })
         placeholder="Komentár k albumu (voliteľné)"
         className="w-full resize-none rounded-lg border border-neutral-300 bg-transparent px-3 py-1.5 text-sm outline-none focus:border-accent dark:border-neutral-700"
       />
+      <VisibilityPicker
+        visibility={visibility}
+        roomIds={roomIds}
+        onChange={(v, r) => {
+          setVisibility(v);
+          setRoomIds(r);
+        }}
+      />
       <div className="flex gap-2">
         <button onClick={() => setOpen(false)} className="ml-auto rounded-lg px-3 py-1.5 text-sm text-neutral-500">
           Zrušiť
         </button>
         <button
           onClick={() => void create()}
-          disabled={!title.trim() || busy}
+          disabled={!title.trim() || busy || (visibility === 'rooms' && roomIds.length === 0)}
           className="rounded-lg bg-accent px-3 py-1.5 text-sm font-medium text-white disabled:opacity-40"
         >
           Vytvoriť
@@ -223,6 +247,8 @@ function AlbumDetailView({ albumId, onBack }: { albumId: string; onBack: () => v
   const [renaming, setRenaming] = useState(false);
   const [newTitle, setNewTitle] = useState('');
   const [newDesc, setNewDesc] = useState('');
+  const [newVis, setNewVis] = useState<ShareVisibility>('family');
+  const [newRooms, setNewRooms] = useState<string[]>([]);
   // Hromadný výber fotiek (ladenie 07/2026): kopírovanie do albumu / odstránenie.
   const [selecting, setSelecting] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -312,6 +338,8 @@ function AlbumDetailView({ albumId, onBack }: { albumId: string; onBack: () => v
   const startEdit = () => {
     setNewTitle(album?.title ?? '');
     setNewDesc(album?.description ?? '');
+    setNewVis(album?.visibility ?? 'family');
+    setNewRooms(album?.roomIds ?? []);
     setRenaming(true);
   };
 
@@ -322,12 +350,16 @@ function AlbumDetailView({ albumId, onBack }: { albumId: string; onBack: () => v
       setRenaming(false);
       return;
     }
-    if (title === album?.title && description === (album?.description ?? '')) {
-      setRenaming(false);
-      return;
-    }
+    if (newVis === 'rooms' && newRooms.length === 0) return;
     try {
-      setAlbum(await albumsApi.update(albumId, { title, description }));
+      setAlbum(
+        await albumsApi.update(albumId, {
+          title,
+          description,
+          visibility: newVis,
+          roomIds: newVis === 'rooms' ? newRooms : [],
+        }),
+      );
       setRenaming(false);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Úprava zlyhala');
@@ -373,13 +405,21 @@ function AlbumDetailView({ albumId, onBack }: { albumId: string; onBack: () => v
                 placeholder="Komentár k albumu (voliteľné)"
                 className="w-full resize-none rounded-lg border border-neutral-300 bg-transparent px-2 py-1 text-sm outline-none focus:border-accent dark:border-neutral-700"
               />
+              <VisibilityPicker
+                visibility={newVis}
+                roomIds={newRooms}
+                onChange={(v, r) => {
+                  setNewVis(v);
+                  setNewRooms(r);
+                }}
+              />
               <div className="flex gap-2">
                 <button onClick={() => setRenaming(false)} className="ml-auto rounded-lg px-2.5 py-1 text-sm text-neutral-500">
                   Zrušiť
                 </button>
                 <button
                   onClick={() => void saveTitle()}
-                  disabled={!newTitle.trim()}
+                  disabled={!newTitle.trim() || (newVis === 'rooms' && newRooms.length === 0)}
                   className="shrink-0 rounded-lg bg-accent px-2.5 py-1 text-sm font-medium text-white disabled:opacity-40"
                 >
                   Uložiť

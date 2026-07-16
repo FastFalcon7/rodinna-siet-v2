@@ -36,7 +36,7 @@ function mapError(err: unknown): { message: string; status: 400 | 403 | 404 } | 
 
 /** GET /api/albums — všetky albumy (family-wide viditeľnosť ako feed). */
 router.get('/', requireAuth, async (c) => {
-  return c.json({ albums: await listAlbums() });
+  return c.json({ albums: await listAlbums(c.get('user')!.id) });
 });
 
 /** GET /api/albums/suggestions — Zberač: návrhy albumov z fotiek jedného dňa. */
@@ -80,7 +80,7 @@ router.post('/', requireAuth, zValidator('json', CreateAlbumInputSchema), async 
 /** GET /api/albums/:id — detail s fotkami. */
 router.get('/:id', requireAuth, async (c) => {
   try {
-    return c.json(await getAlbum(c.req.param('id')));
+    return c.json(await getAlbum(c.req.param('id'), c.get('user')!.id));
   } catch (err) {
     const m = mapError(err);
     if (m) return c.json({ error: m.message }, m.status);

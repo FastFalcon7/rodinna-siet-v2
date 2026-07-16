@@ -13,10 +13,21 @@ export const MAX_ALBUM_TITLE = 120;
 export const MAX_ALBUM_DESC = 2000;
 export const MAX_ALBUM_ADD = 500;
 
+/**
+ * Viditeľnosť albumu (ladenie 07/2026, bod 3): 'private' len tvorca, 'family'
+ * celá rodina (default), 'rooms' členovia vybraných chat podskupín. Rovnaký
+ * model ako poznámky a udalosti.
+ */
+export const AlbumVisibilitySchema = z.enum(['private', 'family', 'rooms']);
+export type AlbumVisibility = z.infer<typeof AlbumVisibilitySchema>;
+
 export const CreateAlbumInputSchema = z.object({
   title: z.string().trim().min(1, 'Album potrebuje názov').max(MAX_ALBUM_TITLE),
   description: z.string().trim().max(MAX_ALBUM_DESC).default(''),
   mediaIds: z.array(z.string().uuid()).max(MAX_ALBUM_ADD).default([]),
+  visibility: AlbumVisibilitySchema.default('family'),
+  /** Pri visibility='rooms': podskupiny, ktoré album vidia. */
+  roomIds: z.array(z.string().uuid()).max(20).default([]),
 });
 export type CreateAlbumInput = z.infer<typeof CreateAlbumInputSchema>;
 
@@ -24,6 +35,8 @@ export const UpdateAlbumInputSchema = z.object({
   title: z.string().trim().min(1).max(MAX_ALBUM_TITLE).optional(),
   description: z.string().trim().max(MAX_ALBUM_DESC).optional(),
   coverMediaId: z.string().uuid().nullable().optional(),
+  visibility: AlbumVisibilitySchema.optional(),
+  roomIds: z.array(z.string().uuid()).max(20).optional(),
 });
 export type UpdateAlbumInput = z.infer<typeof UpdateAlbumInputSchema>;
 
@@ -42,6 +55,9 @@ export const AlbumSummarySchema = z.object({
   createdAt: z.string(),
   /** Posledné pridanie fotky — radenie „najživšie hore". */
   lastAddedAt: z.string().nullable(),
+  visibility: AlbumVisibilitySchema,
+  /** Podskupiny, s ktorými je album zdieľaný (visibility='rooms'). */
+  roomIds: z.array(z.string().uuid()),
 });
 export type AlbumSummary = z.infer<typeof AlbumSummarySchema>;
 

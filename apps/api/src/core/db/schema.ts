@@ -504,17 +504,37 @@ export const pollVotes = pgTable(
  * Albumy (plán §M2). Fotky = referencie na existujúce `media` riadky —
  * album nič nekopíruje. `coverMediaId` null = obálka je najnovšia fotka.
  */
+export const albumVisibilityValues = ['private', 'family', 'rooms'] as const;
+
 export const albums = pgTable('albums', {
   id: uuid('id').primaryKey().defaultRandom(),
   title: text('title').notNull(),
   // Ladenie 07/2026: voliteľný komentár/popis albumu popri názve.
   description: text('description').notNull().default(''),
   coverMediaId: uuid('cover_media_id').references(() => media.id, { onDelete: 'set null' }),
+  // Viditeľnosť (ladenie 07/2026, bod 3): private len tvorca, family celá
+  // rodina (default), rooms členovia vybraných podskupín (album_rooms).
+  visibility: text('visibility', { enum: albumVisibilityValues }).notNull().default('family'),
   createdBy: uuid('created_by')
     .notNull()
     .references(() => users.id, { onDelete: 'cascade' }),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
+
+/** Zdieľanie albumu s podskupinami (visibility='rooms') — ako event_rooms/note_rooms. */
+export const albumRooms = pgTable(
+  'album_rooms',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    albumId: uuid('album_id')
+      .notNull()
+      .references(() => albums.id, { onDelete: 'cascade' }),
+    roomId: uuid('room_id')
+      .notNull()
+      .references(() => chatRooms.id, { onDelete: 'cascade' }),
+  },
+  (t) => [index('album_rooms_album_idx').on(t.albumId), unique('album_rooms_unique').on(t.albumId, t.roomId)],
+);
 
 export const albumPhotos = pgTable(
   'album_photos',
