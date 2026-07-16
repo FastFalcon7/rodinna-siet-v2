@@ -128,13 +128,20 @@ self.addEventListener('push', (event) => {
     /* prázdny/nevalidný payload — zobrazí sa aspoň default */
   }
   event.waitUntil(
-    self.registration.showNotification(data.title, {
-      body: data.body,
-      tag: data.tag,
-      icon: '/icons/icon-192.png',
-      badge: '/icons/badge-72.png',
-      data: { url: data.url },
-    }),
+    (async () => {
+      await self.registration.showNotification(data.title, {
+        body: data.body,
+        tag: data.tag,
+        icon: '/icons/icon-192.png',
+        badge: '/icons/badge-72.png',
+        data: { url: data.url },
+      });
+      // Puntík na ikone appky aj pri zavretej appke (ladenie 07/2026, bod 4).
+      // Bez argumentu = len bodka; presný počet nastaví appka po otvorení.
+      if (self.navigator.setAppBadge) {
+        await self.navigator.setAppBadge().catch(() => {});
+      }
+    })(),
   );
 });
 
