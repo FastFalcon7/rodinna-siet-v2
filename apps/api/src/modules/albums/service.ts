@@ -11,10 +11,13 @@ import type {
 import { db } from '../../core/db/client';
 import {
   albumPhotos,
+  albumRooms,
   albums,
+  chatRooms,
   feedCards,
   media,
   memoryMarks,
+  roomMembers,
   users,
   type AlbumRow,
 } from '../../core/db/schema';
@@ -56,6 +59,38 @@ async function getAlbumRow(albumId: string): Promise<AlbumRow> {
   return rows[0];
 }
 
+// ── Viditeľnosť (ladenie 07/2026, bod 3) — rovnaký model ako udalosti ─────────
+
+/** Množina miestností, ktorých je viewer členom (na 'rooms' viditeľnosť). */
+async function viewerRoomIds(viewerId: string): Promise<Set<string>> {
+  const rows = await db.select({ roomId: roomMembers.roomId }).from(roomMembers).where(eq(roomMembers.userId, viewerId));
+  return new Set(rows.map((r) => r.roomId));
+}
+
+/** Overí, že miestnosti existujú a užívateľ je ich členom. */
+async function verifyRoomsMembership(roomIds: string[], userId: string): Promise<void> {
+  if (roomIds.length === 0) return;
+  const rows = await db
+    .select({ roomId: roomMembers.roomId })
+    .from(roomMembers)
+    .innerJoin(chatRooms, eq(roomMembers.roomId, chatRooms.id))
+    .where(and(inArray(roomMembers.roomId, roomIds), eq(roomMembers.userId, userId)));
+  if (new Set(rows.map((r) => r.roomId)).size !== new Set(roomIds).size) {
+    throw new BadRequestError('Zdieľať sa dá len so skupinami, ktorých si členom');
+  }
+}
+
+/** Vidí viewer tento album? (family / vlastný / člen zdieľanej podskupiny). */
+async function canView(album: AlbumRow, viewerId: string): Promise<boolean> {
+  if (album.visibility === 'family' || album.createdBy === viewerId) return true;
+  if (album.visibility === 'rooms') {
+    const mine = await viewerRoomIds(viewerId);
+    const shares = await db.select({ roomId: albumRooms.roomId }).from(albumRooms).where(eq(albumRooms.albumId, album.id));
+    return shares.some((s) => mine.has(s.roomId));
+  }
+  return false;
+}
+
 // ── Hydratácia ───────────────────────────────────────────────────────────────
 
 async function buildSummaries(rows: AlbumRow[]): Promise<AlbumSummary[]> {
@@ -92,6 +127,14 @@ async function buildSummaries(rows: AlbumRow[]): Promise<AlbumSummary[]> {
 
   const authors = await fetchAuthors([...new Set(rows.map((r) => r.createdBy))]);
 
+  const shareRows = await db.select().from(albumRooms).where(inArray(albumRooms.albumId, albumIds));
+  const roomsByAlbum = new Map<string, string[]>();
+  for (const s of shareRows) {
+    const arr = roomsByAlbum.get(s.albumId) ?? [];
+    arr.push(s.roomId);
+    roomsByAlbum.set(s.albumId, arr);
+  }
+
   return rows.map((row) => {
     const coverId = row.coverMediaId ?? latestMap.get(row.id) ?? null;
     const stat = statMap.get(row.id);
@@ -104,21 +147,31 @@ async function buildSummaries(rows: AlbumRow[]): Promise<AlbumSummary[]> {
       createdBy: authors.get(row.createdBy)!,
       createdAt: row.createdAt.toISOString(),
       lastAddedAt: stat?.lastAddedAt?.toISOString() ?? null,
+      visibility: row.visibility,
+      roomIds: roomsByAlbum.get(row.id) ?? [],
     };
   });
 }
 
-export async function listAlbums(): Promise<AlbumSummary[]> {
+export async function listAlbums(viewerId: string): Promise<AlbumSummary[]> {
   const rows = await db.select().from(albums);
-  const summaries = await buildSummaries(rows);
+  // Viditeľnosť (bod 3): family všetci, private len tvorca, rooms členovia.
+  const mine = await viewerRoomIds(viewerId);
+  const shares = await db.select().from(albumRooms);
+  const sharedWithMe = new Set(shares.filter((sh) => mine.has(sh.roomId)).map((sh) => sh.albumId));
+  const visible = rows.filter(
+    (a) => a.visibility === 'family' || a.createdBy === viewerId || (a.visibility === 'rooms' && sharedWithMe.has(a.id)),
+  );
+  const summaries = await buildSummaries(visible);
   // Najživšie hore (posledná pridaná fotka, potom založenie).
   return summaries.sort((a, b) =>
     (b.lastAddedAt ?? b.createdAt).localeCompare(a.lastAddedAt ?? a.createdAt),
   );
 }
 
-export async function getAlbum(albumId: string): Promise<AlbumDetail> {
+export async function getAlbum(albumId: string, viewerId: string): Promise<AlbumDetail> {
   const row = await getAlbumRow(albumId);
+  if (!(await canView(row, viewerId))) throw new NotFoundError('Album nenájdený');
   const [summary] = await buildSummaries([row]);
 
   const photoRows = await db
@@ -148,11 +201,21 @@ export async function createAlbum(creatorId: string, input: CreateAlbumInput): P
   const mediaIds = [...new Set(input.mediaIds)];
   await verifyMediaExist(mediaIds);
 
+  const roomIds = [...new Set(input.roomIds)];
+  if (input.visibility === 'rooms') {
+    if (roomIds.length === 0) throw new BadRequestError('Vyber aspoň jednu skupinu');
+    await verifyRoomsMembership(roomIds, creatorId);
+  }
+
   const inserted = await db
     .insert(albums)
-    .values({ title: input.title, description: input.description, createdBy: creatorId })
+    .values({ title: input.title, description: input.description, visibility: input.visibility, createdBy: creatorId })
     .returning();
   const album = inserted[0]!;
+
+  if (input.visibility === 'rooms' && roomIds.length > 0) {
+    await db.insert(albumRooms).values(roomIds.map((roomId) => ({ albumId: album.id, roomId })));
+  }
 
   if (mediaIds.length > 0) {
     await db
@@ -161,7 +224,7 @@ export async function createAlbum(creatorId: string, input: CreateAlbumInput): P
   }
 
   // Albumy do Feedu nejdú (ladenie 07/2026) — prístup k nim je v časti Albumy.
-  return getAlbum(album.id);
+  return getAlbum(album.id, creatorId);
 }
 
 export async function addPhotos(albumId: string, userId: string, mediaIds: string[]): Promise<AlbumDetail> {
@@ -172,7 +235,7 @@ export async function addPhotos(albumId: string, userId: string, mediaIds: strin
     .insert(albumPhotos)
     .values(unique.map((mediaId, order) => ({ albumId, mediaId, addedBy: userId, order })))
     .onConflictDoNothing();
-  return getAlbum(albumId);
+  return getAlbum(albumId, userId);
 }
 
 export async function removePhoto(
@@ -213,15 +276,30 @@ export async function updateAlbum(
       .limit(1);
     if (!inAlbum[0]) throw new BadRequestError('Obálka musí byť fotka z albumu');
   }
+
+  // Zmena viditeľnosti (bod 3): pri 'rooms' over členstvo a prepíš väzby.
+  if (input.visibility !== undefined) {
+    const roomIds = [...new Set(input.roomIds ?? [])];
+    if (input.visibility === 'rooms') {
+      if (roomIds.length === 0) throw new BadRequestError('Vyber aspoň jednu skupinu');
+      await verifyRoomsMembership(roomIds, userId);
+      await db.delete(albumRooms).where(eq(albumRooms.albumId, albumId));
+      await db.insert(albumRooms).values(roomIds.map((roomId) => ({ albumId, roomId })));
+    } else {
+      await db.delete(albumRooms).where(eq(albumRooms.albumId, albumId));
+    }
+  }
+
   await db
     .update(albums)
     .set({
       ...(input.title !== undefined ? { title: input.title } : {}),
       ...(input.description !== undefined ? { description: input.description } : {}),
       ...(input.coverMediaId !== undefined ? { coverMediaId: input.coverMediaId } : {}),
+      ...(input.visibility !== undefined ? { visibility: input.visibility } : {}),
     })
     .where(eq(albums.id, albumId));
-  return getAlbum(albumId);
+  return getAlbum(albumId, userId);
 }
 
 export async function deleteAlbum(albumId: string, userId: string, isAdmin: boolean): Promise<void> {

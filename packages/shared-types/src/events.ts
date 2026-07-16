@@ -62,6 +62,10 @@ export const UpdateEventInputSchema = z.object({
   location: z.string().trim().max(MAX_EVENT_LOCATION).optional(),
   bodyMd: z.string().max(MAX_EVENT_BODY).optional(),
   rsvp: z.boolean().optional(),
+  /** Zmena viditeľnosti pri editácii (ladenie 07/2026, bod 6 — parita s tvorbou). */
+  visibility: EventVisibilitySchema.optional(),
+  /** Pri visibility='rooms': nová množina miestností. */
+  roomIds: z.array(z.string().uuid()).max(20).optional(),
 });
 export type UpdateEventInput = z.infer<typeof UpdateEventInputSchema>;
 

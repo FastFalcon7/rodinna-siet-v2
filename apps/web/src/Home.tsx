@@ -4,11 +4,12 @@ import { Avatar } from './shared/Avatar';
 import { nameStyle } from './shared/nameColor';
 import { onAppNavigate, MORE_TAB } from './app/navigate';
 import { peekRoomParam } from './shared/deepLink';
-import { ChatProvider } from './chat/ChatProvider';
+import { ChatProvider, useChat } from './chat/ChatProvider';
 import { More } from './more/More';
 import { CommandPalette } from './app/CommandPalette';
 import { MoreIcon, webModules, type WebModule } from './app/registry';
 import { useSwipeBack } from './shared/useSwipeBack';
+import { useAppBadge } from './shared/useAppBadge';
 
 /**
  * App shell (DESIGN_REVIEW_FEED_CHAT.md §2, plán M0-3): tenký app bar +
@@ -29,6 +30,9 @@ function NavBadge({ module }: { module: WebModule }) {
 
 function HomeInner() {
   const { user } = useAuth();
+  // Puntík na ikone appky (bod 4) — presný počet neprečítaných správ, kým je
+  // appka otvorená; pri 0 zmaže aj puntík nahodený service workerom.
+  useAppBadge(useChat().totalUnread);
   // Deep link z push notifikácie (/?room=…) → štart rovno v chate.
   const [tab, setTab] = useState<string>(() => (peekRoomParam() ? 'chat' : webModules[0]!.name));
 

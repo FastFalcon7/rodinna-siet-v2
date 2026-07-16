@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type { MediaPublic } from '@rodinna/shared-types';
+import { ZoomableImage } from './ZoomableImage';
 
 interface LightboxProps {
   items: MediaPublic[];
@@ -85,7 +86,7 @@ export function Lightbox({ items, initialIndex, onClose, renderActions }: Lightb
             ‹
           </button>
         )}
-        <img src={current.url} alt="" className="max-h-full max-w-full object-contain" />
+        <ZoomableImage key={current.id} src={current.url} />
         {index < items.length - 1 && (
           <button
             type="button"

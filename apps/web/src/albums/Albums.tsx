@@ -8,6 +8,8 @@ import { AlbumPickerDialog } from './AlbumPickerDialog';
 import { NotePickerDialog } from '../notes/NotePickerDialog';
 import { EventPickerDialog } from '../events/EventPickerDialog';
 import { MediaTargetButtons, type MediaTargetKind } from '../shared/MediaTargetButtons';
+import { ZoomableImage } from '../shared/ZoomableImage';
+import { VisibilityPicker, type ShareVisibility } from '../shared/VisibilityPicker';
 
 /**
  * Modul Albumy (M2): zoznam albumov + Zberač banner, detail s fotkami,
@@ -74,7 +76,11 @@ export function Albums() {
               <div className="grid aspect-square w-full place-items-center bg-neutral-100 text-3xl dark:bg-neutral-800">📷</div>
             )}
             <div className="px-3 py-2">
-              <p className="truncate text-sm font-medium">{a.title}</p>
+              <p className="truncate text-sm font-medium">
+                {a.visibility === 'private' && <span title="Len pre mňa">🔒 </span>}
+                {a.visibility === 'rooms' && <span title="Podskupiny">👥 </span>}
+                {a.title}
+              </p>
               <p className="text-xs text-neutral-500">{a.photoCount} fotiek</p>
             </div>
           </button>
@@ -110,7 +116,7 @@ function SuggestionBanner({
         month: '2-digit',
         year: '2-digit',
       });
-      const album = await albumsApi.create({ title, description: '', mediaIds: suggestion.mediaIds });
+      const album = await albumsApi.create({ title, description: '', mediaIds: suggestion.mediaIds, visibility: 'family', roomIds: [] });
       onCreated(album.id);
     } finally {
       setBusy(false);
@@ -152,16 +158,27 @@ function NewAlbumButton({ onCreated }: { onCreated: (albumId: string) => void })
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
+  const [visibility, setVisibility] = useState<ShareVisibility>('family');
+  const [roomIds, setRoomIds] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
 
   const create = async () => {
     if (!title.trim() || busy) return;
+    if (visibility === 'rooms' && roomIds.length === 0) return;
     setBusy(true);
     try {
-      const album = await albumsApi.create({ title: title.trim(), description: description.trim(), mediaIds: [] });
+      const album = await albumsApi.create({
+        title: title.trim(),
+        description: description.trim(),
+        mediaIds: [],
+        visibility,
+        roomIds: visibility === 'rooms' ? roomIds : [],
+      });
       setOpen(false);
       setTitle('');
       setDescription('');
+      setVisibility('family');
+      setRoomIds([]);
       onCreated(album.id);
     } finally {
       setBusy(false);
@@ -197,13 +214,21 @@ function NewAlbumButton({ onCreated }: { onCreated: (albumId: string) => void })
         placeholder="Komentár k albumu (voliteľné)"
         className="w-full resize-none rounded-lg border border-neutral-300 bg-transparent px-3 py-1.5 text-sm outline-none focus:border-accent dark:border-neutral-700"
       />
+      <VisibilityPicker
+        visibility={visibility}
+        roomIds={roomIds}
+        onChange={(v, r) => {
+          setVisibility(v);
+          setRoomIds(r);
+        }}
+      />
       <div className="flex gap-2">
         <button onClick={() => setOpen(false)} className="ml-auto rounded-lg px-3 py-1.5 text-sm text-neutral-500">
           Zrušiť
         </button>
         <button
           onClick={() => void create()}
-          disabled={!title.trim() || busy}
+          disabled={!title.trim() || busy || (visibility === 'rooms' && roomIds.length === 0)}
           className="rounded-lg bg-accent px-3 py-1.5 text-sm font-medium text-white disabled:opacity-40"
         >
           Vytvoriť
@@ -222,6 +247,8 @@ function AlbumDetailView({ albumId, onBack }: { albumId: string; onBack: () => v
   const [renaming, setRenaming] = useState(false);
   const [newTitle, setNewTitle] = useState('');
   const [newDesc, setNewDesc] = useState('');
+  const [newVis, setNewVis] = useState<ShareVisibility>('family');
+  const [newRooms, setNewRooms] = useState<string[]>([]);
   // Hromadný výber fotiek (ladenie 07/2026): kopírovanie do albumu / odstránenie.
   const [selecting, setSelecting] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -266,6 +293,23 @@ function AlbumDetailView({ albumId, onBack }: { albumId: string; onBack: () => v
     void load();
   };
 
+  /** Hromadné odobratie vybraných fotiek z albumu (ladenie 07/2026, bod 2).
+      Odoberá len z albumu — fotky ostávajú nahraté (chat/feed nedotknuté). */
+  const removeSelected = async () => {
+    if (selected.size === 0) return;
+    const n = selected.size;
+    if (!confirm(`Odobrať ${n} ${n === 1 ? 'fotku' : n < 5 ? 'fotky' : 'fotiek'} z albumu? (Z chatu/feedu nezmiznú.)`)) {
+      return;
+    }
+    try {
+      for (const id of selected) await albumsApi.removePhoto(albumId, id);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Niektoré fotky sa nepodarilo odobrať');
+    }
+    exitSelecting();
+    void load();
+  };
+
   const removeAlbum = async () => {
     if (!confirm('Zmazať celý album? Fotky ostanú v systéme.')) return;
     await albumsApi.remove(albumId);
@@ -294,6 +338,8 @@ function AlbumDetailView({ albumId, onBack }: { albumId: string; onBack: () => v
   const startEdit = () => {
     setNewTitle(album?.title ?? '');
     setNewDesc(album?.description ?? '');
+    setNewVis(album?.visibility ?? 'family');
+    setNewRooms(album?.roomIds ?? []);
     setRenaming(true);
   };
 
@@ -304,12 +350,16 @@ function AlbumDetailView({ albumId, onBack }: { albumId: string; onBack: () => v
       setRenaming(false);
       return;
     }
-    if (title === album?.title && description === (album?.description ?? '')) {
-      setRenaming(false);
-      return;
-    }
+    if (newVis === 'rooms' && newRooms.length === 0) return;
     try {
-      setAlbum(await albumsApi.update(albumId, { title, description }));
+      setAlbum(
+        await albumsApi.update(albumId, {
+          title,
+          description,
+          visibility: newVis,
+          roomIds: newVis === 'rooms' ? newRooms : [],
+        }),
+      );
       setRenaming(false);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Úprava zlyhala');
@@ -355,13 +405,21 @@ function AlbumDetailView({ albumId, onBack }: { albumId: string; onBack: () => v
                 placeholder="Komentár k albumu (voliteľné)"
                 className="w-full resize-none rounded-lg border border-neutral-300 bg-transparent px-2 py-1 text-sm outline-none focus:border-accent dark:border-neutral-700"
               />
+              <VisibilityPicker
+                visibility={newVis}
+                roomIds={newRooms}
+                onChange={(v, r) => {
+                  setNewVis(v);
+                  setNewRooms(r);
+                }}
+              />
               <div className="flex gap-2">
                 <button onClick={() => setRenaming(false)} className="ml-auto rounded-lg px-2.5 py-1 text-sm text-neutral-500">
                   Zrušiť
                 </button>
                 <button
                   onClick={() => void saveTitle()}
-                  disabled={!newTitle.trim()}
+                  disabled={!newTitle.trim() || (newVis === 'rooms' && newRooms.length === 0)}
                   className="shrink-0 rounded-lg bg-accent px-2.5 py-1 text-sm font-medium text-white disabled:opacity-40"
                 >
                   Uložiť
@@ -488,6 +546,19 @@ function AlbumDetailView({ albumId, onBack }: { albumId: string; onBack: () => v
           </button>
           <div className="ml-auto flex shrink-0 items-center gap-2">
             <MediaTargetButtons disabled={selected.size === 0} onPick={setPicker} />
+            <button
+              type="button"
+              onClick={() => void removeSelected()}
+              disabled={selected.size === 0}
+              title="Odobrať z albumu"
+              aria-label="Odobrať z albumu"
+              className="grid h-9 w-9 place-items-center rounded-full text-red-500 transition hover:bg-red-50 disabled:opacity-40 dark:hover:bg-red-950/40"
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5" aria-hidden>
+                <path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m2 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" />
+                <path d="M10 11v6M14 11v6" />
+              </svg>
+            </button>
           </div>
         </div>
       )}
@@ -568,7 +639,7 @@ function AlbumDetailView({ albumId, onBack }: { albumId: string; onBack: () => v
                 ‹
               </button>
             )}
-            <img src={album.photos[lightbox].media.url} alt="" className="max-h-full max-w-full object-contain" />
+            <ZoomableImage key={album.photos[lightbox].media.id} src={album.photos[lightbox].media.url} />
             {lightbox < album.photos.length - 1 && (
               <button onClick={() => setLightbox(lightbox + 1)} aria-label="Ďalšia" className="absolute right-2 z-10 grid h-10 w-10 place-items-center rounded-full bg-white/10 text-xl text-white">
                 ›

@@ -22,6 +22,9 @@ export function Feed() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [compose, setCompose] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // FAB prekrýval tlačidlo „Odoslať" v komentári (ladenie 07/2026, bod 8) —
+  // kým je zaostrené textové pole vo feede, FAB skryjeme (aj tak sa nepoužíva).
+  const [typing, setTyping] = useState(false);
 
   const loadFirst = () =>
     feedApi
@@ -67,8 +70,17 @@ export function Feed() {
   const removePost = (id: string) =>
     setItems((prev) => prev?.filter((it) => it.type !== 'post' || it.post.id !== id) ?? null);
 
+  const onFocusCapture = (e: React.FocusEvent) => {
+    const el = e.target as HTMLElement;
+    if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable) setTyping(true);
+  };
+  const onBlurCapture = (e: React.FocusEvent) => {
+    const el = e.target as HTMLElement;
+    if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable) setTyping(false);
+  };
+
   return (
-    <div>
+    <div onFocusCapture={onFocusCapture} onBlurCapture={onBlurCapture}>
       {/* Desktop: inline composer nad feedom. Mobil má FAB nižšie. */}
       <div className="hidden px-4 pt-4 md:block">
         <PostComposer onCreated={prepend} />
@@ -105,16 +117,19 @@ export function Feed() {
         </div>
       )}
 
-      {/* FAB — nový príspevok (len mobil; nad bottom navom + safe area). */}
-      <button
-        type="button"
-        onClick={() => setCompose(true)}
-        aria-label="Nový príspevok"
-        className="fixed right-4 z-30 grid h-14 w-14 place-items-center rounded-full bg-accent text-white shadow-lg transition active:scale-95 md:hidden"
-        style={{ bottom: 'calc(4.5rem + env(safe-area-inset-bottom))' }}
-      >
-        <PencilIcon />
-      </button>
+      {/* FAB — nový príspevok (len mobil; nad bottom navom + safe area).
+          Skrytý počas písania (komentár), nech neprekrýva „Odoslať". */}
+      {!typing && (
+        <button
+          type="button"
+          onClick={() => setCompose(true)}
+          aria-label="Nový príspevok"
+          className="fixed right-4 z-30 grid h-14 w-14 place-items-center rounded-full bg-accent text-white shadow-lg transition active:scale-95 md:hidden"
+          style={{ bottom: 'calc(4.5rem + env(safe-area-inset-bottom))' }}
+        >
+          <PencilIcon />
+        </button>
+      )}
 
       {compose && (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40" onClick={() => setCompose(false)}>
