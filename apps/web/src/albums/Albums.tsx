@@ -8,6 +8,7 @@ import { AlbumPickerDialog } from './AlbumPickerDialog';
 import { NotePickerDialog } from '../notes/NotePickerDialog';
 import { EventPickerDialog } from '../events/EventPickerDialog';
 import { MediaTargetButtons, type MediaTargetKind } from '../shared/MediaTargetButtons';
+import { ZoomableImage } from '../shared/ZoomableImage';
 
 /**
  * Modul Albumy (M2): zoznam albumov + Zberač banner, detail s fotkami,
@@ -266,6 +267,23 @@ function AlbumDetailView({ albumId, onBack }: { albumId: string; onBack: () => v
     void load();
   };
 
+  /** Hromadné odobratie vybraných fotiek z albumu (ladenie 07/2026, bod 2).
+      Odoberá len z albumu — fotky ostávajú nahraté (chat/feed nedotknuté). */
+  const removeSelected = async () => {
+    if (selected.size === 0) return;
+    const n = selected.size;
+    if (!confirm(`Odobrať ${n} ${n === 1 ? 'fotku' : n < 5 ? 'fotky' : 'fotiek'} z albumu? (Z chatu/feedu nezmiznú.)`)) {
+      return;
+    }
+    try {
+      for (const id of selected) await albumsApi.removePhoto(albumId, id);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Niektoré fotky sa nepodarilo odobrať');
+    }
+    exitSelecting();
+    void load();
+  };
+
   const removeAlbum = async () => {
     if (!confirm('Zmazať celý album? Fotky ostanú v systéme.')) return;
     await albumsApi.remove(albumId);
@@ -488,6 +506,19 @@ function AlbumDetailView({ albumId, onBack }: { albumId: string; onBack: () => v
           </button>
           <div className="ml-auto flex shrink-0 items-center gap-2">
             <MediaTargetButtons disabled={selected.size === 0} onPick={setPicker} />
+            <button
+              type="button"
+              onClick={() => void removeSelected()}
+              disabled={selected.size === 0}
+              title="Odobrať z albumu"
+              aria-label="Odobrať z albumu"
+              className="grid h-9 w-9 place-items-center rounded-full text-red-500 transition hover:bg-red-50 disabled:opacity-40 dark:hover:bg-red-950/40"
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5" aria-hidden>
+                <path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m2 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" />
+                <path d="M10 11v6M14 11v6" />
+              </svg>
+            </button>
           </div>
         </div>
       )}
@@ -568,7 +599,7 @@ function AlbumDetailView({ albumId, onBack }: { albumId: string; onBack: () => v
                 ‹
               </button>
             )}
-            <img src={album.photos[lightbox].media.url} alt="" className="max-h-full max-w-full object-contain" />
+            <ZoomableImage key={album.photos[lightbox].media.id} src={album.photos[lightbox].media.url} />
             {lightbox < album.photos.length - 1 && (
               <button onClick={() => setLightbox(lightbox + 1)} aria-label="Ďalšia" className="absolute right-2 z-10 grid h-10 w-10 place-items-center rounded-full bg-white/10 text-xl text-white">
                 ›
