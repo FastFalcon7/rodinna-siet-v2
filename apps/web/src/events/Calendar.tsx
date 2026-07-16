@@ -112,8 +112,9 @@ export function Calendar() {
         <section className="rounded-2xl border border-neutral-200 bg-white p-4 dark:border-neutral-800 dark:bg-neutral-900">
           <h3 className="mb-1 text-sm font-semibold">Odber v Apple/Google Calendar</h3>
           <p className="mb-2 text-xs text-neutral-500">
-            Pridaj túto URL ako odoberaný kalendár — udalosti aj narodeniny sa objavia v tvojej
-            kalendárovej appke (len na čítanie).
+            Pridaj túto URL ako odoberaný kalendár — rodinné udalosti, narodeniny aj tvoje
+            súkromné a skupinové udalosti sa objavia v tvojej kalendárovej appke (len na čítanie).
+            Odkaz je osobný — nezdieľaj ho.
           </p>
           <div className="flex gap-2">
             <input

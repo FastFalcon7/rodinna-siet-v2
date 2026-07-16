@@ -410,6 +410,16 @@ export function icsToken(): string | null {
   return sha256Hex(`rodinna-ics:${env.ICS_SECRET}`).slice(0, 40);
 }
 
+/**
+ * Osobný token pre per-user ICS feed (ladenie 07/2026, bod 5). Odvodený z
+ * ICS_SECRET + userId → každý má vlastný odkaz, ktorý zahrnie aj jeho súkromné
+ * a podskupinové udalosti (nielen rodinné ako spoločný feed).
+ */
+export function icsTokenFor(userId: string): string | null {
+  if (!env.ICS_SECRET) return null;
+  return sha256Hex(`rodinna-ics:${env.ICS_SECRET}:${userId}`).slice(0, 40);
+}
+
 function icsEscape(s: string): string {
   return s.replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\n/g, '\\n');
 }
@@ -418,21 +428,31 @@ function icsDateTime(d: Date): string {
   return d.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
 }
 
-/** VCALENDAR: manuálne udalosti (od -30 d) + narodeniny ako ročné RRULE. */
-export async function buildIcs(): Promise<string> {
+/**
+ * VCALENDAR: manuálne udalosti (od -30 d) + narodeniny ako ročné RRULE.
+ * Bez `viewerId` = spoločný feed (len rodinné udalosti). S `viewerId` = osobný
+ * feed: rodinné + vlastné súkromné + udalosti podskupín, ktorých je členom
+ * (rovnaká viditeľnosť ako agenda; ladenie 07/2026, bod 5).
+ */
+export async function buildIcs(viewerId?: string): Promise<string> {
   const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-  const rows = await db
+  const all = await db
     .select()
     .from(events)
-    .where(
-      and(
-        isNull(events.deletedAt),
-        sql`${events.source} <> 'birthday'`,
-        eq(events.visibility, 'family'),
-        gte(events.startsAt, since),
-      ),
-    )
+    .where(and(isNull(events.deletedAt), sql`${events.source} <> 'birthday'`, gte(events.startsAt, since)))
     .orderBy(asc(events.startsAt));
+  let rows = all.filter((e) => e.visibility === 'family');
+  if (viewerId) {
+    const mine = await viewerRoomIds(viewerId);
+    const shares = await db.select().from(eventRooms);
+    const sharedWithMe = new Set(shares.filter((sh) => mine.has(sh.roomId)).map((sh) => sh.eventId));
+    rows = all.filter(
+      (e) =>
+        e.visibility === 'family' ||
+        e.createdBy === viewerId ||
+        (e.visibility === 'rooms' && sharedWithMe.has(e.id)),
+    );
+  }
   const people = await db
     .select({ id: users.id, displayName: users.displayName, birthday: users.birthday })
     .from(users)

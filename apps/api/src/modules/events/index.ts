@@ -23,6 +23,7 @@ import {
   deleteEvent,
   getEvent,
   icsToken,
+  icsTokenFor,
   listAgenda,
   removeEventMedia,
   setRsvp,
@@ -62,22 +63,32 @@ router.get('/', requireAuth, zValidator('query', AgendaQuerySchema), async (c) =
  * token odvodený z ICS_SECRET. Bez nastaveného tajomstva je feed vypnutý.
  */
 router.get('/calendar.ics', async (c) => {
-  const expected = icsToken();
-  if (!expected) return c.text('ICS feed nie je nakonfigurovaný', 404);
-  if (!timingSafeEqualStr(c.req.query('token') ?? '', expected)) {
-    return c.text('Unauthorized', 401);
-  }
-  return c.body(await buildIcs(), 200, {
+  const provided = c.req.query('token') ?? '';
+  const headers = {
     'content-type': 'text/calendar; charset=utf-8',
     'content-disposition': 'inline; filename=rodinna.ics',
-  });
+  };
+  // Osobný feed (?u=<userId>) zahŕňa aj súkromné/podskupinové udalosti daného
+  // usera; bez `u` ostáva spoločný feed (len rodinné) pre spätnu kompatibilitu.
+  const uid = c.req.query('u');
+  if (uid) {
+    const expected = icsTokenFor(uid);
+    if (!expected) return c.text('ICS feed nie je nakonfigurovaný', 404);
+    if (!timingSafeEqualStr(provided, expected)) return c.text('Unauthorized', 401);
+    return c.body(await buildIcs(uid), 200, headers);
+  }
+  const expected = icsToken();
+  if (!expected) return c.text('ICS feed nie je nakonfigurovaný', 404);
+  if (!timingSafeEqualStr(provided, expected)) return c.text('Unauthorized', 401);
+  return c.body(await buildIcs(), 200, headers);
 });
 
 /** GET /api/events/ics-url — osobná subscribe URL (zobrazí ju kalendár UI). */
 router.get('/ics-url', requireAuth, (c) => {
-  const token = icsToken();
+  const me = c.get('user')!;
+  const token = icsTokenFor(me.id);
   return c.json({
-    url: token ? `${env.PUBLIC_WEB_ORIGIN}/api/events/calendar.ics?token=${token}` : null,
+    url: token ? `${env.PUBLIC_WEB_ORIGIN}/api/events/calendar.ics?u=${me.id}&token=${token}` : null,
   });
 });
 
