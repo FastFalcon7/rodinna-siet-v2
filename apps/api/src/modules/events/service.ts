@@ -325,6 +325,26 @@ export async function updateEvent(
   if (event.createdBy !== userId && !isAdmin) {
     throw new ForbiddenError('Udalosť môže upraviť len jej autor alebo admin');
   }
+
+  // Zmena viditeľnosti (bod 6 — parita s tvorbou). Pri 'rooms' overíme členstvo
+  // a prepíšeme väzby; pri prechode mimo 'family' zmažeme feed kartu, nech sa
+  // udalosť neukáže celej rodine.
+  if (input.visibility !== undefined) {
+    const roomIds = [...new Set(input.roomIds ?? [])];
+    if (input.visibility === 'rooms') {
+      if (roomIds.length === 0) throw new BadRequestError('Vyber aspoň jednu skupinu');
+      await verifyRoomsMembership(roomIds, userId);
+      await db.delete(eventRooms).where(eq(eventRooms.eventId, eventId));
+      await db.insert(eventRooms).values(roomIds.map((roomId) => ({ eventId, roomId })));
+    } else {
+      await db.delete(eventRooms).where(eq(eventRooms.eventId, eventId));
+    }
+    if (input.visibility !== 'family') {
+      await db.delete(feedCards).where(and(eq(feedCards.module, 'events'), eq(feedCards.entityId, eventId)));
+      await publishCrossProcess(APP_TOPIC, { t: 'feed:card', module: 'events', entityId: eventId });
+    }
+  }
+
   const updated = await db
     .update(events)
     .set({
@@ -335,6 +355,7 @@ export async function updateEvent(
       ...(input.location !== undefined ? { location: input.location } : {}),
       ...(input.bodyMd !== undefined ? { bodyMd: input.bodyMd } : {}),
       ...(input.rsvp !== undefined ? { rsvp: input.rsvp } : {}),
+      ...(input.visibility !== undefined ? { visibility: input.visibility } : {}),
     })
     .where(eq(events.id, eventId))
     .returning();
