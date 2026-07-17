@@ -132,7 +132,9 @@ rodina reálne používa. Zhrnutie (detaily v histórii commitov, hľadaj „lad
 - **Fotky**: vo Feede/Chate/komentároch sa zobrazuje len úvodná fotka s
   badge „+N fotiek"; klik otvorí mriežku všetkých fotiek (PhotoBrowser) s
   vlastným hromadným výberom (Do albumu / Do poznámky / Do udalosti).
-- **Video na iPhone zostáva otvorená téma** — pozri
+- **Video na iPhone**: príčina nájdená a opravená (chunked 206 bez
+  `Content-Length` + neukončený stream z media endpointu — iOS AVFoundation
+  to odmieta, PC toleroval); rozbor v
   [`docs/DEPLOY_RUNBOOK.md` §9](./docs/DEPLOY_RUNBOOK.md).
 
 ---
@@ -213,5 +215,5 @@ krok za krokom v [`docs/DEPLOY_RUNBOOK.md`](./docs/DEPLOY_RUNBOOK.md).
 Pozri `ARCHITECTURE_V2.md §13` a [`docs/MODULES_PLAN_PHASE2.md`](./docs/MODULES_PLAN_PHASE2.md).
 Hotové: **T1–T9 (Phase 1 jadro) + M0–M8 (Phase 2 moduly).**
 Otvorené: T2b (Passkey), feed virtualizácia, diary push po manuálnom zápise,
-kvalita LLM obsahu (denník, kvízy), prehrávanie videa na iPhone — pozri
+kvalita LLM obsahu (denník, kvízy) — pozri
 [`docs/DEPLOY_RUNBOOK.md` §9](./docs/DEPLOY_RUNBOOK.md).
