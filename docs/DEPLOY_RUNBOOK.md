@@ -326,11 +326,16 @@ podrobnosti a kontext v `ARCHITECTURE_V2.md` §13 „Odchýlky implementácie":
   `dennikn.sk`). Zoznam feedov per kategória je `NEWS_FEEDS` v
   `apps/api/src/modules/news/service.ts` — zmena zdroja je úprava kódu (PR),
   nie config/env.
-- **Video na iPhone sa niekedy neprehrá.** Napriek transkódu na H.264/AAC
-  (worker `media.transcode`) a podpísanému capability tokenu v URL
-  (`apps/api/src/modules/media/urlToken.ts` — rieši, že iOS `AVPlayer`
-  neposiela session cookie) rodina opakovane hlásila čierne okno s
-  preškrtnutým prehrávaním na iPhone, zatiaľ čo na PC video hrá bez
-  problémov. Príčina nie je uzavretá; podľa dohody s rodinou je téma
-  **úmyselne odložená** na samostatné ladenie, nerieš ju mimochodom pri
-  inej práci na module Feed/Chat.
+- **Video na iPhone sa neprehrávalo — príčina nájdená a opravená (júl 2026).**
+  Nebol to kodek (transkód H.264/AAC fungoval — PC hral ten istý súbor) ani
+  auth (`?mt=` token fungoval). Koreň: serve endpoint `/api/media/:id` vracal
+  telo cez Hono `c.body(stream)` — Hono/Bun pri ReadableStream zahodí
+  explicitný `Content-Length`, pošle 206 ako `Transfer-Encoding: chunked`
+  a stream z `Bun.file().slice()` nikdy neukončí spojenie. iOS AVFoundation
+  začína probe requestom `Range: bytes=0-1`, čaká na koniec tela (ktorý
+  nepríde), timeoutne → preškrtnuté play. Chrome chunked toleruje a dáta
+  streamuje priebežne, preto na PC hralo. Fix: telo ide do `new Response`
+  ako BunFile/Blob — Bun nastaví presný `Content-Length` a spojenie korektne
+  zavrie (`apps/api/src/modules/media/index.ts`). Overené probe testami
+  (bytes=0-1, 0-, suffix, mid-range byte-presné, HEAD); reálne overenie na
+  iPhone po nasadení.

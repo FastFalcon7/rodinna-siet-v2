@@ -116,11 +116,15 @@ router.get('/:id/poster', requireAuthOrMediaToken, async (c) => {
   if (!row?.posterPath) return c.json({ error: 'Poster nenájdený' }, 404);
   const file = readMedia(row.posterPath);
   if (!(await file.exists())) return c.json({ error: 'Súbor chýba' }, 404);
-  c.header('Content-Type', 'image/jpeg');
-  c.header('X-Content-Type-Options', 'nosniff');
-  c.header('Cache-Control', 'private, max-age=31536000, immutable');
-  c.header('Content-Length', String(file.size));
-  return c.body(file.stream());
+  // BunFile priamo do Response (nie .stream() cez c.body) — viď komentár v /:id.
+  return new Response(file, {
+    headers: {
+      'Content-Type': 'image/jpeg',
+      'X-Content-Type-Options': 'nosniff',
+      'Cache-Control': 'private, max-age=31536000, immutable',
+      'Content-Length': String(file.size),
+    },
+  });
 });
 
 /**
@@ -140,32 +144,46 @@ router.get('/:id', requireAuthOrMediaToken, async (c) => {
   // Skutočná veľkosť z disku — playback súbor má inú veľkosť než originál v DB.
   const size = file.size;
 
-  c.header('Content-Type', usePlayback ? 'video/mp4' : row.mime);
-  c.header('Accept-Ranges', 'bytes');
-  c.header('X-Content-Type-Options', 'nosniff');
-  // Obsah je nemenný (nikdy neprepisujeme existujúce id) → dlhý cache.
-  c.header('Cache-Control', 'private, max-age=31536000, immutable');
+  const headers: Record<string, string> = {
+    'Content-Type': usePlayback ? 'video/mp4' : row.mime,
+    'Accept-Ranges': 'bytes',
+    'X-Content-Type-Options': 'nosniff',
+    // Obsah je nemenný (nikdy neprepisujeme existujúce id) → dlhý cache.
+    'Cache-Control': 'private, max-age=31536000, immutable',
+  };
 
   if (row.kind === 'file') {
     const name = (row.fileName ?? `subor.${row.storagePath.split('.').pop()}`).replace(/["\\\r\n]/g, '');
-    c.header('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(name)}`);
+    headers['Content-Disposition'] = `attachment; filename*=UTF-8''${encodeURIComponent(name)}`;
+  }
+
+  // KRITICKÉ pre iOS video (ladenie 07/2026, koreň „preškrtnutého play"):
+  // telo musí ísť do Response ako BunFile/Blob, NIE cez c.body(stream).
+  // Hono/Bun pri ReadableStream zahodí explicitný Content-Length, pošle 206
+  // ako Transfer-Encoding: chunked a stream z file.slice() neukončí spojenie
+  // — AVFoundation čaká na koniec tela (probe bytes=0-1), timeoutne a video
+  // označí za neprehrateľné. Chrome to toleruje, preto na PC hralo.
+  // S Blob telom Bun nastaví presný Content-Length a spojenie korektne zavrie.
+
+  // HEAD: hlavičky vrátane dĺžky, bez tela.
+  if (c.req.method === 'HEAD') {
+    headers['Content-Length'] = String(size);
+    return new Response(null, { headers });
   }
 
   const rangeHeader = c.req.header('range');
   if (rangeHeader) {
     const range = parseRange(rangeHeader, size);
     if (!range) {
-      c.header('Content-Range', `bytes */${size}`);
-      return c.body(null, 416);
+      headers['Content-Range'] = `bytes */${size}`;
+      return new Response(null, { status: 416, headers });
     }
     const [start, end] = range;
-    c.header('Content-Range', `bytes ${start}-${end}/${size}`);
-    c.header('Content-Length', String(end - start + 1));
-    return c.body(file.slice(start, end + 1).stream(), 206);
+    headers['Content-Range'] = `bytes ${start}-${end}/${size}`;
+    return new Response(file.slice(start, end + 1), { status: 206, headers });
   }
 
-  c.header('Content-Length', String(size));
-  return c.body(file.stream());
+  return new Response(file, { headers });
 });
 
 export const mediaModule: AppModule = {
