@@ -25,8 +25,23 @@ const RSVP_LABELS: { status: RsvpStatus; label: string }[] = [
 export function eventTimeText(e: EventPublic): string {
   const d = new Date(e.startsAt);
   const date = d.toLocaleDateString('sk-SK', { weekday: 'short', day: 'numeric', month: 'numeric' });
-  if (e.allDay) return date;
+  const end = e.endsAt ? new Date(e.endsAt) : null;
+  if (e.allDay) {
+    // Viacdňová (ladenie 07/2026): „pi 18. 7. – ut 28. 7." (endsAt = posledný deň, vrátane).
+    if (end && e.endsAt!.slice(0, 10) !== e.startsAt.slice(0, 10)) {
+      return `${date} – ${end.toLocaleDateString('sk-SK', { weekday: 'short', day: 'numeric', month: 'numeric' })}`;
+    }
+    return date;
+  }
   const time = d.toLocaleTimeString('sk-SK', { hour: 'numeric', minute: '2-digit' });
+  if (end) {
+    const endTime = end.toLocaleTimeString('sk-SK', { hour: 'numeric', minute: '2-digit' });
+    // Koniec v iný deň (dáta z API to dovoľujú) → vypíš aj dátum konca.
+    const sameDay = d.toDateString() === end.toDateString();
+    return sameDay
+      ? `${date} ${time} – ${endTime}`
+      : `${date} ${time} – ${end.toLocaleDateString('sk-SK', { weekday: 'short', day: 'numeric', month: 'numeric' })} ${endTime}`;
+  }
   return `${date} ${time}`;
 }
 

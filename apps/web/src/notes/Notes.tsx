@@ -7,12 +7,9 @@ import { consumePendingNav } from '../app/navigate';
 import { buildAppLink } from '../shared/appLink';
 import { relativeTime } from '../shared/time';
 import { PhotoGallery } from '../shared/PhotoGallery';
-import { UploadPreviews } from '../shared/UploadPreviews';
-import { useMediaUpload } from '../shared/useMediaUpload';
 import { useSwipeBack } from '../shared/useSwipeBack';
 import { useAutoGrow } from '../shared/useAutoGrow';
-import { TitleInput } from '../shared/TitleInput';
-import { VisibilityPicker, type ShareVisibility } from '../shared/VisibilityPicker';
+import { NoteForm } from './NoteForm';
 
 /**
  * Modul Zoznamy & Poznámky (M3): rodinne zdieľané zoznamy s odškrtávaním
@@ -97,36 +94,6 @@ export function Notes() {
 
 function NewNoteButtons({ onCreated }: { onCreated: (id: string) => void }) {
   const [mode, setMode] = useState<'list' | 'note' | null>(null);
-  const [title, setTitle] = useState('');
-  // Nové poznámky sú predvolene súkromné (ladenie 07/2026) — vidí ich len autor.
-  const [visibility, setVisibility] = useState<ShareVisibility>('private');
-  const [roomIds, setRoomIds] = useState<string[]>([]);
-  const [busy, setBusy] = useState(false);
-  const uploads = useMediaUpload(20);
-  const fileRef = useRef<HTMLInputElement>(null);
-
-  const create = async () => {
-    if (!title.trim() || busy || !mode || uploads.uploading) return;
-    if (visibility === 'rooms' && roomIds.length === 0) return;
-    setBusy(true);
-    try {
-      const n = await notesApi.create({
-        kind: mode,
-        visibility,
-        title: title.trim(),
-        bodyMd: '',
-        items: [],
-        mediaIds: uploads.mediaIds,
-        roomIds: visibility === 'rooms' ? roomIds : [],
-      });
-      setMode(null);
-      setTitle('');
-      uploads.clear();
-      onCreated(n.id);
-    } finally {
-      setBusy(false);
-    }
-  };
 
   if (!mode) {
     return (
@@ -147,52 +114,16 @@ function NewNoteButtons({ onCreated }: { onCreated: (id: string) => void }) {
     );
   }
   return (
-    <div className="space-y-2 rounded-2xl border border-neutral-200 bg-white p-3 dark:border-neutral-800 dark:bg-neutral-900">
-      <UploadPreviews items={uploads.items} onRemove={uploads.remove} onMakeCover={uploads.makeFirst} />
-      <div className="flex gap-2">
-        <TitleInput
-          value={title}
-          onChange={setTitle}
-          onSubmit={() => void create()}
-          autoFocus
-          placeholder={mode === 'list' ? 'Názov zoznamu (napr. Nákup)' : 'Názov poznámky'}
-          className="min-w-0 flex-1"
-        />
-        <button
-          onClick={() => fileRef.current?.click()}
-          title="Pridať prílohu"
-          aria-label="Pridať prílohu"
-          className="grid h-8 w-8 shrink-0 place-items-center self-center rounded-full text-xl leading-none text-neutral-500 hover:bg-neutral-100 dark:hover:bg-neutral-800"
-        >
-          +
-        </button>
-        <button onClick={() => setMode(null)} className="text-sm text-neutral-400">Zrušiť</button>
-        <button
-          onClick={() => void create()}
-          disabled={!title.trim() || busy || uploads.uploading}
-          className="rounded-lg bg-accent px-3 py-1.5 text-sm font-medium text-white disabled:opacity-40"
-        >
-          Vytvoriť
-        </button>
-      </div>
-      <VisibilityPicker
-        visibility={visibility}
-        roomIds={roomIds}
-        onChange={(v, r) => {
-          setVisibility(v);
-          setRoomIds(r);
+    <div className="rounded-2xl border border-neutral-200 bg-white p-3 dark:border-neutral-800 dark:bg-neutral-900">
+      <NoteForm
+        initialKind={mode}
+        submitLabel="Vytvoriť"
+        busyLabel="Vytváram…"
+        onDone={(n) => {
+          setMode(null);
+          onCreated(n.id);
         }}
-      />
-      <input
-        ref={fileRef}
-        type="file"
-        multiple
-        hidden
-        onChange={(e) => {
-          const files = Array.from(e.target.files ?? []);
-          e.target.value = '';
-          if (files.length > 0) uploads.addFiles(files);
-        }}
+        onCancel={() => setMode(null)}
       />
     </div>
   );
@@ -212,8 +143,9 @@ function NoteDetailView({ noteId, onBack }: { noteId: string; onBack: () => void
   const [toast, setToast] = useState<string | null>(null);
   const [uploadingMedia, setUploadingMedia] = useState(false);
   const [locating, setLocating] = useState(false);
-  const [visPick, setVisPick] = useState(false);
-  const [visDraft, setVisDraft] = useState<{ visibility: ShareVisibility; roomIds: string[] } | null>(null);
+  // Jednotná editácia (7B): ⋯ menu → NoteForm, ako pri udalostiach/albumoch.
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [editing, setEditing] = useState(false);
   const mediaFileRef = useRef<HTMLInputElement>(null);
   const bodyRef = useRef<HTMLTextAreaElement>(null);
   useAutoGrow(bodyRef, body ?? '', 60);
@@ -328,6 +260,30 @@ function NoteDetailView({ noteId, onBack }: { noteId: string; onBack: () => void
   };
 
   const noteImages = note.media.filter((m) => m.kind === 'image');
+  const isAuthor = user ? note.createdBy.id === user.id : false;
+
+  // Jednotná editácia (7B): rovnaký formulár ako tvorba (názov, fotky,
+  // viditeľnosť) — text/položky sa ďalej upravujú priamo v detaile.
+  if (editing) {
+    return (
+      <div className="px-4 py-4">
+        <div className="rounded-2xl border border-neutral-200 bg-white p-4 dark:border-neutral-800 dark:bg-neutral-900">
+          <NoteForm
+            note={note}
+            canEditVisibility={isAuthor}
+            submitLabel="Uložiť"
+            busyLabel="Ukladám…"
+            onDone={(n) => {
+              setNote(n);
+              setEditing(false);
+              flash('Uložené ✓');
+            }}
+            onCancel={() => setEditing(false)}
+          />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="px-4 py-4" {...swipeBack}>
@@ -337,6 +293,7 @@ function NoteDetailView({ noteId, onBack }: { noteId: string; onBack: () => void
         </button>
         <div className="min-w-0 flex-1">
           <h2 className="truncate font-semibold">
+            {note.visibility === 'private' ? '🔒 ' : note.visibility === 'rooms' ? '👥 ' : ''}
             {note.kind === 'list' ? '✅' : '📝'} {note.title}
           </h2>
           <p className="text-xs text-neutral-500">
@@ -344,15 +301,6 @@ function NoteDetailView({ noteId, onBack }: { noteId: string; onBack: () => void
             {relativeTime(note.updatedAt)}
           </p>
         </div>
-        {user && note.createdBy.id === user.id && (
-          <button
-            onClick={() => setVisPick(true)}
-            title="Zmeniť viditeľnosť"
-            className="shrink-0 rounded-lg px-2 py-1.5 text-sm"
-          >
-            {note.visibility === 'private' ? '🔒' : note.visibility === 'rooms' ? '👥' : '👪'}
-          </button>
-        )}
         <button
           onClick={() => void notesApi.update(noteId, { pinned: !note.pinned }).then(setNote)}
           title={note.pinned ? 'Odopnúť' : 'Pripnúť hore'}
@@ -367,6 +315,56 @@ function NoteDetailView({ noteId, onBack }: { noteId: string; onBack: () => void
         >
           💬 Zdieľať
         </button>
+        {/* ⋯ menu — rovnaké ako na karte udalosti (7B): Upraviť / Duplikovať / Zmazať. */}
+        <div className="relative shrink-0">
+          <button
+            onClick={() => setMenuOpen((v) => !v)}
+            aria-label="Možnosti"
+            className="grid h-8 w-8 place-items-center rounded-full text-lg leading-none text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800"
+          >
+            ⋯
+          </button>
+          {menuOpen && (
+            <>
+              <div className="fixed inset-0 z-10" onClick={() => setMenuOpen(false)} />
+              <div className="absolute right-0 top-9 z-20 w-44 overflow-hidden rounded-xl border border-black/10 bg-white shadow-lg dark:border-white/10 dark:bg-neutral-800">
+                <button
+                  onClick={() => {
+                    setMenuOpen(false);
+                    setEditing(true);
+                  }}
+                  className="block w-full px-3 py-2 text-left text-sm hover:bg-neutral-100 dark:hover:bg-neutral-700"
+                >
+                  Upraviť
+                </button>
+                <button
+                  onClick={() => {
+                    setMenuOpen(false);
+                    void notesApi.duplicate(noteId).then((n) => {
+                      flash(`Kópia „${n.title}" vytvorená ✓`);
+                    });
+                  }}
+                  className="block w-full px-3 py-2 text-left text-sm hover:bg-neutral-100 dark:hover:bg-neutral-700"
+                >
+                  Duplikovať (šablóna)
+                </button>
+                {isOwner && (
+                  <button
+                    onClick={() => {
+                      setMenuOpen(false);
+                      if (confirm('Zmazať tento zoznam/poznámku?')) {
+                        void notesApi.remove(noteId).then(onBack);
+                      }
+                    }}
+                    className="block w-full px-3 py-2 text-left text-sm text-red-600 hover:bg-neutral-100 dark:hover:bg-neutral-700"
+                  >
+                    Zmazať
+                  </button>
+                )}
+              </div>
+            </>
+          )}
+        </div>
       </div>
 
       {/* Fotky poznámky (ladenie 07/2026) + pridávanie príloh a polohy. */}
@@ -562,70 +560,6 @@ function NoteDetailView({ noteId, onBack }: { noteId: string; onBack: () => void
             </ul>
           )}
         </>
-      )}
-
-      <div className="mt-4 flex gap-3 text-sm">
-        <button
-          onClick={() =>
-            void notesApi.duplicate(noteId).then((n) => {
-              flash(`Kópia „${n.title}" vytvorená ✓`);
-            })
-          }
-          className="text-neutral-500 underline underline-offset-2"
-        >
-          Duplikovať (šablóna)
-        </button>
-        {isOwner && (
-          <button
-            onClick={() => {
-              if (confirm('Zmazať tento zoznam/poznámku?')) {
-                void notesApi.remove(noteId).then(onBack);
-              }
-            }}
-            className="text-red-500 underline underline-offset-2"
-          >
-            Zmazať
-          </button>
-        )}
-      </div>
-
-      {visPick && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 md:items-center" onClick={() => setVisPick(false)}>
-          <div
-            className="w-full max-w-md space-y-3 rounded-t-2xl bg-white p-4 md:rounded-2xl dark:bg-neutral-900"
-            style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h3 className="font-semibold">Kto poznámku vidí</h3>
-            <VisibilityPicker
-              visibility={(visDraft ?? { visibility: note.visibility, roomIds: note.roomIds }).visibility}
-              roomIds={(visDraft ?? { visibility: note.visibility, roomIds: note.roomIds }).roomIds}
-              onChange={(v, r) => setVisDraft({ visibility: v, roomIds: r })}
-            />
-            <div className="flex justify-end gap-2">
-              <button onClick={() => { setVisPick(false); setVisDraft(null); }} className="rounded-lg px-3 py-1.5 text-sm text-neutral-500">
-                Zrušiť
-              </button>
-              <button
-                onClick={() => {
-                  const d = visDraft ?? { visibility: note.visibility, roomIds: note.roomIds };
-                  if (d.visibility === 'rooms' && d.roomIds.length === 0) return;
-                  void notesApi
-                    .update(noteId, { visibility: d.visibility, roomIds: d.visibility === 'rooms' ? d.roomIds : [] })
-                    .then((n) => {
-                      setNote(n);
-                      setVisPick(false);
-                      setVisDraft(null);
-                      flash('Viditeľnosť zmenená ✓');
-                    });
-                }}
-                className="rounded-lg bg-accent px-3 py-1.5 text-sm font-medium text-white"
-              >
-                Uložiť
-              </button>
-            </div>
-          </div>
-        </div>
       )}
 
       {sharePick && (
