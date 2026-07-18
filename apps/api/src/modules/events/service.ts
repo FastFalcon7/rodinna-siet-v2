@@ -1,4 +1,4 @@
-import { and, asc, eq, gte, inArray, isNull, lte, sql } from 'drizzle-orm';
+import { and, asc, eq, gte, inArray, isNull, lte, or, sql } from 'drizzle-orm';
 import type {
   AgendaResponse,
   BirthdayPublic,
@@ -226,8 +226,10 @@ export async function listAgenda(from: Date, to: Date, viewerId: string): Promis
         isNull(events.deletedAt),
         // Narodeninové riadky sú len nosič feed karty — agenda ich počíta virtuálne.
         sql`${events.source} <> 'birthday'`,
-        gte(events.startsAt, from),
         lte(events.startsAt, to),
+        // Začína v okne ALEBO ešte prebieha (viacdňová, napr. dovolenka) —
+        // endsAt je pri celodennej posledný deň (vrátane), ladenie 07/2026.
+        or(gte(events.startsAt, from), gte(events.endsAt, from)),
       ),
     )
     .orderBy(asc(events.startsAt));
@@ -324,6 +326,14 @@ export async function updateEvent(
   const event = await getEventRow(eventId, userId);
   if (event.createdBy !== userId && !isAdmin) {
     throw new ForbiddenError('Udalosť môže upraviť len jej autor alebo admin');
+  }
+
+  // Rozsah: koniec nesmie byť pred začiatkom (create to rieši Zod refine,
+  // update je partial → validujeme efektívne hodnoty tu).
+  const nextStarts = input.startsAt !== undefined ? new Date(input.startsAt) : event.startsAt;
+  const nextEnds = input.endsAt !== undefined ? (input.endsAt ? new Date(input.endsAt) : null) : event.endsAt;
+  if (nextEnds && nextEnds < nextStarts) {
+    throw new BadRequestError('Koniec nemôže byť pred začiatkom');
   }
 
   // Zmena viditeľnosti (bod 6 — parita s tvorbou). Pri 'rooms' overíme členstvo
@@ -477,6 +487,11 @@ export async function buildIcs(viewerId?: string): Promise<string> {
       e.allDay
         ? `DTSTART;VALUE=DATE:${e.startsAt.toISOString().slice(0, 10).replace(/-/g, '')}`
         : `DTSTART:${icsDateTime(e.startsAt)}`,
+      // Celodenná viacdňová: endsAt je posledný deň (vrátane), ICS DTEND je
+      // exkluzívny → +1 deň. Časová: DTEND priamo.
+      ...(e.endsAt && e.allDay
+        ? [`DTEND;VALUE=DATE:${new Date(e.endsAt.getTime() + 86_400_000).toISOString().slice(0, 10).replace(/-/g, '')}`]
+        : []),
       ...(e.endsAt && !e.allDay ? [`DTEND:${icsDateTime(e.endsAt)}`] : []),
       `SUMMARY:${icsEscape(e.title)}`,
       ...(e.location ? [`LOCATION:${icsEscape(e.location)}`] : []),

@@ -39,8 +39,11 @@ export function Calendar() {
     if (!agenda) return [];
     const byDay = new Map<string, { events: EventPublic[]; birthdays: AgendaResponse['birthdays'] }>();
     const dayOf = (iso: string) => iso.slice(0, 10);
+    const today = new Date().toISOString().slice(0, 10);
     for (const e of agenda.events) {
-      const d = dayOf(e.startsAt);
+      // Prebiehajúca viacdňová (začala pred dneškom) → zaraď pod „Dnes".
+      const startDay = dayOf(e.startsAt);
+      const d = startDay < today ? today : startDay;
       const entry = byDay.get(d) ?? { events: [], birthdays: [] };
       entry.events.push(e);
       byDay.set(d, entry);

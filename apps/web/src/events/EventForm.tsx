@@ -53,6 +53,13 @@ export function EventForm({
     event && !event.allDay ? `${pad(start!.getHours())}:${pad(start!.getMinutes())}` : '17:00',
   );
   const [allDay, setAllDay] = useState(event?.allDay ?? false);
+  // Rozsah (ladenie 07/2026): celodenná viacdňová (dátum do, vrátane) alebo
+  // od–do v hodinách v rámci dňa. Prázdne = bez konca (správanie ako doteraz).
+  const end = event?.endsAt ? new Date(event.endsAt) : null;
+  const [endDate, setEndDate] = useState(event?.allDay && event.endsAt ? event.endsAt.slice(0, 10) : '');
+  const [timeTo, setTimeTo] = useState(
+    event && !event.allDay && end ? `${pad(end.getHours())}:${pad(end.getMinutes())}` : '',
+  );
   const [location, setLocation] = useState(event?.location ?? '');
   const [locating, setLocating] = useState(false);
   const [bodyMd, setBodyMd] = useState(event?.bodyMd ?? '');
@@ -69,11 +76,13 @@ export function EventForm({
   // Z chatu je viditeľnosť daná miestnosťou; inde ju drží picker.
   const effVisibility: ShareVisibility = roomId ? 'rooms' : visibility;
   const effRoomIds = roomId ? [roomId] : visibility === 'rooms' ? roomIds : [];
+  const rangeInvalid = allDay ? endDate !== '' && endDate < date : timeTo !== '' && timeTo <= time;
   const canSubmit =
     title.trim().length > 0 &&
     date.length > 0 &&
     !busy &&
     !uploads.uploading &&
+    !rangeInvalid &&
     (effVisibility !== 'rooms' || effRoomIds.length > 0);
 
   /** 📍 vyplní pole Miesto odkazom na mapu z GPS. */
@@ -114,11 +123,21 @@ export function EventForm({
       const startsAt = allDay
         ? new Date(`${date}T00:00:00Z`).toISOString()
         : new Date(`${date}T${time}:00`).toISOString();
+      // Celodenná: endsAt = 00:00Z posledného dňa (vrátane); ICS si prepočíta
+      // exkluzívny DTEND sám. Časová: koniec v ten istý deň.
+      const endsAt = allDay
+        ? endDate && endDate > date
+          ? new Date(`${endDate}T00:00:00Z`).toISOString()
+          : null
+        : timeTo
+          ? new Date(`${date}T${timeTo}:00`).toISOString()
+          : null;
 
       if (event) {
         let result = await eventsApi.update(event.id, {
           title: title.trim(),
           startsAt,
+          endsAt,
           allDay,
           location: location.trim(),
           bodyMd: bodyMd.trim(),
@@ -135,6 +154,7 @@ export function EventForm({
         const created = await eventsApi.create({
           title: title.trim(),
           startsAt,
+          endsAt,
           allDay,
           location: location.trim(),
           bodyMd: bodyMd.trim(),
@@ -170,19 +190,44 @@ export function EventForm({
           onChange={(e) => setDate(e.target.value)}
           className="rounded-lg border border-neutral-300 bg-transparent px-2.5 py-1.5 text-sm dark:border-neutral-700"
         />
-        {!allDay && (
-          <input
-            type="time"
-            value={time}
-            onChange={(e) => setTime(e.target.value)}
-            className="rounded-lg border border-neutral-300 bg-transparent px-2.5 py-1.5 text-sm dark:border-neutral-700"
-          />
+        {allDay ? (
+          <>
+            <span className="text-sm text-neutral-500">do</span>
+            <input
+              type="date"
+              value={endDate}
+              min={date || undefined}
+              onChange={(e) => setEndDate(e.target.value)}
+              title="Posledný deň (voliteľné — napr. koniec dovolenky)"
+              className="rounded-lg border border-neutral-300 bg-transparent px-2.5 py-1.5 text-sm dark:border-neutral-700"
+            />
+          </>
+        ) : (
+          <>
+            <input
+              type="time"
+              value={time}
+              onChange={(e) => setTime(e.target.value)}
+              className="rounded-lg border border-neutral-300 bg-transparent px-2.5 py-1.5 text-sm dark:border-neutral-700"
+            />
+            <span className="text-sm text-neutral-500">do</span>
+            <input
+              type="time"
+              value={timeTo}
+              onChange={(e) => setTimeTo(e.target.value)}
+              title="Koniec (voliteľné)"
+              className="rounded-lg border border-neutral-300 bg-transparent px-2.5 py-1.5 text-sm dark:border-neutral-700"
+            />
+          </>
         )}
         <label className="flex items-center gap-1.5 text-sm">
           <input type="checkbox" checked={allDay} onChange={(e) => setAllDay(e.target.checked)} className="accent-accent" />
           Celý deň
         </label>
       </div>
+      {rangeInvalid && (
+        <p className="text-xs text-red-600">Koniec nemôže byť pred začiatkom.</p>
+      )}
       <div className="flex gap-2">
         <input
           value={location}
