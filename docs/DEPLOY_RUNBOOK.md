@@ -328,14 +328,17 @@ podrobnosti a kontext v `ARCHITECTURE_V2.md` §13 „Odchýlky implementácie":
   nie config/env.
 - **Video na iPhone sa neprehrávalo — príčina nájdená a opravená (júl 2026).**
   Nebol to kodek (transkód H.264/AAC fungoval — PC hral ten istý súbor) ani
-  auth (`?mt=` token fungoval). Koreň: serve endpoint `/api/media/:id` vracal
-  telo cez Hono `c.body(stream)` — Hono/Bun pri ReadableStream zahodí
-  explicitný `Content-Length`, pošle 206 ako `Transfer-Encoding: chunked`
-  a stream z `Bun.file().slice()` nikdy neukončí spojenie. iOS AVFoundation
-  začína probe requestom `Range: bytes=0-1`, čaká na koniec tela (ktorý
-  nepríde), timeoutne → preškrtnuté play. Chrome chunked toleruje a dáta
-  streamuje priebežne, preto na PC hralo. Fix: telo ide do `new Response`
-  ako BunFile/Blob — Bun nastaví presný `Content-Length` a spojenie korektne
-  zavrie (`apps/api/src/modules/media/index.ts`). Overené probe testami
-  (bytes=0-1, 0-, suffix, mid-range byte-presné, HEAD); reálne overenie na
-  iPhone po nasadení.
+  auth (`?mt=` token fungoval). Koreň (overený repro testom na Bun 1.2.23 +
+  hono 4.12.27 s produkčnou kompozíciou middleware): range odpoveď z
+  `/api/media/:id` s telom ako Blob výsek/stream sa pri prechode middleware
+  reťazou (cors/logger) a vnorenými routermi prebalí (telo Blob → stream)
+  a Bun 1.2 pri streame z `file.slice()` pošle **celý súbor** —
+  `HTTP 206` s `Content-Range: bytes 0-1/399224` nieslo `Content-Length:
+  399224` a plné telo. Chrome takú odpoveď zožerie (preto PC hral), iOS
+  AVFoundation začína striktným probe `Range: bytes=0-1` a odmietne ju →
+  preškrtnuté play; priamo v Safari (bez probe) video hralo. Fix: výsek sa
+  načíta do pamäte (`arrayBuffer`, strop 8 MB na odpoveď — klient si zvyšok
+  vypýta ďalším requestom) a telo s pevnou dĺžkou prežije akékoľvek
+  prebalenie (`apps/api/src/modules/media/index.ts`). Diagnostika:
+  `bun apps/api/scripts/video-diag.ts` (v api kontajneri) + akceptačný curl
+  s `Range: bytes=0-1` musí vrátiť `content-length: 2`.
