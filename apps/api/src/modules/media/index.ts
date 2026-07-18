@@ -158,12 +158,17 @@ router.get('/:id', requireAuthOrMediaToken, async (c) => {
   }
 
   // KRITICKÉ pre iOS video (ladenie 07/2026, koreň „preškrtnutého play"):
-  // telo musí ísť do Response ako BunFile/Blob, NIE cez c.body(stream).
-  // Hono/Bun pri ReadableStream zahodí explicitný Content-Length, pošle 206
-  // ako Transfer-Encoding: chunked a stream z file.slice() neukončí spojenie
-  // — AVFoundation čaká na koniec tela (probe bytes=0-1), timeoutne a video
-  // označí za neprehrateľné. Chrome to toleruje, preto na PC hralo.
-  // S Blob telom Bun nastaví presný Content-Length a spojenie korektne zavrie.
+  // range odpoveď NESMIE ísť von ako Blob výsek ani stream. Middleware reťaz
+  // (cors/logger) + vnorené routery Response prebalia (telo Blob → stream)
+  // a Bun 1.2 pri streame z file.slice() pošle CELÝ súbor s Content-Length
+  // celého súboru — 206 s Content-Range „bytes 0-1/…" tak nesie plné telo.
+  // Chrome to zožerie (preto PC hral), iOS AVFoundation probe bytes=0-1 takú
+  // odpoveď odmietne → preškrtnuté play. Overené repro testom na Bun 1.2.23
+  // + hono 4.12.27 s produkčnou kompozíciou middleware.
+  // Fix: výsek načítame do pamäte (ArrayBuffer) — telo s pevnou dĺžkou prežije
+  // akékoľvek prebalenie. Veľkosť drží pod kontrolou RANGE_CHUNK strop; klient
+  // si zvyšok vypýta ďalším requestom (bežná CDN prax, RFC 9110 §14).
+  const RANGE_CHUNK = 8 * 1024 * 1024;
 
   // HEAD: hlavičky vrátane dĺžky, bez tela.
   if (c.req.method === 'HEAD') {
@@ -178,9 +183,12 @@ router.get('/:id', requireAuthOrMediaToken, async (c) => {
       headers['Content-Range'] = `bytes */${size}`;
       return new Response(null, { status: 416, headers });
     }
-    const [start, end] = range;
-    headers['Content-Range'] = `bytes ${start}-${end}/${size}`;
-    return new Response(file.slice(start, end + 1), { status: 206, headers });
+    const [start, requestedEnd] = range;
+    const end = Math.min(requestedEnd, start + RANGE_CHUNK - 1);
+    const buf = await file.slice(start, end + 1).arrayBuffer();
+    headers['Content-Range'] = `bytes ${start}-${start + buf.byteLength - 1}/${size}`;
+    headers['Content-Length'] = String(buf.byteLength);
+    return new Response(buf, { status: 206, headers });
   }
 
   return new Response(file, { headers });

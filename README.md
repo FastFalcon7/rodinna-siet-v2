@@ -132,9 +132,9 @@ rodina reálne používa. Zhrnutie (detaily v histórii commitov, hľadaj „lad
 - **Fotky**: vo Feede/Chate/komentároch sa zobrazuje len úvodná fotka s
   badge „+N fotiek"; klik otvorí mriežku všetkých fotiek (PhotoBrowser) s
   vlastným hromadným výberom (Do albumu / Do poznámky / Do udalosti).
-- **Video na iPhone**: príčina nájdená a opravená (chunked 206 bez
-  `Content-Length` + neukončený stream z media endpointu — iOS AVFoundation
-  to odmieta, PC toleroval); rozbor v
+- **Video na iPhone**: príčina nájdená a opravená (range odpoveď media
+  endpointu niesla po prebalení middleware reťazou celý súbor namiesto
+  výseku — iOS AVFoundation to odmieta, PC toleroval); rozbor v
   [`docs/DEPLOY_RUNBOOK.md` §9](./docs/DEPLOY_RUNBOOK.md).
 
 ---
