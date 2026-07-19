@@ -10,6 +10,8 @@ import { CommandPalette } from './app/CommandPalette';
 import { MoreIcon, webModules, type WebModule } from './app/registry';
 import { useSwipeBack } from './shared/useSwipeBack';
 import { useAppBadge } from './shared/useAppBadge';
+import { useKeyboardScroll } from './shared/useKeyboardScroll';
+import { notificationsApi } from './lib/api';
 
 /**
  * App shell (DESIGN_REVIEW_FEED_CHAT.md §2, plán M0-3): tenký app bar +
@@ -33,6 +35,13 @@ function HomeInner() {
   // Puntík na ikone appky (bod 4) — presný počet neprečítaných správ, kým je
   // appka otvorená; pri 0 zmaže aj puntík nahodený service workerom.
   useAppBadge(useChat().totalUnread);
+  // iOS: prvé zaostrenie poľa po studenom štarte neposunie pole nad klávesnicu.
+  useKeyboardScroll();
+  // Otvorenie appky = novinky videné (feed/albumy/udalosti… sú na obrazovke) —
+  // in-app notifikácie sa označia prečítané, puntík klesne na neprečítaný chat.
+  useEffect(() => {
+    void notificationsApi.markRead().catch(() => {});
+  }, []);
   // Deep link z push notifikácie (/?room=…) → štart rovno v chate.
   const [tab, setTab] = useState<string>(() => (peekRoomParam() ? 'chat' : webModules[0]!.name));
 

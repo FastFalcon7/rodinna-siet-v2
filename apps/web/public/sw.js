@@ -137,9 +137,13 @@ self.addEventListener('push', (event) => {
         data: { url: data.url },
       });
       // Puntík na ikone appky aj pri zavretej appke (ladenie 07/2026, bod 4).
-      // Bez argumentu = len bodka; presný počet nastaví appka po otvorení.
+      // iOS nevie bodku bez čísla — worker posiela presný počet v data.badge.
       if (self.navigator.setAppBadge) {
-        await self.navigator.setAppBadge().catch(() => {});
+        const badge = typeof data.badge === 'number' ? data.badge : undefined;
+        await (badge === undefined
+          ? self.navigator.setAppBadge()
+          : self.navigator.setAppBadge(badge)
+        ).catch(() => {});
       }
     })(),
   );

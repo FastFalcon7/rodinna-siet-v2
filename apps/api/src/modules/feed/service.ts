@@ -303,6 +303,18 @@ export async function createPost(authorId: string, input: CreatePostInput, viewe
   }
 
   const [hydrated] = await hydratePosts([post], viewerId);
+
+  // Novinka pre rodinu (ladenie 07/2026): push + in-app notifikácia — cez ňu
+  // sa nový príspevok premietne aj do puntíka na ikone appky.
+  const { notifyUsers, allUserIdsExcept } = await import('../notifications/service');
+  const excerpt = input.bodyMd.trim().slice(0, 80) || (input.mediaIds.length > 0 ? '📷 Fotky' : '');
+  await notifyUsers(await allUserIdsExcept(authorId), 'feed.post', {
+    title: 'Nový príspevok vo Feede',
+    body: `${hydrated!.author.displayName}${excerpt ? `: ${excerpt}` : ''}`,
+    url: '/',
+    tag: 'feed',
+  });
+
   return hydrated!;
 }
 

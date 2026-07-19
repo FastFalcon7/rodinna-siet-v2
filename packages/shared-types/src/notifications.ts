@@ -9,6 +9,10 @@ import { z } from 'zod';
 /** Známe druhy notifikácií. Nové moduly sem pridávajú svoje (K3). */
 export const NOTIFICATION_KINDS = [
   'chat.message',
+  'feed.post',
+  'albums.created',
+  'notes.shared',
+  'events.created',
   'polls.closed',
   'events.reminder',
   'events.birthday',
@@ -22,6 +26,10 @@ export type NotificationKind = z.infer<typeof NotificationKindSchema>;
 /** Slovenské popisky pre nastavenia (jediný zdroj pravdy pre UI). */
 export const NOTIFICATION_KIND_LABELS: Record<NotificationKind, string> = {
   'chat.message': 'Nové správy v chate',
+  'feed.post': 'Nové príspevky vo Feede',
+  'albums.created': 'Nové albumy',
+  'notes.shared': 'Nové zoznamy a poznámky',
+  'events.created': 'Nové udalosti',
   'polls.closed': 'Výsledky ankiet',
   'events.reminder': 'Pripomienky udalostí',
   'events.birthday': 'Blížiace sa narodeniny',
@@ -38,6 +46,12 @@ export const NotificationPayloadSchema = z.object({
   url: z.string(),
   /** Tag zoskupuje push notifikácie (napr. roomId — nová správa nahradí starú). */
   tag: z.string().optional(),
+  /**
+   * Počet pre puntík na ikone appky (ladenie 07/2026): iOS nepozná bodku bez
+   * čísla, preto worker pri push odoslaní dopĺňa presný počet noviniek
+   * (neprečítaný chat + neprečítané notifikácie) per užívateľ.
+   */
+  badge: z.number().int().nonnegative().optional(),
 });
 export type NotificationPayload = z.infer<typeof NotificationPayloadSchema>;
 
