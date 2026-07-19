@@ -314,6 +314,29 @@ export async function createEvent(creatorId: string, input: CreateEventInput): P
   }
   await scheduleReminders(event);
   await publishCrossProcess(APP_TOPIC, { t: 'event:update', eventId: event.id });
+
+  // Novinka pre tých, čo udalosť vidia (ladenie 07/2026) — súkromná nikoho neruší.
+  if (input.visibility !== 'private') {
+    const { notifyUsers, allUserIdsExcept, roomMemberIdsExcept } = await import('../notifications/service');
+    const recipients =
+      input.visibility === 'family'
+        ? await allUserIdsExcept(creatorId)
+        : await roomMemberIdsExcept(roomIds, creatorId);
+    const who = await db.select({ displayName: users.displayName }).from(users).where(eq(users.id, creatorId)).limit(1);
+    const when = new Intl.DateTimeFormat('sk-SK', {
+      timeZone: 'Europe/Bratislava',
+      day: 'numeric',
+      month: 'numeric',
+      ...(input.allDay ? {} : { hour: 'numeric', minute: '2-digit' }),
+    }).format(startsAt);
+    await notifyUsers(recipients, 'events.created', {
+      title: input.rsvp ? 'Nová pozvánka' : 'Nová udalosť',
+      body: `${who[0]?.displayName ?? 'Niekto'}: „${input.title}" — ${when}`,
+      url: '/',
+      tag: `event-${event.id}`,
+    });
+  }
+
   return getEvent(event.id, creatorId);
 }
 

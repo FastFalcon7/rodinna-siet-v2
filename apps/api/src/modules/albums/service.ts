@@ -223,6 +223,22 @@ export async function createAlbum(creatorId: string, input: CreateAlbumInput): P
       .values(mediaIds.map((mediaId, order) => ({ albumId: album.id, mediaId, addedBy: creatorId, order })));
   }
 
+  // Novinka pre tých, čo album vidia (ladenie 07/2026) — súkromný nikoho neruší.
+  if (input.visibility !== 'private') {
+    const { notifyUsers, allUserIdsExcept, roomMemberIdsExcept } = await import('../notifications/service');
+    const recipients =
+      input.visibility === 'family'
+        ? await allUserIdsExcept(creatorId)
+        : await roomMemberIdsExcept(roomIds, creatorId);
+    const who = await db.select({ displayName: users.displayName }).from(users).where(eq(users.id, creatorId)).limit(1);
+    await notifyUsers(recipients, 'albums.created', {
+      title: 'Nový album',
+      body: `${who[0]?.displayName ?? 'Niekto'}: „${input.title}"${mediaIds.length > 0 ? ` (${mediaIds.length} fotiek)` : ''}`,
+      url: '/',
+      tag: `album-${album.id}`,
+    });
+  }
+
   // Albumy do Feedu nejdú (ladenie 07/2026) — prístup k nim je v časti Albumy.
   return getAlbum(album.id, creatorId);
 }

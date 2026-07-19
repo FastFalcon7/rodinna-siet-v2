@@ -133,8 +133,12 @@ export function PostCard({ post, onChange, onDeleted }: PostCardProps) {
     >
       <div className="flex gap-3">
         <Avatar user={post.author} size={40} />
-        {/* Dlhé podržanie (mimo fotky) otvorí reakcie — len ak nie som autor. */}
-        <div className="min-w-0 flex-1" {...(!isAuthor && !editing ? longPress : {})}>
+        {/* Dlhé podržanie (mimo fotky) otvorí reakcie — len ak nie som autor.
+            Na dotyku bez výberu textu (obrazovka „zmodrela"), desktop kopíruje ďalej. */}
+        <div
+          className="min-w-0 flex-1 [@media(hover:none)]:select-none [@media(hover:none)]:[-webkit-touch-callout:none]"
+          {...(!isAuthor && !editing ? longPress : {})}
+        >
           <div className="flex items-center gap-1.5">
             <span className="truncate font-semibold" style={nameStyle(post.author)}>
               {post.author.displayName}

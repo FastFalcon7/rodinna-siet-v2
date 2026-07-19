@@ -232,6 +232,23 @@ export async function createNote(creatorId: string, input: CreateNoteInput): Pro
     await db.insert(noteRooms).values(roomIds.map((roomId) => ({ noteId: note.id, roomId })));
   }
   await publishCrossProcess(APP_TOPIC, { t: 'note:update', noteId: note.id });
+
+  // Novinka pre tých, čo ju vidia (ladenie 07/2026) — súkromná nikoho neruší.
+  if (input.visibility !== 'private') {
+    const { notifyUsers, allUserIdsExcept, roomMemberIdsExcept } = await import('../notifications/service');
+    const recipients =
+      input.visibility === 'family'
+        ? await allUserIdsExcept(creatorId)
+        : await roomMemberIdsExcept(roomIds, creatorId);
+    const who = await db.select({ displayName: users.displayName }).from(users).where(eq(users.id, creatorId)).limit(1);
+    await notifyUsers(recipients, 'notes.shared', {
+      title: input.kind === 'list' ? 'Nový zoznam' : 'Nová poznámka',
+      body: `${who[0]?.displayName ?? 'Niekto'}: „${input.title}"`,
+      url: '/',
+      tag: `note-${note.id}`,
+    });
+  }
+
   return getNote(note.id, creatorId);
 }
 

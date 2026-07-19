@@ -4,6 +4,7 @@ import type { NotificationPayload } from '@rodinna/shared-types';
 import { db } from '../../core/db/client';
 import { pushSubs } from '../../core/db/schema';
 import { env, pushEnabled } from '../../config/env';
+import { badgeCountFor } from './service';
 
 /**
  * Web Push odosielanie (VAPID) — beží **len vo worker procese** (job
@@ -32,14 +33,21 @@ export async function sendPushToUsers(userIds: string[], payload: NotificationPa
   const subs = await db.select().from(pushSubs).where(inArray(pushSubs.userId, userIds));
   if (subs.length === 0) return;
 
-  const body = JSON.stringify(payload);
+  // Badge (ladenie 07/2026): počet noviniek je per užívateľ → telo push
+  // notifikácie sa skladá per user, nie jedno pre všetkých.
+  const bodyByUser = new Map<string, string>();
+  for (const userId of new Set(subs.map((s) => s.userId))) {
+    const badge = await badgeCountFor(userId).catch(() => undefined);
+    bodyByUser.set(userId, JSON.stringify(badge === undefined ? payload : { ...payload, badge }));
+  }
+
   let transientFailures = 0;
 
   for (const sub of subs) {
     try {
       await webpush.sendNotification(
         { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
-        body,
+        bodyByUser.get(sub.userId)!,
         // TTL 1 h: správa doručená s hodinovým oneskorením už nemá cenu ako push
         // (unread badge ju ukáže); urgency high = doručenie aj v power-save režime.
         { TTL: 3600, urgency: 'high' },

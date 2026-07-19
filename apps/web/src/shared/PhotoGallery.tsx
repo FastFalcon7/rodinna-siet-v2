@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { MediaPublic } from '@rodinna/shared-types';
 import { PhotoBrowser } from './PhotoBrowser';
+import { Lightbox } from './Lightbox';
 
 /** Slovenské množné číslo pre badge „+N fotiek". */
 function extraLabel(n: number): string {
@@ -29,6 +30,9 @@ export function PhotoGallery({ images, compact = false, onRemove }: PhotoGallery
 
   const cover = images[0]!;
   const extra = images.length - 1;
+  // Jediná fotka bez potreby výberu → rovno lightbox na celú obrazovku
+  // (ladenie 07/2026) — mriežka s jednou fotkou bola zbytočný klik navyše.
+  const directLightbox = images.length === 1 && !onRemove;
 
   return (
     <>
@@ -52,7 +56,12 @@ export function PhotoGallery({ images, compact = false, onRemove }: PhotoGallery
         )}
       </button>
 
-      {open && <PhotoBrowser images={images} onClose={() => setOpen(false)} onRemove={onRemove} />}
+      {open &&
+        (directLightbox ? (
+          <Lightbox items={images} initialIndex={0} onClose={() => setOpen(false)} />
+        ) : (
+          <PhotoBrowser images={images} onClose={() => setOpen(false)} onRemove={onRemove} />
+        ))}
     </>
   );
 }

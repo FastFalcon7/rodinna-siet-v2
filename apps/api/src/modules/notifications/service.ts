@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray, isNull, sql } from 'drizzle-orm';
+import { and, desc, eq, inArray, isNull, or, sql } from 'drizzle-orm';
 import {
   NotificationPayloadSchema,
   type NotificationKind,
@@ -8,7 +8,7 @@ import {
   type PushSubscribeInput,
 } from '@rodinna/shared-types';
 import { db } from '../../core/db/client';
-import { notifications, pushSubs, users, type NotificationRow } from '../../core/db/schema';
+import { messages, notifications, pushSubs, roomMembers, users, type NotificationRow } from '../../core/db/schema';
 import { publishCrossProcess } from '../../core/events';
 import { enqueueJob } from '../../core/jobs/queue';
 import { pushEnabled } from '../../config/env';
@@ -80,6 +80,50 @@ export async function notifyUsers(
   if (pushEnabled && pushTargets.length > 0) {
     await enqueueJob('push.send', { userIds: pushTargets, notification: payload });
   }
+}
+
+// ── Puntík na ikone appky (ladenie 07/2026) ─────────────────────────────────
+
+/**
+ * Počet noviniek pre badge na ikone: neprečítané správy v chate + neprečítané
+ * in-app notifikácie (feed, albumy, zoznamy, udalosti…). Worker ho dopĺňa do
+ * push payloadu — iOS vie zobraziť len číselný badge, bodku bez čísla nie.
+ */
+export async function badgeCountFor(userId: string): Promise<number> {
+  const chat = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(messages)
+    .innerJoin(roomMembers, and(eq(roomMembers.roomId, messages.roomId), eq(roomMembers.userId, userId)))
+    .where(
+      and(
+        isNull(messages.deletedAt),
+        sql`${messages.authorId} <> ${userId}`,
+        or(isNull(roomMembers.lastReadAt), sql`${messages.createdAt} > ${roomMembers.lastReadAt}`),
+      ),
+    );
+  const notif = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(notifications)
+    .where(and(eq(notifications.userId, userId), isNull(notifications.readAt)));
+  return (chat[0]?.count ?? 0) + (notif[0]?.count ?? 0);
+}
+
+// ── Príjemcovia noviniek (pomôcky pre moduly, K3) ───────────────────────────
+
+/** Všetci členovia rodiny okrem aktéra — príjemcovia rodinnej novinky. */
+export async function allUserIdsExcept(userId: string): Promise<string[]> {
+  const rows = await db.select({ id: users.id }).from(users);
+  return rows.map((r) => r.id).filter((id) => id !== userId);
+}
+
+/** Členovia daných chat miestností okrem aktéra (novinky s visibility='rooms'). */
+export async function roomMemberIdsExcept(roomIds: string[], userId: string): Promise<string[]> {
+  if (roomIds.length === 0) return [];
+  const rows = await db
+    .select({ userId: roomMembers.userId })
+    .from(roomMembers)
+    .where(inArray(roomMembers.roomId, roomIds));
+  return [...new Set(rows.map((r) => r.userId))].filter((id) => id !== userId);
 }
 
 // ── In-app zoznam ────────────────────────────────────────────────────────────

@@ -121,7 +121,9 @@ export function MessageBubble({ message, mine, showAuthor, seen, tail, onReply, 
 
         <div
           {...longPress}
-          className={`relative rounded-2xl px-3 py-2 text-sm leading-relaxed shadow-sm ${
+          // Na dotykových zariadeniach long-press nesmie spúšťať výber textu
+          // (obrazovka „zmodrela" — ladenie 07/2026); desktop kopírovanie ostáva.
+          className={`relative rounded-2xl px-3 py-2 text-sm leading-relaxed shadow-sm [@media(hover:none)]:select-none [@media(hover:none)]:[-webkit-touch-callout:none] ${
             mine
               ? `${tail ? 'rounded-br-md' : ''} bg-bubble-mine text-neutral-900 dark:text-neutral-100`
               : `${tail ? 'rounded-bl-md' : ''} bg-neutral-100 text-neutral-900 dark:bg-neutral-800 dark:text-neutral-100`
