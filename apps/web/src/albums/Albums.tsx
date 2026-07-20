@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import type { AlbumDetail, AlbumSuggestion, AlbumSummary } from '@rodinna/shared-types';
+import type { AlbumDetail, AlbumSummary } from '@rodinna/shared-types';
 import { ApiError, albumsApi, mediaApi } from '../lib/api';
 import { useAuth } from '../auth/AuthContext';
 import { consumePendingNav } from '../app/navigate';
@@ -8,26 +8,26 @@ import { AlbumPickerDialog } from './AlbumPickerDialog';
 import { NotePickerDialog } from '../notes/NotePickerDialog';
 import { EventPickerDialog } from '../events/EventPickerDialog';
 import { MediaTargetButtons, type MediaTargetKind } from '../shared/MediaTargetButtons';
+import { ChatShareDialog, FeedShareDialog } from '../shared/ShareTargetDialogs';
 import { ZoomableImage } from '../shared/ZoomableImage';
 import { VisibilityPicker, type ShareVisibility } from '../shared/VisibilityPicker';
 
 /**
- * Modul Albumy (M2): zoznam albumov + Zberač banner, detail s fotkami,
- * upload, lightbox. Bez routera — detail je in-tab stav; karta vo Feede
- * sem naviguje cez app/navigate.
+ * Modul Albumy (M2): zoznam albumov, detail s fotkami, upload, lightbox.
+ * Zberač banner (návrhy albumov z fotiek dňa) zrušený pri ladení 07/2026 —
+ * zobrazoval sa pri každom otvorení a nebol praktický; API endpoint ostal.
+ * Bez routera — detail je in-tab stav; karta vo Feede sem naviguje cez
+ * app/navigate.
  */
 export function Albums() {
   const [albums, setAlbums] = useState<AlbumSummary[] | null>(null);
-  const [suggestions, setSuggestions] = useState<AlbumSuggestion[]>([]);
   const [openId, setOpenId] = useState<string | null>(() => consumePendingNav('albums')?.entityId ?? null);
   const [error, setError] = useState<string | null>(null);
 
   const refresh = () =>
-    Promise.all([albumsApi.list(), albumsApi.suggestions()])
-      .then(([a, s]) => {
-        setAlbums(a.albums);
-        setSuggestions(s.suggestions);
-      })
+    albumsApi
+      .list()
+      .then((a) => setAlbums(a.albums))
       .catch((err) => setError(err instanceof ApiError ? err.message : 'Načítanie albumov zlyhalo'));
 
   useEffect(() => {
@@ -50,16 +50,12 @@ export function Albums() {
     <div className="space-y-4 px-4 py-4">
       {error && <p className="text-sm text-red-600">{error}</p>}
 
-      {suggestions.map((s) => (
-        <SuggestionBanner key={s.date} suggestion={s} onCreated={(id) => setOpenId(id)} />
-      ))}
-
       <NewAlbumButton onCreated={(id) => setOpenId(id)} />
 
       {!albums && !error && <p className="py-6 text-sm text-neutral-500">Načítavam albumy…</p>}
-      {albums?.length === 0 && suggestions.length === 0 && (
+      {albums?.length === 0 && (
         <p className="py-10 text-center text-sm text-neutral-500">
-          Zatiaľ žiadne albumy. Vytvor prvý — alebo pošli fotky do chatu a Zberač ti ho navrhne sám. 📷
+          Zatiaľ žiadne albumy. Vytvor prvý! 📷
         </p>
       )}
 
@@ -87,70 +83,6 @@ export function Albums() {
         ))}
       </div>
     </div>
-  );
-}
-
-/** Zberač: „Máte N fotiek z dňa X — vytvoriť album?" (plán §M2, inovácia 1). */
-function SuggestionBanner({
-  suggestion,
-  onCreated,
-}: {
-  suggestion: AlbumSuggestion;
-  onCreated: (albumId: string) => void;
-}) {
-  const [busy, setBusy] = useState(false);
-  const [dismissed, setDismissed] = useState(false);
-  if (dismissed) return null;
-
-  const dateText = new Date(`${suggestion.date}T12:00:00Z`).toLocaleDateString('sk-SK', {
-    day: 'numeric',
-    month: 'long',
-  });
-
-  const create = async () => {
-    setBusy(true);
-    try {
-      // Názov = len dátum dd.mm.rr (ladenie 07/2026) — premenovať sa dá v detaile.
-      const title = new Date(`${suggestion.date}T12:00:00Z`).toLocaleDateString('sk-SK', {
-        day: '2-digit',
-        month: '2-digit',
-        year: '2-digit',
-      });
-      const album = await albumsApi.create({ title, description: '', mediaIds: suggestion.mediaIds, visibility: 'family', roomIds: [] });
-      onCreated(album.id);
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  return (
-    <section className="overflow-hidden rounded-2xl border border-accent/30 bg-accent/5">
-      <div className="flex items-center gap-3 p-3">
-        <div className="flex -space-x-2">
-          {suggestion.previews.slice(0, 3).map((m) => (
-            <img key={m.id} src={m.url} alt="" className="h-12 w-12 rounded-lg border-2 border-white object-cover dark:border-neutral-900" />
-          ))}
-        </div>
-        <p className="min-w-0 flex-1 text-sm">
-          <strong>{suggestion.count} fotiek</strong> z {dateText} ešte nie je v albume.
-        </p>
-      </div>
-      <div className="flex justify-end gap-2 px-3 pb-3">
-        <button
-          onClick={() => setDismissed(true)}
-          className="rounded-lg px-3 py-1.5 text-sm text-neutral-500 hover:bg-neutral-100 dark:hover:bg-neutral-800"
-        >
-          Teraz nie
-        </button>
-        <button
-          onClick={() => void create()}
-          disabled={busy}
-          className="rounded-lg bg-accent px-3 py-1.5 text-sm font-medium text-white transition hover:opacity-90 disabled:opacity-40"
-        >
-          {busy ? 'Vytváram…' : 'Vytvoriť album'}
-        </button>
-      </div>
-    </section>
   );
 }
 
@@ -542,7 +474,7 @@ function AlbumDetailView({ albumId, onBack }: { albumId: string; onBack: () => v
             >
               ✓
             </span>
-            <span className="truncate">{selected.size > 0 ? `${selected.size} vybraných` : 'Vybrať všetko'}</span>
+            <span className="truncate">{selected.size > 0 ? `${selected.size}` : 'Všetko'}</span>
           </button>
           <div className="ml-auto flex shrink-0 items-center gap-2">
             <MediaTargetButtons disabled={selected.size === 0} onPick={setPicker} />
@@ -563,6 +495,24 @@ function AlbumDetailView({ albumId, onBack }: { albumId: string; onBack: () => v
         </div>
       )}
 
+      {picker === 'feed' && selected.size > 0 && (
+        <FeedShareDialog
+          mediaIds={[...selected]}
+          onClose={() => {
+            setPicker(null);
+            exitSelecting();
+          }}
+        />
+      )}
+      {picker === 'chat' && selected.size > 0 && (
+        <ChatShareDialog
+          mediaIds={[...selected]}
+          onClose={() => {
+            setPicker(null);
+            exitSelecting();
+          }}
+        />
+      )}
       {picker === 'album' && selected.size > 0 && (
         <AlbumPickerDialog
           mediaIds={[...selected]}

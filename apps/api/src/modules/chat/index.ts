@@ -122,7 +122,8 @@ router.post('/rooms/:id/read', requireAuth, zValidator('json', MarkReadInputSche
 router.patch('/messages/:id', requireAuth, zValidator('json', EditMessageInputSchema), async (c) => {
   const me = c.get('user')!;
   try {
-    const message = await editMessage(c.req.param('id'), me.id, c.req.valid('json').bodyMd);
+    const input = c.req.valid('json');
+    const message = await editMessage(c.req.param('id'), me.id, input.bodyMd, input.mediaIds);
     return c.json(message);
   } catch (err) {
     if (err instanceof NotFoundError) return c.json({ error: err.message }, 404);

@@ -11,7 +11,7 @@ import { MoreIcon, webModules, type WebModule } from './app/registry';
 import { useSwipeBack } from './shared/useSwipeBack';
 import { useAppBadge } from './shared/useAppBadge';
 import { useKeyboardScroll } from './shared/useKeyboardScroll';
-import { notificationsApi } from './lib/api';
+import { NotificationsProvider, useNotifications } from './app/NotificationsProvider';
 
 /**
  * App shell (DESIGN_REVIEW_FEED_CHAT.md §2, plán M0-3): tenký app bar +
@@ -32,21 +32,24 @@ function NavBadge({ module }: { module: WebModule }) {
 
 function HomeInner() {
   const { user } = useAuth();
-  // Puntík na ikone appky (bod 4) — presný počet neprečítaných správ, kým je
-  // appka otvorená; pri 0 zmaže aj puntík nahodený service workerom.
-  useAppBadge(useChat().totalUnread);
+  const { unreadTotal, markModuleRead } = useNotifications();
+  // Puntík na ikone appky — neprečítaný chat + neprečítané notifikácie
+  // (rovnaký výpočet ako server pri push); pri 0 puntík zmizne.
+  useAppBadge(useChat().totalUnread + unreadTotal);
   // iOS: prvé zaostrenie poľa po studenom štarte neposunie pole nad klávesnicu.
   useKeyboardScroll();
-  // Otvorenie appky = novinky videné (feed/albumy/udalosti… sú na obrazovke) —
-  // in-app notifikácie sa označia prečítané, puntík klesne na neprečítaný chat.
-  useEffect(() => {
-    void notificationsApi.markRead().catch(() => {});
-  }, []);
   // Deep link z push notifikácie (/?room=…) → štart rovno v chate.
   const [tab, setTab] = useState<string>(() => (peekRoomParam() ? 'chat' : webModules[0]!.name));
 
   // Navigácia z živých kariet (napr. karta albumu vo Feede → modul Albumy).
   useEffect(() => onAppNavigate((req) => setTab(req.module)), []);
+
+  // Otvorený modul = jeho novinky videné → puntík na jeho ikonke zhasne.
+  // Beží aj pri zmene unreadTotal — novinka doručená počas pozerania modulu
+  // sa označí hneď.
+  useEffect(() => {
+    markModuleRead(tab);
+  }, [tab, unreadTotal, markModuleRead]);
 
   if (!user) return null;
 
@@ -178,7 +181,10 @@ function HomeInner() {
 export function Home() {
   return (
     <ChatProvider>
-      <HomeInner />
+      {/* Notifikácie potrebujú WS eventy z ChatProvider (subscribe). */}
+      <NotificationsProvider>
+        <HomeInner />
+      </NotificationsProvider>
     </ChatProvider>
   );
 }

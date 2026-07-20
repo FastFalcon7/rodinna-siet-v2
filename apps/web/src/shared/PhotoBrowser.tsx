@@ -5,6 +5,7 @@ import { AlbumPickerDialog } from '../albums/AlbumPickerDialog';
 import { NotePickerDialog } from '../notes/NotePickerDialog';
 import { EventPickerDialog } from '../events/EventPickerDialog';
 import { MediaTargetButtons } from './MediaTargetButtons';
+import { ChatShareDialog, FeedShareDialog } from './ShareTargetDialogs';
 
 interface PhotoBrowserProps {
   images: MediaPublic[];
@@ -13,7 +14,7 @@ interface PhotoBrowserProps {
   onRemove?: (mediaIds: string[]) => Promise<void>;
 }
 
-type PickerKind = 'album' | 'note' | 'event' | null;
+type PickerKind = 'feed' | 'chat' | 'album' | 'note' | 'event' | null;
 
 /**
  * Prehliadač skupiny fotiek (ladenie 07/2026): mriežka ako v albume +
@@ -156,7 +157,7 @@ export function PhotoBrowser({ images, onClose, onRemove }: PhotoBrowserProps) {
             >
               ✓
             </span>
-            <span className="truncate">{selected.size > 0 ? `${selected.size} vybraných` : 'Vybrať všetko'}</span>
+            <span className="truncate">{selected.size > 0 ? `${selected.size}` : 'Všetko'}</span>
           </button>
           <div className="ml-auto flex shrink-0 items-center gap-2">
             <MediaTargetButtons disabled={selected.size === 0 || busy} onPick={openPicker} />
@@ -196,6 +197,8 @@ export function PhotoBrowser({ images, onClose, onRemove }: PhotoBrowserProps) {
         />
       )}
 
+      {picker === 'feed' && <FeedShareDialog mediaIds={pickerIds} onClose={() => setPicker(null)} />}
+      {picker === 'chat' && <ChatShareDialog mediaIds={pickerIds} onClose={() => setPicker(null)} />}
       {picker === 'album' && <AlbumPickerDialog mediaIds={pickerIds} onClose={() => setPicker(null)} />}
       {picker === 'note' && <NotePickerDialog mediaIds={pickerIds} onClose={() => setPicker(null)} />}
       {picker === 'event' && <EventPickerDialog mediaIds={pickerIds} onClose={() => setPicker(null)} />}

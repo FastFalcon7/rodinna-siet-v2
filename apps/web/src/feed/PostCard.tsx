@@ -292,7 +292,19 @@ export function PostCard({ post, onChange, onDeleted }: PostCardProps) {
 
           {post.media.length > 0 && (
             <div className="mt-2 space-y-2">
-              <PhotoGallery images={images} />
+              <PhotoGallery
+                images={images}
+                // Kôš vo výbere fotiek (ladenie 07/2026): autor odoberie vybrané
+                // fotky z príspevku (ostávajú nahraté; server edit púšťa len autora).
+                onRemove={
+                  isAuthor
+                    ? async (ids) => {
+                        const remaining = post.media.filter((m) => !ids.includes(m.id)).map((m) => m.id);
+                        onChange(await feedApi.updatePost(post.id, { bodyMd: post.bodyMd, mediaIds: remaining }));
+                      }
+                    : undefined
+                }
+              />
               {rest.map((m) => (
                 <MediaItem key={m.id} media={m} />
               ))}

@@ -358,10 +358,10 @@ export const chatApi = {
       method: 'POST',
       body: JSON.stringify(input),
     }),
-  editMessage: (id: string, bodyMd: string) =>
+  editMessage: (id: string, bodyMd: string, mediaIds?: string[]) =>
     request<MessagePublic>(`/chat/messages/${id}`, {
       method: 'PATCH',
-      body: JSON.stringify({ bodyMd }),
+      body: JSON.stringify(mediaIds === undefined ? { bodyMd } : { bodyMd, mediaIds }),
     }),
   deleteMessage: (id: string) => request<void>(`/chat/messages/${id}`, { method: 'DELETE' }),
   markRead: (roomId: string, messageId: string) =>

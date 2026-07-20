@@ -414,12 +414,12 @@ export async function sendMessage(
 
   const mediaIds = input.mediaIds ?? [];
   if (mediaIds.length > 0) {
-    const owned = await db
-      .select({ id: media.id })
-      .from(media)
-      .where(and(inArray(media.id, mediaIds), eq(media.ownerId, author.id)));
-    if (owned.length !== mediaIds.length) {
-      throw new ForbiddenError('Niektoré prílohy neexistujú alebo nie sú tvoje');
+    // Len existencia, nie vlastníctvo (ladenie 07/2026): médiá sú family-wide
+    // (EXIF strip, auth-gated serve) a výber fotiek umožňuje preposlať do
+    // chatu aj fotky iných členov — rovnaká filozofia ako Zberač albumov.
+    const found = await db.select({ id: media.id }).from(media).where(inArray(media.id, mediaIds));
+    if (found.length !== new Set(mediaIds).size) {
+      throw new ForbiddenError('Niektoré prílohy neexistujú');
     }
   }
 
@@ -470,10 +470,31 @@ export async function editMessage(
   messageId: string,
   userId: string,
   bodyMd: string,
+  mediaIds?: string[],
 ): Promise<MessagePublic> {
   const msg = await getLiveMessage(messageId);
   await requireMembership(msg.roomId, userId);
   if (msg.authorId !== userId) throw new ForbiddenError('Upraviť môžeš len svoju správu');
+
+  // Úprava príloh (ladenie 07/2026): mediaIds = kompletná množina po úprave.
+  if (mediaIds !== undefined) {
+    const next = [...new Set(mediaIds)];
+    if (bodyMd.length === 0 && next.length === 0) {
+      throw new BadRequestError('Správa nemôže ostať úplne prázdna — zmaž ju celú');
+    }
+    if (next.length > 0) {
+      const found = await db.select({ id: media.id }).from(media).where(inArray(media.id, next));
+      if (found.length !== next.length) throw new ForbiddenError('Niektoré prílohy neexistujú');
+    }
+    await db.delete(messageMedia).where(eq(messageMedia.messageId, messageId));
+    if (next.length > 0) {
+      await db
+        .insert(messageMedia)
+        .values(next.map((mediaId, order) => ({ messageId, mediaId, order })));
+    }
+  } else if (bodyMd.length === 0) {
+    throw new BadRequestError('Správa nemôže byť prázdna');
+  }
 
   const updated = await db
     .update(messages)
