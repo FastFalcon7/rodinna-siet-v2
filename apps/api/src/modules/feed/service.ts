@@ -286,12 +286,12 @@ export async function listFeed(
 
 export async function createPost(authorId: string, input: CreatePostInput, viewerId: string): Promise<PostPublic> {
   if (input.mediaIds.length > 0) {
-    const owned = await db
-      .select({ id: media.id })
-      .from(media)
-      .where(and(inArray(media.id, input.mediaIds), eq(media.ownerId, authorId)));
-    if (owned.length !== input.mediaIds.length) {
-      throw new ForbiddenError('Niektoré médiá neexistujú alebo nie sú tvoje');
+    // Len existencia, nie vlastníctvo (ladenie 07/2026): výber fotiek umožňuje
+    // preposlať do Feedu aj fotky iných členov — médiá sú family-wide
+    // (EXIF strip, auth-gated serve), rovnaká filozofia ako Zberač albumov.
+    const found = await db.select({ id: media.id }).from(media).where(inArray(media.id, input.mediaIds));
+    if (found.length !== new Set(input.mediaIds).size) {
+      throw new ForbiddenError('Niektoré médiá neexistujú');
     }
   }
 
@@ -348,12 +348,10 @@ export async function updatePost(
     const kept = new Set(current.map((c) => c.mediaId));
     const added = next.filter((id) => !kept.has(id));
     if (added.length > 0) {
-      const owned = await db
-        .select({ id: media.id })
-        .from(media)
-        .where(and(inArray(media.id, added), eq(media.ownerId, userId)));
-      if (owned.length !== added.length) {
-        throw new ForbiddenError('Niektoré médiá neexistujú alebo nie sú tvoje');
+      // Existencia namiesto vlastníctva — viď createPost (ladenie 07/2026).
+      const found = await db.select({ id: media.id }).from(media).where(inArray(media.id, added));
+      if (found.length !== added.length) {
+        throw new ForbiddenError('Niektoré médiá neexistujú');
       }
     }
     await db.delete(postMedia).where(eq(postMedia.postId, postId));

@@ -2,6 +2,7 @@ import { useMemo, type ComponentType } from 'react';
 import { Feed } from '../feed/Feed';
 import { Chat } from '../chat/Chat';
 import { useChat } from '../chat/ChatProvider';
+import { useNotifications } from './NotificationsProvider';
 import { Albums } from '../albums/Albums';
 import { Notes } from '../notes/Notes';
 import { Calendar } from '../events/Calendar';
@@ -57,6 +58,21 @@ function useChatBadge(): number {
   return useChat().totalUnread;
 }
 
+// Puntíky z neprečítaných in-app notifikácií (ladenie 07/2026) — novinky vo
+// Feede/Albumoch/Zoznamoch/Kalendári; otvorenie modulu ich zmaže (Home).
+function useFeedBadge(): number {
+  return useNotifications().moduleUnread('feed');
+}
+function useAlbumsBadge(): number {
+  return useNotifications().moduleUnread('albums');
+}
+function useNotesBadge(): number {
+  return useNotifications().moduleUnread('notes');
+}
+function useCalendarBadge(): number {
+  return useNotifications().moduleUnread('calendar');
+}
+
 export const webModules: WebModule[] = [
   {
     name: 'feed',
@@ -65,6 +81,7 @@ export const webModules: WebModule[] = [
     slot: 'bar',
     layout: 'scroll',
     Component: FeedScreen,
+    useBadge: useFeedBadge,
   },
   {
     name: 'chat',
@@ -82,6 +99,7 @@ export const webModules: WebModule[] = [
     slot: 'bar',
     layout: 'scroll',
     Component: Albums,
+    useBadge: useAlbumsBadge,
   },
   // Ladenie 07/2026: Zoznamy a Kalendár povýšené do bottom navu (len ikony).
   {
@@ -91,6 +109,7 @@ export const webModules: WebModule[] = [
     slot: 'bar',
     layout: 'scroll',
     Component: Notes,
+    useBadge: useNotesBadge,
   },
   {
     name: 'calendar',
@@ -99,6 +118,7 @@ export const webModules: WebModule[] = [
     slot: 'bar',
     layout: 'scroll',
     Component: Calendar,
+    useBadge: useCalendarBadge,
   },
   {
     name: 'diary',

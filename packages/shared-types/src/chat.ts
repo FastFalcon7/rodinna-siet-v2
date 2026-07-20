@@ -104,7 +104,10 @@ export const SendMessageInputSchema = z
 export type SendMessageInput = z.infer<typeof SendMessageInputSchema>;
 
 export const EditMessageInputSchema = z.object({
-  bodyMd: z.string().trim().min(1, 'Správa nemôže byť prázdna').max(MAX_MESSAGE_LENGTH),
+  // Prázdny text je OK, ak správe ostávajú prílohy (server kontroluje kombináciu).
+  bodyMd: z.string().trim().max(MAX_MESSAGE_LENGTH),
+  /** Úprava príloh (ladenie 07/2026): kompletná množina po úprave (ako pri poste). */
+  mediaIds: z.array(z.string().uuid()).max(10).optional(),
 });
 export type EditMessageInput = z.infer<typeof EditMessageInputSchema>;
 

@@ -38,6 +38,10 @@ export function NoteForm({
   const isEdit = !!note;
   const [kind, setKind] = useState<NoteKind>(note?.kind ?? initialKind);
   const [title, setTitle] = useState(note?.title ?? '');
+  // Obsah už pri tvorbe (ladenie 07/2026): text poznámky / položky zoznamu —
+  // celý formulár naraz ako pri udalosti; v editácii sa obsah mení v detaile.
+  const [bodyMd, setBodyMd] = useState('');
+  const [itemsText, setItemsText] = useState('');
   // Nové poznámky sú predvolene súkromné (ladenie 07/2026) — vidí ich len autor.
   const [visibility, setVisibility] = useState<ShareVisibility>(note?.visibility ?? 'private');
   const [roomIds, setRoomIds] = useState<string[]>(note?.roomIds ?? []);
@@ -82,12 +86,19 @@ export function NoteForm({
         uploads.clear();
         onDone(result);
       } else {
+        const items =
+          kind === 'list'
+            ? itemsText
+                .split('\n')
+                .map((l) => l.trim())
+                .filter((l) => l.length > 0)
+            : [];
         const created = await notesApi.create({
           kind,
           visibility: effVisibility,
           title: title.trim(),
-          bodyMd: '',
-          items: [],
+          bodyMd: kind === 'note' ? bodyMd.trim() : '',
+          items,
           mediaIds: uploads.mediaIds,
           roomIds: effRoomIds,
         });
@@ -134,6 +145,26 @@ export function NoteForm({
         placeholder={kind === 'list' ? 'Názov zoznamu (napr. Nákup)' : 'Názov poznámky'}
         className="w-full px-3 py-2"
       />
+
+      {!isEdit && kind === 'note' && (
+        <textarea
+          value={bodyMd}
+          onChange={(e) => setBodyMd(e.target.value)}
+          rows={3}
+          maxLength={20000}
+          placeholder="Text poznámky (voliteľné)"
+          className="w-full resize-none rounded-lg border border-neutral-300 bg-transparent px-3 py-2 text-sm outline-none focus:border-accent dark:border-neutral-700"
+        />
+      )}
+      {!isEdit && kind === 'list' && (
+        <textarea
+          value={itemsText}
+          onChange={(e) => setItemsText(e.target.value)}
+          rows={3}
+          placeholder={'Položky — každá na nový riadok (voliteľné)\nnapr.:\nmlieko\nchlieb'}
+          className="w-full resize-none rounded-lg border border-neutral-300 bg-transparent px-3 py-2 text-sm outline-none focus:border-accent dark:border-neutral-700"
+        />
+      )}
 
       {existing.length > 0 && (
         <div className="flex flex-wrap gap-2">

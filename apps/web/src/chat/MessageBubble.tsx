@@ -36,14 +36,27 @@ function ReplyQuote({ message }: { message: NonNullable<MessagePublic['replyTo']
   );
 }
 
-function MediaGrid({ message }: { message: MessagePublic }) {
+function MediaGrid({ message, mine }: { message: MessagePublic; mine: boolean }) {
   if (message.media.length === 0) return null;
   // Úvodná fotka + „+N fotiek" badge (PhotoGallery); video a súbory na plnú šírku.
   const images = message.media.filter((m) => m.kind === 'image');
   const rest = message.media.filter((m) => m.kind !== 'image');
   return (
     <div className="mt-1 space-y-1">
-      <PhotoGallery images={images} compact />
+      <PhotoGallery
+        images={images}
+        compact
+        // Kôš vo výbere fotiek (ladenie 07/2026): autor odoberie vybrané fotky
+        // zo svojej správy (UI sa obnoví cez WS message:edit broadcast).
+        onRemove={
+          mine
+            ? async (ids) => {
+                const remaining = message.media.filter((m) => !ids.includes(m.id)).map((m) => m.id);
+                await chatApi.editMessage(message.id, message.bodyMd, remaining);
+              }
+            : undefined
+        }
+      />
       {rest.map((m) => (
         <MediaItem key={m.id} media={m} className="max-h-72" />
       ))}
@@ -147,7 +160,7 @@ export function MessageBubble({ message, mine, showAuthor, seen, tail, onReply, 
               <LinkPreviewCard url={previewUrl} compact />
             </div>
           )}
-          <MediaGrid message={message} />
+          <MediaGrid message={message} mine={mine} />
 
           {/* Čas + doručenky len na poslednej správe skupiny (§4.1). */}
           {tail && (

@@ -25,18 +25,23 @@ interface PhotoGalleryProps {
  * s režimom „Vybrať" (Do albumu / poznámky / udalosti) a lightboxom.
  */
 export function PhotoGallery({ images, compact = false, onRemove }: PhotoGalleryProps) {
-  const [open, setOpen] = useState(false);
+  // 'light' = fullscreen lightbox (jediná fotka), 'browser' = mriežka s výberom.
+  const [view, setView] = useState<'closed' | 'light' | 'browser'>('closed');
   if (images.length === 0) return null;
 
   const cover = images[0]!;
   const extra = images.length - 1;
-  // Jediná fotka bez potreby výberu → rovno lightbox na celú obrazovku
-  // (ladenie 07/2026) — mriežka s jednou fotkou bola zbytočný klik navyše.
-  const directLightbox = images.length === 1 && !onRemove;
+  // Jediná fotka → rovno lightbox na celú obrazovku (ladenie 07/2026);
+  // výber (preposlať/zmazať) je v jeho hlavičke cez „Vybrať".
+  const single = images.length === 1;
 
   return (
     <>
-      <button type="button" onClick={() => setOpen(true)} className="relative block w-full">
+      <button
+        type="button"
+        onClick={() => setView(single ? 'light' : 'browser')}
+        className="relative block w-full"
+      >
         <img
           src={cover.url}
           alt=""
@@ -56,12 +61,25 @@ export function PhotoGallery({ images, compact = false, onRemove }: PhotoGallery
         )}
       </button>
 
-      {open &&
-        (directLightbox ? (
-          <Lightbox items={images} initialIndex={0} onClose={() => setOpen(false)} />
-        ) : (
-          <PhotoBrowser images={images} onClose={() => setOpen(false)} onRemove={onRemove} />
-        ))}
+      {view === 'light' && (
+        <Lightbox
+          items={images}
+          initialIndex={0}
+          onClose={() => setView('closed')}
+          renderActions={() => (
+            <button
+              type="button"
+              onClick={() => setView('browser')}
+              className="rounded-lg bg-white/10 px-3 py-1.5 text-sm transition hover:bg-white/20"
+            >
+              Vybrať
+            </button>
+          )}
+        />
+      )}
+      {view === 'browser' && (
+        <PhotoBrowser images={images} onClose={() => setView('closed')} onRemove={onRemove} />
+      )}
     </>
   );
 }
