@@ -94,6 +94,8 @@ export const NoteSummarySchema = z.object({
   /** Len pre kind='list'. */
   itemsTotal: z.number().int(),
   itemsChecked: z.number().int(),
+  /** Podskupiny, s ktorými je zdieľané (visibility='rooms') — pre avatary v zozname. */
+  roomIds: z.array(z.string().uuid()).default([]),
 });
 export type NoteSummary = z.infer<typeof NoteSummarySchema>;
 

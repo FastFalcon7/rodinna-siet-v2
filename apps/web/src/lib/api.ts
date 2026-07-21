@@ -39,6 +39,7 @@ import type {
   CreateCommentInput,
   CreatePostInput,
   CreateRoomInput,
+  UpdateRoomInput,
   FeedPage,
   InviteInput,
   InviteResponse,
@@ -363,6 +364,13 @@ export const chatApi = {
       method: 'PATCH',
       body: JSON.stringify(mediaIds === undefined ? { bodyMd } : { bodyMd, mediaIds }),
     }),
+  updateRoom: (id: string, input: UpdateRoomInput) =>
+    request<ChatRoomPublic>(`/chat/rooms/${id}`, { method: 'PATCH', body: JSON.stringify(input) }),
+  addRoomMembers: (id: string, memberIds: string[]) =>
+    request<ChatRoomPublic>(`/chat/rooms/${id}/members`, { method: 'POST', body: JSON.stringify({ memberIds }) }),
+  removeRoomMember: (id: string, userId: string) =>
+    request<void>(`/chat/rooms/${id}/members/${userId}`, { method: 'DELETE' }),
+  deleteRoom: (id: string) => request<void>(`/chat/rooms/${id}`, { method: 'DELETE' }),
   deleteMessage: (id: string) => request<void>(`/chat/messages/${id}`, { method: 'DELETE' }),
   markRead: (roomId: string, messageId: string) =>
     request<{ read: { lastReadAt: string; lastReadMessageId: string } | null }>(

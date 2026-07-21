@@ -5,6 +5,7 @@ import { Avatar } from '../shared/Avatar';
 import { useChat } from './ChatProvider';
 import { MessageBubble } from './MessageBubble';
 import { MessageComposer } from './MessageComposer';
+import { RoomSettings } from './RoomSettings';
 import { formatDayLabel, formatLastSeen, sameDay } from './chatTime';
 import { useSwipeBack } from '../shared/useSwipeBack';
 
@@ -36,6 +37,7 @@ export function Conversation({ room, meId, onBack }: ConversationProps) {
   // Swipe doprava od ľavého okraja = späť na zoznam konverzácií
   // (swipe-to-reply na bublinách edge zónu ignoruje — bez kolízie).
   const swipeBack = useSwipeBack(onBack, { edgeOnly: true });
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [messages, setMessages] = useState<MessagePublic[]>([]);
   const [cursor, setCursor] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -196,20 +198,36 @@ export function Conversation({ room, meId, onBack }: ConversationProps) {
         <div className="relative">
           {other ? (
             <Avatar user={other} size={40} />
+          ) : room.avatarUrl ? (
+            <img src={room.avatarUrl} alt="" className="h-10 w-10 rounded-full object-cover" />
           ) : (
-            <div className="grid h-10 w-10 place-items-center rounded-full bg-accent-teal/20 text-lg">👪</div>
+            <div className="grid h-10 w-10 place-items-center rounded-full bg-accent-teal/20 text-lg">
+              {room.kind === 'family' ? '🏡' : '👥'}
+            </div>
           )}
           {other && chat.isOnline(other.id) && (
             <span className="absolute -right-0.5 -bottom-0.5 h-3 w-3 rounded-full border-2 border-white bg-green-500 dark:border-neutral-900" />
           )}
         </div>
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1">
           <h2 className="truncate font-semibold">{roomTitle(room, meId)}</h2>
           <p className={`truncate text-xs ${typingNames.length ? 'text-accent' : 'text-neutral-500'}`}>
             {subtitle()}
           </p>
         </div>
+        {/* Nastavenia skupiny/rodiny (ladenie 07/2026) — premenovať, avatar, členovia. */}
+        {room.kind !== 'dm' && (
+          <button
+            type="button"
+            onClick={() => setSettingsOpen(true)}
+            aria-label="Nastavenia skupiny"
+            className="shrink-0 rounded-lg px-2 py-1.5 text-lg leading-none text-neutral-500 hover:bg-neutral-100 dark:hover:bg-neutral-800"
+          >
+            ⋯
+          </button>
+        )}
       </header>
+      {settingsOpen && <RoomSettings room={room} onClose={() => setSettingsOpen(false)} />}
 
       {/* Správy */}
       <div ref={scrollRef} onScroll={onScroll} className="flex-1 overflow-y-auto px-3 py-3">

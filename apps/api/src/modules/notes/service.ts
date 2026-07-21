@@ -126,6 +126,15 @@ async function buildSummaries(rows: NoteRow[]): Promise<NoteSummary[]> {
   const statMap = new Map(stats.map((s) => [s.noteId, s]));
   const authors = await fetchAuthors(rows.flatMap((r) => [r.createdBy, r.updatedBy]));
 
+  // Zdieľané podskupiny per poznámka (na avatary v zozname).
+  const shareRows = await db.select().from(noteRooms).where(inArray(noteRooms.noteId, rows.map((r) => r.id)));
+  const roomsByNote = new Map<string, string[]>();
+  for (const s of shareRows) {
+    const arr = roomsByNote.get(s.noteId) ?? [];
+    arr.push(s.roomId);
+    roomsByNote.set(s.noteId, arr);
+  }
+
   return rows.map((row) => ({
     id: row.id,
     kind: row.kind,
@@ -138,6 +147,7 @@ async function buildSummaries(rows: NoteRow[]): Promise<NoteSummary[]> {
     createdAt: row.createdAt.toISOString(),
     itemsTotal: statMap.get(row.id)?.total ?? 0,
     itemsChecked: statMap.get(row.id)?.checked ?? 0,
+    roomIds: roomsByNote.get(row.id) ?? [],
   }));
 }
 

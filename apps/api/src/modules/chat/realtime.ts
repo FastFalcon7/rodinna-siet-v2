@@ -44,6 +44,16 @@ export function joinRoomTopic(userId: string, roomId: string): void {
   }
 }
 
+/** Opak joinRoomTopic — po odchode/odstránení člena prestane dostávať eventy. */
+export function leaveRoomTopic(userId: string, roomId: string): void {
+  const set = userSockets.get(userId);
+  if (!set) return;
+  for (const ws of set) {
+    ws.unsubscribe(`room:${roomId}`);
+    ws.data.roomIds = ws.data.roomIds.filter((id) => id !== roomId);
+  }
+}
+
 function parseCookie(header: string | null, name: string): string | null {
   if (!header) return null;
   for (const part of header.split(';')) {

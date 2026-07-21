@@ -91,6 +91,19 @@ export const CreateRoomInputSchema = z
   });
 export type CreateRoomInput = z.infer<typeof CreateRoomInputSchema>;
 
+/** Úprava skupiny (ladenie 07/2026): názov a/alebo avatar. `avatarUrl` null = zmazať. */
+export const UpdateRoomInputSchema = z.object({
+  title: z.string().trim().min(1).max(MAX_GROUP_TITLE).optional(),
+  avatarUrl: z.string().nullable().optional(),
+});
+export type UpdateRoomInput = z.infer<typeof UpdateRoomInputSchema>;
+
+/** Pridanie členov do skupiny. */
+export const AddRoomMembersInputSchema = z.object({
+  memberIds: z.array(z.string().uuid()).min(1).max(50),
+});
+export type AddRoomMembersInput = z.infer<typeof AddRoomMembersInputSchema>;
+
 export const SendMessageInputSchema = z
   .object({
     bodyMd: z.string().trim().max(MAX_MESSAGE_LENGTH).default(''),
@@ -174,6 +187,10 @@ export const ServerWsEventSchema = z.discriminatedUnion('t', [
     lastReadMessageId: z.string().uuid(),
   }),
   z.object({ t: z.literal('room:new'), room: ChatRoomPublicSchema }),
+  // Zmena skupiny (názov/avatar/členovia) — klient upsertne miestnosť.
+  z.object({ t: z.literal('room:update'), room: ChatRoomPublicSchema }),
+  // Skupina zmazaná alebo som z nej odišiel — klient ju odstráni zo zoznamu.
+  z.object({ t: z.literal('room:remove'), roomId: z.string().uuid() }),
   // In-app notifikácia (M0 notifications kernel) — live update zvončeka.
   z.object({ t: z.literal('notification:new'), notification: NotificationPublicSchema }),
   // Zmena stavu ankety (M1) — klient si refetchne viewer-specific stav.

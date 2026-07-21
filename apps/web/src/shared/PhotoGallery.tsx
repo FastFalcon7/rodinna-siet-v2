@@ -78,7 +78,13 @@ export function PhotoGallery({ images, compact = false, onRemove }: PhotoGallery
         />
       )}
       {view === 'browser' && (
-        <PhotoBrowser images={images} onClose={() => setView('closed')} onRemove={onRemove} />
+        <PhotoBrowser
+          images={images}
+          onClose={() => setView('closed')}
+          onRemove={onRemove}
+          // Jediná fotka → výber „Vybrať" ju rovno označí a ukáže dolné menu.
+          initialSelectedIds={single ? [cover.id] : undefined}
+        />
       )}
     </>
   );

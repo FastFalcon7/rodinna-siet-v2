@@ -1,12 +1,14 @@
-import { Hono } from 'hono';
+import { Hono, type Context } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import {
+  AddRoomMembersInputSchema,
   CreateRoomInputSchema,
   EditMessageInputSchema,
   MarkReadInputSchema,
   SendMessageInputSchema,
   SetMessageReactionInputSchema,
+  UpdateRoomInputSchema,
 } from '@rodinna/shared-types';
 import type { AppEnv } from '../../core/types';
 import type { AppModule } from '../../core/module';
@@ -16,15 +18,19 @@ import {
   BadRequestError,
   ForbiddenError,
   NotFoundError,
+  addRoomMembers,
   createRoom,
   deleteMessage,
+  deleteRoom,
   editMessage,
   getRoom,
   listMessages,
   listRooms,
   markRead,
+  removeRoomMember,
   sendMessage,
   setMessageReaction,
+  updateRoom,
 } from './service';
 
 const router = new Hono<AppEnv>();
@@ -64,6 +70,56 @@ router.get('/rooms/:id', requireAuth, async (c) => {
   } catch (err) {
     if (err instanceof NotFoundError) return c.json({ error: err.message }, 404);
     throw err;
+  }
+});
+
+/** Mapovanie chýb služby na HTTP status (spoločné pre správu skupín). */
+function roomError(c: Context<AppEnv>, err: unknown): Response {
+  if (err instanceof NotFoundError) return c.json({ error: err.message }, 404);
+  if (err instanceof ForbiddenError) return c.json({ error: err.message }, 403);
+  if (err instanceof BadRequestError) return c.json({ error: err.message }, 400);
+  throw err;
+}
+
+/** PATCH /api/chat/rooms/:id — premenovať/prefotiť skupinu (zakladateľ/admin). */
+router.patch('/rooms/:id', requireAuth, zValidator('json', UpdateRoomInputSchema), async (c) => {
+  const me = c.get('user')!;
+  try {
+    return c.json(await updateRoom(c.req.param('id'), me.id, me.role === 'admin', c.req.valid('json')));
+  } catch (err) {
+    return roomError(c, err);
+  }
+});
+
+/** POST /api/chat/rooms/:id/members — pridať členov (zakladateľ/admin). */
+router.post('/rooms/:id/members', requireAuth, zValidator('json', AddRoomMembersInputSchema), async (c) => {
+  const me = c.get('user')!;
+  try {
+    return c.json(await addRoomMembers(c.req.param('id'), me.id, me.role === 'admin', c.req.valid('json').memberIds));
+  } catch (err) {
+    return roomError(c, err);
+  }
+});
+
+/** DELETE /api/chat/rooms/:id/members/:userId — odobrať člena / odísť zo skupiny. */
+router.delete('/rooms/:id/members/:userId', requireAuth, async (c) => {
+  const me = c.get('user')!;
+  try {
+    await removeRoomMember(c.req.param('id'), me.id, me.role === 'admin', c.req.param('userId'));
+    return c.body(null, 204);
+  } catch (err) {
+    return roomError(c, err);
+  }
+});
+
+/** DELETE /api/chat/rooms/:id — zmazať skupinu (zakladateľ/admin). */
+router.delete('/rooms/:id', requireAuth, async (c) => {
+  const me = c.get('user')!;
+  try {
+    await deleteRoom(c.req.param('id'), me.id, me.role === 'admin');
+    return c.body(null, 204);
+  } catch (err) {
+    return roomError(c, err);
   }
 });
 

@@ -10,6 +10,7 @@ import { PhotoGallery } from '../shared/PhotoGallery';
 import { useSwipeBack } from '../shared/useSwipeBack';
 import { useAutoGrow } from '../shared/useAutoGrow';
 import { NoteForm } from './NoteForm';
+import { SharedWith } from '../shared/SharedWith';
 
 /**
  * Modul Zoznamy & Poznámky (M3): rodinne zdieľané zoznamy s odškrtávaním
@@ -80,9 +81,12 @@ export function Notes() {
                   />
                 </span>
               )}
-              <span className="mt-1 block text-xs text-neutral-400">
-                {n.updatedBy ? `${n.updatedBy.displayName} · ` : ''}
-                {relativeTime(n.updatedAt)}
+              <span className="mt-1 flex items-center gap-2 text-xs text-neutral-400">
+                <span className="truncate">
+                  {n.updatedBy ? `${n.updatedBy.displayName} · ` : ''}
+                  {relativeTime(n.updatedAt)}
+                </span>
+                <SharedWith visibility={n.visibility} roomIds={n.roomIds} className="ml-auto shrink-0" />
               </span>
             </button>
           </li>
