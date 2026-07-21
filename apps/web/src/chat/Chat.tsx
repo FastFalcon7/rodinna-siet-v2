@@ -32,9 +32,12 @@ export function Chat({ initialRoomId = null }: { initialRoomId?: string | null }
           Pripájam sa…
         </div>
       )}
-      <div className="grid min-h-0 flex-1 md:grid-cols-[320px_1fr]">
+      <div className="grid min-h-0 min-w-0 flex-1 grid-cols-1 md:grid-cols-[320px_1fr]">
+        {/* min-w-0: bez neho má grid položka min-width:auto a dlhý „nowrap"
+            náhľad správy ju v portréte roztiahne za viewport (ladenie 07/2026)
+            → „+ Nová" a koniec náhľadu vypadnú mimo obrazovku. */}
         <div
-          className={`min-h-0 border-neutral-200 md:border-r dark:border-neutral-800 ${
+          className={`min-h-0 min-w-0 overflow-hidden border-neutral-200 md:border-r dark:border-neutral-800 ${
             selectedRoom ? 'hidden md:block' : 'block'
           }`}
         >
@@ -53,7 +56,7 @@ export function Chat({ initialRoomId = null }: { initialRoomId?: string | null }
         <div
           className={
             selectedRoom
-              ? 'fixed inset-0 z-40 app-bg md:static md:z-auto md:min-h-0'
+              ? 'fixed inset-0 z-40 app-bg md:static md:z-auto md:min-h-0 md:min-w-0'
               : 'hidden min-h-0 md:block'
           }
           style={selectedRoom ? { paddingTop: 'env(safe-area-inset-top)' } : undefined}

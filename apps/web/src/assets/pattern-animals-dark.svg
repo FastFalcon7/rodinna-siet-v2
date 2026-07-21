@@ -35,5 +35,12 @@
       <path d="M6 50 Q-8 44 -14 32"/>
       <path d="M28 66 L24 80 M24 80 L18 84 M24 80 L30 84"/>
     </g>
+    <!-- Murárska lyžica (ladenie 07/2026): drobný vtipný rodinný symbol; rúčka zo stredu hornej hrany -->
+    <g transform="translate(206,150) rotate(58) scale(0.82)">
+      <path d="M10 0 L54 0 L43 53 Q32 57 21 53 Z"/>
+      <path d="M32 0 L32 -14"/>
+      <path d="M27 -13 L37 -13 L37 -17 L27 -17 Z"/>
+      <path d="M32 -17 Q23 -21 23 -34 Q23 -49 32 -50 Q41 -49 41 -34 Q41 -21 32 -17 Z"/>
+    </g>
   </g>
 </svg>
