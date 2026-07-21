@@ -12,6 +12,9 @@ interface PhotoBrowserProps {
   onClose: () => void;
   /** Ak je zadané, výber ponúkne aj „Odstrániť" (napr. fotky poznámky). */
   onRemove?: (mediaIds: string[]) => Promise<void>;
+  /** Otvoriť rovno v režime výberu s týmito fotkami označenými (ladenie 07/2026,
+   *  napr. „Vybrať" pri jedinej fotke → hneď dolné menu, bez ďalších klikov). */
+  initialSelectedIds?: string[];
 }
 
 type PickerKind = 'feed' | 'chat' | 'album' | 'note' | 'event' | null;
@@ -22,9 +25,9 @@ type PickerKind = 'feed' | 'chat' | 'album' | 'note' | 'event' | null;
  * Ťuknutie na fotku (mimo výberu) otvorí fullscreen lightbox. Swipe
  * doprava zatvára (gestá vnútri lightboxu si rieši lightbox sám).
  */
-export function PhotoBrowser({ images, onClose, onRemove }: PhotoBrowserProps) {
-  const [selecting, setSelecting] = useState(false);
-  const [selected, setSelected] = useState<Set<string>>(new Set());
+export function PhotoBrowser({ images, onClose, onRemove, initialSelectedIds }: PhotoBrowserProps) {
+  const [selecting, setSelecting] = useState((initialSelectedIds?.length ?? 0) > 0);
+  const [selected, setSelected] = useState<Set<string>>(new Set(initialSelectedIds ?? []));
   const [lightbox, setLightbox] = useState<number | null>(null);
   const [picker, setPicker] = useState<PickerKind>(null);
   const [pickerIds, setPickerIds] = useState<string[]>([]);

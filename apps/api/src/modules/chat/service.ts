@@ -3,6 +3,7 @@ import {
   type ChatMember,
   type ChatRoomPublic,
   type CreateRoomInput,
+  type UpdateRoomInput,
   type MessagePublic,
   type MessagesPage,
   type PostAuthor,
@@ -25,7 +26,7 @@ import {
 import { toMediaPublic } from '../media/service';
 import { decodeCursor, encodeCursor, type Cursor } from '../feed/cursor';
 import { advanceRead } from './state';
-import { broadcastToRoom, broadcastToUser, joinRoomTopic } from './realtime';
+import { broadcastToRoom, broadcastToUser, joinRoomTopic, leaveRoomTopic } from './realtime';
 import { notifyNewMessage } from './notify';
 
 export class NotFoundError extends Error {}
@@ -365,6 +366,121 @@ export async function createRoom(creatorId: string, input: CreateRoomInput): Pro
 
   await announceRoom(room.id, memberIds);
   return getRoom(room.id, creatorId);
+}
+
+// ── Správa skupín (ladenie 07/2026) ─────────────────────────────────────────
+
+/** Členovia miestnosti — na fan-out room:update/room:remove. */
+async function roomMemberIds(roomId: string): Promise<string[]> {
+  const rows = await db.select({ userId: roomMembers.userId }).from(roomMembers).where(eq(roomMembers.roomId, roomId));
+  return rows.map((r) => r.userId);
+}
+
+/** Rozošle aktuálny stav miestnosti všetkým jej členom (po zmene názvu/avatara/členov). */
+async function announceRoomUpdate(roomId: string): Promise<void> {
+  for (const uid of await roomMemberIds(roomId)) {
+    broadcastToUser(uid, { t: 'room:update', room: await getRoom(roomId, uid) });
+  }
+}
+
+async function getGroupRow(roomId: string): Promise<ChatRoomRow> {
+  const rows = await db.select().from(chatRooms).where(eq(chatRooms.id, roomId)).limit(1);
+  const room = rows[0];
+  if (!room) throw new NotFoundError('Miestnosť nenájdená');
+  if (room.kind === 'dm') throw new BadRequestError('Priamu správu nemožno upravovať');
+  return room;
+}
+
+export async function updateRoom(
+  roomId: string,
+  userId: string,
+  isAdmin: boolean,
+  input: UpdateRoomInput,
+): Promise<ChatRoomPublic> {
+  const role = await requireMembership(roomId, userId);
+  const room = await getGroupRow(roomId);
+  // Rodinnú miestnosť (všetci členovia) smie premenovať/prefotiť len admin;
+  // vlastnú skupinu jej zakladateľ (owner) alebo admin.
+  const mayManage = isAdmin || (room.kind === 'group' && role === 'owner');
+  if (!mayManage) throw new ForbiddenError('Skupinu môže upraviť len jej zakladateľ alebo admin');
+
+  await db
+    .update(chatRooms)
+    .set({
+      ...(input.title !== undefined ? { title: input.title } : {}),
+      ...(input.avatarUrl !== undefined ? { avatarUrl: input.avatarUrl } : {}),
+    })
+    .where(eq(chatRooms.id, roomId));
+  await announceRoomUpdate(roomId);
+  return getRoom(roomId, userId);
+}
+
+export async function addRoomMembers(
+  roomId: string,
+  userId: string,
+  isAdmin: boolean,
+  memberIds: string[],
+): Promise<ChatRoomPublic> {
+  const role = await requireMembership(roomId, userId);
+  const room = await getGroupRow(roomId);
+  const mayManage = isAdmin || (room.kind === 'group' && role === 'owner');
+  if (!mayManage) throw new ForbiddenError('Členov môže pridať len zakladateľ skupiny alebo admin');
+
+  const ids = [...new Set(memberIds)];
+  await verifyUsersExist(ids);
+  await db
+    .insert(roomMembers)
+    .values(ids.map((id) => ({ roomId, userId: id, role: 'member' as const })))
+    .onConflictDoNothing();
+  // Noví členovia dostanú miestnosť + jej eventy okamžite.
+  for (const id of ids) {
+    joinRoomTopic(id, roomId);
+    broadcastToUser(id, { t: 'room:new', room: await getRoom(roomId, id) });
+  }
+  await announceRoomUpdate(roomId);
+  return getRoom(roomId, userId);
+}
+
+/** Odstránenie člena (owner/admin), alebo odchod zo skupiny (self). */
+export async function removeRoomMember(
+  roomId: string,
+  actorId: string,
+  isAdmin: boolean,
+  targetId: string,
+): Promise<void> {
+  const role = await requireMembership(roomId, actorId);
+  const room = await getGroupRow(roomId);
+  const isSelf = actorId === targetId;
+  const mayManage = isAdmin || (room.kind === 'group' && role === 'owner');
+  if (!isSelf && !mayManage) throw new ForbiddenError('Člena môže odobrať len zakladateľ skupiny alebo admin');
+  if (room.kind === 'family') throw new BadRequestError('Z rodinnej miestnosti nemožno odísť');
+
+  await db.delete(roomMembers).where(and(eq(roomMembers.roomId, roomId), eq(roomMembers.userId, targetId)));
+  leaveRoomTopic(targetId, roomId);
+  broadcastToUser(targetId, { t: 'room:remove', roomId });
+
+  // Prázdna skupina po odchode → zmaž ju (cascade zmaže správy aj väzby).
+  const remaining = await roomMemberIds(roomId);
+  if (remaining.length === 0) {
+    await db.delete(chatRooms).where(eq(chatRooms.id, roomId));
+    return;
+  }
+  await announceRoomUpdate(roomId);
+}
+
+export async function deleteRoom(roomId: string, userId: string, isAdmin: boolean): Promise<void> {
+  const role = await requireMembership(roomId, userId);
+  const room = await getGroupRow(roomId);
+  if (room.kind === 'family') throw new BadRequestError('Rodinnú miestnosť nemožno zmazať');
+  const mayManage = isAdmin || role === 'owner';
+  if (!mayManage) throw new ForbiddenError('Skupinu môže zmazať len jej zakladateľ alebo admin');
+
+  const members = await roomMemberIds(roomId);
+  await db.delete(chatRooms).where(eq(chatRooms.id, roomId));
+  for (const uid of members) {
+    leaveRoomTopic(uid, roomId);
+    broadcastToUser(uid, { t: 'room:remove', roomId });
+  }
 }
 
 // ── Správy ───────────────────────────────────────────────────────────────────

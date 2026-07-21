@@ -6,6 +6,7 @@ import { useChat } from '../chat/ChatProvider';
 import { appNavigate } from '../app/navigate';
 import type { EntityCardProps } from '../app/cards';
 import { PhotoGallery } from '../shared/PhotoGallery';
+import { SharedWith } from '../shared/SharedWith';
 import { EventForm } from './EventForm';
 
 /**
@@ -190,9 +191,12 @@ export function EventCard({ entityId, compact }: EntityCardProps) {
       )}
 
       <p className="pr-7 text-sm font-semibold text-neutral-900 dark:text-neutral-100">📅 {event.title}</p>
-      <p className="mt-0.5 text-xs text-neutral-500">
-        {eventTimeText(event)}
-        {event.location && ` · 📍 ${event.location}`}
+      <p className="mt-0.5 flex items-center gap-2 text-xs text-neutral-500">
+        <span className="truncate">
+          {eventTimeText(event)}
+          {event.location && ` · 📍 ${event.location}`}
+        </span>
+        <SharedWith visibility={event.visibility} roomIds={event.roomIds} className="ml-auto shrink-0" />
       </p>
       {event.bodyMd && !compact && (
         <p className="mt-1 line-clamp-2 whitespace-pre-wrap text-sm text-neutral-600 dark:text-neutral-300">

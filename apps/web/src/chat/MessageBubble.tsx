@@ -3,7 +3,7 @@ import { type MessagePublic } from '@rodinna/shared-types';
 import { chatApi } from '../lib/api';
 import { MediaItem } from '../shared/MediaItem';
 import { nameStyle } from '../shared/nameColor';
-import { ReactionPicker } from '../shared/ReactionPicker';
+import { MessageActionSheet } from './MessageActionSheet';
 import { PhotoGallery } from '../shared/PhotoGallery';
 import { LinkPreviewCard } from '../shared/LinkPreviewCard';
 import { extractFirstUrl, RichBody } from '../shared/linkify';
@@ -76,8 +76,6 @@ export function MessageBubble({ message, mine, showAuthor, seen, tail, onReply, 
   const bodyText = appLink ? stripAppLink(message.bodyMd, appLink) : message.bodyMd;
   const previewUrl =
     message.media.length === 0 && !appLink ? extractFirstUrl(message.bodyMd) : null;
-
-  const myReaction = message.reactions.find((r) => r.reactedByMe)?.emoji ?? null;
 
   const react = async (emoji: string) => {
     if (busy) return;
@@ -233,54 +231,21 @@ export function MessageBubble({ message, mine, showAuthor, seen, tail, onReply, 
           )}
         </div>
 
-        {picker && (
-          <>
-            {/* Klik mimo zavrie picker (dôležité pre touch). */}
-            <div className="fixed inset-0 z-10" onClick={() => setPicker(false)} />
-            <div
-              className={`absolute z-20 ${mine ? 'right-0' : 'left-0'} bottom-full mb-1 w-max rounded-2xl border border-neutral-200 bg-white p-1.5 shadow-lg dark:border-neutral-700 dark:bg-neutral-900`}
-            >
-              <ReactionPicker current={myReaction} onPick={react} />
-              <div className="mt-1 flex gap-1 border-t border-neutral-100 pt-1 dark:border-neutral-800">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setPicker(false);
-                    onReply(message);
-                  }}
-                  className="flex-1 rounded-lg px-2 py-1 text-xs text-neutral-600 transition hover:bg-neutral-100 dark:text-neutral-300 dark:hover:bg-neutral-800"
-                >
-                  ↩ Odpovedať
-                </button>
-                {mine && (
-                  <>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setPicker(false);
-                        onEdit(message);
-                      }}
-                      className="flex-1 rounded-lg px-2 py-1 text-xs text-neutral-600 transition hover:bg-neutral-100 dark:text-neutral-300 dark:hover:bg-neutral-800"
-                    >
-                      ✎ Upraviť
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setPicker(false);
-                        void del();
-                      }}
-                      className="flex-1 rounded-lg px-2 py-1 text-xs text-red-600 transition hover:bg-red-50 dark:hover:bg-red-950"
-                    >
-                      🗑 Zmazať
-                    </button>
-                  </>
-                )}
-              </div>
-            </div>
-          </>
-        )}
       </div>
+
+      {picker && (
+        <MessageActionSheet
+          message={message}
+          mine={mine}
+          canDelete={mine}
+          bodyText={bodyText}
+          onReact={react}
+          onReply={() => onReply(message)}
+          onEdit={() => onEdit(message)}
+          onDelete={del}
+          onClose={() => setPicker(false)}
+        />
+      )}
     </div>
   );
 }

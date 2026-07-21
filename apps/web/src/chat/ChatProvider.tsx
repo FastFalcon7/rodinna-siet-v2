@@ -213,6 +213,12 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       case 'room:new':
         setState((s) => (s.rooms.some((r) => r.id === e.room.id) ? s : { ...s, rooms: [e.room, ...s.rooms] }));
         return;
+      case 'room:update':
+        setState((s) => ({ ...s, rooms: s.rooms.map((r) => (r.id === e.room.id ? e.room : r)) }));
+        return;
+      case 'room:remove':
+        setState((s) => ({ ...s, rooms: s.rooms.filter((r) => r.id !== e.roomId) }));
+        return;
     }
   }
 

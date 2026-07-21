@@ -90,6 +90,8 @@ export function RoomList({ rooms, activeRoomId, meId, onSelect, onNewChat }: Roo
               <div className="relative shrink-0">
                 {room.kind === 'dm' && other ? (
                   <Avatar user={other} size={48} />
+                ) : room.avatarUrl ? (
+                  <img src={room.avatarUrl} alt="" className="h-12 w-12 rounded-full object-cover" />
                 ) : (
                   <div className="grid h-12 w-12 place-items-center rounded-full bg-accent-teal/20 text-xl">
                     {room.kind === 'family' ? '🏡' : '👥'}
