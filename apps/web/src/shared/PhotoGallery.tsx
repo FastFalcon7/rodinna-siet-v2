@@ -3,14 +3,19 @@ import type { MediaPublic } from '@rodinna/shared-types';
 import { PhotoBrowser } from './PhotoBrowser';
 import { Lightbox } from './Lightbox';
 
-/** Slovenské množné číslo pre badge „+N fotiek". */
-function extraLabel(n: number): string {
-  if (n === 1) return '+1 fotka';
-  if (n < 5) return `+${n} fotky`;
-  return `+${n} fotiek`;
+/** Kombinovaný popis obsahu galérie pre badge, napr. „1 video, 5 fotiek". */
+function contentLabel(media: MediaPublic[]): string {
+  const vid = media.filter((m) => m.kind === 'video').length;
+  const img = media.length - vid;
+  const photos = img === 1 ? '1 fotka' : img < 5 ? `${img} fotky` : `${img} fotiek`;
+  const videos = vid === 1 ? '1 video' : vid < 5 ? `${vid} videá` : `${vid} videí`;
+  if (vid > 0 && img > 0) return `${videos}, ${photos}`;
+  if (vid > 0) return videos;
+  return photos;
 }
 
 interface PhotoGalleryProps {
+  /** Vizuálne médiá (fotky aj videá) v poradí — prvé je úvodný náhľad. */
   images: MediaPublic[];
   /** Kompaktný variant (bublina v chate, komentár) — menšia výška, jemnejší rám. */
   compact?: boolean;
@@ -19,20 +24,17 @@ interface PhotoGalleryProps {
 }
 
 /**
- * Fotky príspevku/správy (ladenie 07/2026): zobrazuje sa LEN úvodná fotka
- * (prvá v poradí — autor si ju vyberie v composeri), pri viacerých fotkách
- * badge „+N fotiek". Klik otvorí PhotoBrowser — mriežku ako v albume
- * s režimom „Vybrať" (Do albumu / poznámky / udalosti) a lightboxom.
+ * Vizuálne médiá príspevku/správy (ladenie 07/2026): zobrazuje sa LEN úvodný
+ * náhľad (prvé médium v poradí), pri viacerých badge s obsahom celej skupiny
+ * („1 video, 5 fotiek"). Klik otvorí jednu skupinu — mriežku (PhotoBrowser)
+ * a lightbox, ktoré zvládajú foto (zoom) aj video (prehrávač).
  */
 export function PhotoGallery({ images, compact = false, onRemove }: PhotoGalleryProps) {
-  // 'light' = fullscreen lightbox (jediná fotka), 'browser' = mriežka s výberom.
+  // 'light' = fullscreen lightbox (jedno médium), 'browser' = mriežka s výberom.
   const [view, setView] = useState<'closed' | 'light' | 'browser'>('closed');
   if (images.length === 0) return null;
 
   const cover = images[0]!;
-  const extra = images.length - 1;
-  // Jediná fotka → rovno lightbox na celú obrazovku (ladenie 07/2026);
-  // výber (preposlať/zmazať) je v jeho hlavičke cez „Vybrať".
   const single = images.length === 1;
 
   return (
@@ -43,7 +45,7 @@ export function PhotoGallery({ images, compact = false, onRemove }: PhotoGallery
         className="relative block w-full"
       >
         <img
-          src={cover.url}
+          src={cover.kind === 'video' ? (cover.posterUrl ?? cover.url) : cover.url}
           alt=""
           loading="lazy"
           width={cover.width ?? undefined}
@@ -54,9 +56,15 @@ export function PhotoGallery({ images, compact = false, onRemove }: PhotoGallery
               : 'max-h-96 rounded-xl border border-neutral-200 dark:border-neutral-800'
           }`}
         />
-        {extra > 0 && (
+        {/* Úvodné médium je video → prehrávacia ikona v strede. */}
+        {cover.kind === 'video' && (
+          <span className="pointer-events-none absolute inset-0 grid place-items-center">
+            <span className="grid h-12 w-12 place-items-center rounded-full bg-black/55 text-2xl text-white">▶</span>
+          </span>
+        )}
+        {!single && (
           <span className="absolute bottom-2 right-2 rounded-full bg-black/65 px-2.5 py-1 text-xs font-semibold text-white">
-            {extraLabel(extra)}
+            {contentLabel(images)}
           </span>
         )}
       </button>
@@ -82,7 +90,7 @@ export function PhotoGallery({ images, compact = false, onRemove }: PhotoGallery
           images={images}
           onClose={() => setView('closed')}
           onRemove={onRemove}
-          // Jediná fotka → výber „Vybrať" ju rovno označí a ukáže dolné menu.
+          // Jedno médium → výber „Vybrať" ho rovno označí a ukáže dolné menu.
           initialSelectedIds={single ? [cover.id] : undefined}
         />
       )}

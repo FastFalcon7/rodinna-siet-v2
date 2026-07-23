@@ -6,7 +6,7 @@ import { EventCard } from './EventCard';
 import { EventForm } from './EventForm';
 
 /**
- * Modul Kalendár (M4): agenda najbližších 60 dní — udalosti s RSVP kartou
+ * Modul Kalendár (M4): agenda najbližšieho pol roka — udalosti s RSVP kartou
  * + narodeniny z profilov, zoskupené po dňoch. Mesačná mriežka je na
  * mobile nepoužiteľná (plán §M4) — agenda je default aj jediný pohľad.
  * Dole ICS subscribe URL pre Apple/Google Calendar.
@@ -16,8 +16,6 @@ export function Calendar() {
   const [agenda, setAgenda] = useState<AgendaResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [compose, setCompose] = useState(false);
-  const [icsUrl, setIcsUrl] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
 
   const refresh = () =>
     eventsApi
@@ -27,7 +25,6 @@ export function Calendar() {
 
   useEffect(() => {
     void refresh();
-    void eventsApi.icsUrl().then((r) => setIcsUrl(r.url)).catch(() => {});
     const off = subscribe((e) => {
       if (e.t === 'event:update') void refresh();
     });
@@ -87,7 +84,7 @@ export function Calendar() {
       {!agenda && !error && <p className="py-6 text-sm text-neutral-500">Načítavam…</p>}
       {agenda && days.length === 0 && (
         <p className="py-10 text-center text-sm text-neutral-500">
-          Najbližších 60 dní je voľných. Naplánuj grilovačku! 🍖
+          Najbližšie mesiace sú voľné. Naplánuj grilovačku! 🍖
         </p>
       )}
 
@@ -110,36 +107,6 @@ export function Calendar() {
           </div>
         </section>
       ))}
-
-      {icsUrl && (
-        <section className="rounded-2xl border border-neutral-200 bg-white p-4 dark:border-neutral-800 dark:bg-neutral-900">
-          <h3 className="mb-1 text-sm font-semibold">Odber v Apple/Google Calendar</h3>
-          <p className="mb-2 text-xs text-neutral-500">
-            Pridaj túto URL ako odoberaný kalendár — rodinné udalosti, narodeniny aj tvoje
-            súkromné a skupinové udalosti sa objavia v tvojej kalendárovej appke (len na čítanie).
-            Odkaz je osobný — nezdieľaj ho.
-          </p>
-          <div className="flex gap-2">
-            <input
-              readOnly
-              value={icsUrl}
-              onFocus={(e) => e.target.select()}
-              className="min-w-0 flex-1 rounded-lg border border-neutral-300 bg-neutral-50 px-2 py-1.5 text-xs text-neutral-600 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-300"
-            />
-            <button
-              onClick={() => {
-                void navigator.clipboard?.writeText(icsUrl).then(() => {
-                  setCopied(true);
-                  setTimeout(() => setCopied(false), 2000);
-                });
-              }}
-              className="shrink-0 rounded-lg border border-neutral-300 px-3 py-1.5 text-xs transition hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-800"
-            >
-              {copied ? '✓' : 'Kopírovať'}
-            </button>
-          </div>
-        </section>
-      )}
     </div>
   );
 }

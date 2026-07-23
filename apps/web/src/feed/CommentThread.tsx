@@ -41,8 +41,8 @@ function CommentNode({
   const canDelete = comment.author.id === user.id || user.role === 'admin';
   const canReply = comment.depth < MAX_COMMENT_DEPTH;
 
-  const images = comment.media.filter((m) => m.kind === 'image');
-  const rest = comment.media.filter((m) => m.kind !== 'image');
+  const images = comment.media.filter((m) => m.kind === 'image' || m.kind === 'video');
+  const rest = comment.media.filter((m) => m.kind === 'file');
 
   const submitReply = async (input: { bodyMd: string; mediaIds: string[] }) => {
     const created = await feedApi.createComment(postId, { ...input, parentCommentId: comment.id });

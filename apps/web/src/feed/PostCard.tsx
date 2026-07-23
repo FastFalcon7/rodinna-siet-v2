@@ -103,8 +103,8 @@ export function PostCard({ post, onChange, onDeleted }: PostCardProps) {
   };
 
   // Obrázky do mriežky, video a súbory pod nimi na plnú šírku.
-  const images = post.media.filter((m) => m.kind === 'image');
-  const rest = post.media.filter((m) => m.kind !== 'image');
+  const images = post.media.filter((m) => m.kind === 'image' || m.kind === 'video');
+  const rest = post.media.filter((m) => m.kind === 'file');
   // Živá karta (app:// link, §M0-4) má prednosť pred OG preview.
   const appLink = parseAppLink(post.bodyMd);
   const bodyText = appLink ? stripAppLink(post.bodyMd, appLink) : post.bodyMd;
