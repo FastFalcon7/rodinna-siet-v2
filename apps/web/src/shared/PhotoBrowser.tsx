@@ -125,7 +125,17 @@ export function PhotoBrowser({ images, onClose, onRemove, initialSelectedIds }: 
               onClick={() => (selecting ? toggle(m.id) : setLightbox(i))}
               className="relative aspect-square"
             >
-              <img src={m.url} alt="" loading="lazy" className="h-full w-full object-cover" />
+              <img
+                src={m.kind === 'video' ? (m.posterUrl ?? m.url) : m.url}
+                alt=""
+                loading="lazy"
+                className="h-full w-full object-cover"
+              />
+              {m.kind === 'video' && !selecting && (
+                <span className="pointer-events-none absolute inset-0 grid place-items-center">
+                  <span className="grid h-8 w-8 place-items-center rounded-full bg-black/55 text-sm text-white">▶</span>
+                </span>
+              )}
               {selecting && (
                 <span
                   className={`absolute right-1.5 top-1.5 grid h-6 w-6 place-items-center rounded-full text-xs font-bold ${

@@ -11,6 +11,7 @@ import { useSwipeBack } from '../shared/useSwipeBack';
 import { useAutoGrow } from '../shared/useAutoGrow';
 import { NoteForm } from './NoteForm';
 import { SharedWith } from '../shared/SharedWith';
+import { VisibilityPicker } from '../shared/VisibilityPicker';
 
 /**
  * Modul Zoznamy & Poznámky (M3): rodinne zdieľané zoznamy s odškrtávaním
@@ -147,9 +148,11 @@ function NoteDetailView({ noteId, onBack }: { noteId: string; onBack: () => void
   const [toast, setToast] = useState<string | null>(null);
   const [uploadingMedia, setUploadingMedia] = useState(false);
   const [locating, setLocating] = useState(false);
-  // Jednotná editácia (7B): ⋯ menu → NoteForm, ako pri udalostiach/albumoch.
+  // Priama editácia v detaile (ladenie 07/2026): názov aj viditeľnosť sa menia
+  // rovno v detaile, bez cesty cez ⋯ → Upraviť.
   const [menuOpen, setMenuOpen] = useState(false);
-  const [editing, setEditing] = useState(false);
+  const [titleDraft, setTitleDraft] = useState<string | null>(null);
+  const [visOpen, setVisOpen] = useState(false);
   const mediaFileRef = useRef<HTMLInputElement>(null);
   const bodyRef = useRef<HTMLTextAreaElement>(null);
   useAutoGrow(bodyRef, body ?? '', 60);
@@ -263,31 +266,14 @@ function NoteDetailView({ noteId, onBack }: { noteId: string; onBack: () => void
     );
   };
 
-  const noteImages = note.media.filter((m) => m.kind === 'image');
+  const noteImages = note.media.filter((m) => m.kind === 'image' || m.kind === 'video');
   const isAuthor = user ? note.createdBy.id === user.id : false;
 
-  // Jednotná editácia (7B): rovnaký formulár ako tvorba (názov, fotky,
-  // viditeľnosť) — text/položky sa ďalej upravujú priamo v detaile.
-  if (editing) {
-    return (
-      <div className="px-4 py-4">
-        <div className="rounded-2xl border border-neutral-200 bg-white p-4 dark:border-neutral-800 dark:bg-neutral-900">
-          <NoteForm
-            note={note}
-            canEditVisibility={isAuthor}
-            submitLabel="Uložiť"
-            busyLabel="Ukladám…"
-            onDone={(n) => {
-              setNote(n);
-              setEditing(false);
-              flash('Uložené ✓');
-            }}
-            onCancel={() => setEditing(false)}
-          />
-        </div>
-      </div>
-    );
-  }
+  const saveTitle = () => {
+    const t = (titleDraft ?? '').trim();
+    setTitleDraft(null);
+    if (t && t !== note.title) void notesApi.update(noteId, { title: t }).then(setNote);
+  };
 
   return (
     <div className="px-4 py-4" {...swipeBack}>
@@ -296,11 +282,23 @@ function NoteDetailView({ noteId, onBack }: { noteId: string; onBack: () => void
           ←
         </button>
         <div className="min-w-0 flex-1">
-          <h2 className="truncate font-semibold">
-            {note.visibility === 'private' ? '🔒 ' : note.visibility === 'rooms' ? '👥 ' : ''}
-            {note.kind === 'list' ? '✅' : '📝'} {note.title}
-          </h2>
-          <p className="text-xs text-neutral-500">
+          {/* Názov editovateľný priamo (ladenie 07/2026) — bez ⋯ → Upraviť. */}
+          <div className="flex items-center gap-1">
+            <span className="shrink-0">{note.kind === 'list' ? '✅' : '📝'}</span>
+            <input
+              value={titleDraft ?? note.title}
+              onChange={(e) => setTitleDraft(e.target.value)}
+              onBlur={saveTitle}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') e.currentTarget.blur();
+                if (e.key === 'Escape') setTitleDraft(null);
+              }}
+              maxLength={120}
+              aria-label="Názov"
+              className="min-w-0 flex-1 rounded-lg border border-transparent bg-transparent px-1 py-0.5 font-semibold outline-none hover:border-neutral-200 focus:border-accent dark:hover:border-neutral-700"
+            />
+          </div>
+          <p className="px-1 text-xs text-neutral-500">
             {note.updatedBy ? `naposledy ${note.updatedBy.displayName} · ` : ''}
             {relativeTime(note.updatedAt)}
           </p>
@@ -335,15 +333,6 @@ function NoteDetailView({ noteId, onBack }: { noteId: string; onBack: () => void
                 <button
                   onClick={() => {
                     setMenuOpen(false);
-                    setEditing(true);
-                  }}
-                  className="block w-full px-3 py-2 text-left text-sm hover:bg-neutral-100 dark:hover:bg-neutral-700"
-                >
-                  Upraviť
-                </button>
-                <button
-                  onClick={() => {
-                    setMenuOpen(false);
                     void notesApi.duplicate(noteId).then((n) => {
                       flash(`Kópia „${n.title}" vytvorená ✓`);
                     });
@@ -369,6 +358,40 @@ function NoteDetailView({ noteId, onBack }: { noteId: string; onBack: () => void
             </>
           )}
         </div>
+      </div>
+
+      {/* Viditeľnosť priamo v detaile (ladenie 07/2026) — mení ju len autor. */}
+      <div className="mb-3">
+        {isAuthor ? (
+          <button
+            onClick={() => setVisOpen((v) => !v)}
+            className="rounded-full border border-neutral-300 px-3 py-1 text-xs text-neutral-600 transition hover:border-accent hover:text-accent dark:border-neutral-700 dark:text-neutral-300"
+          >
+            {note.visibility === 'private' ? '🔒 Len ja' : note.visibility === 'rooms' ? '👥 Podskupiny' : '👪 Celá rodina'}
+            <span className="ml-1 opacity-60">upraviť ▾</span>
+          </button>
+        ) : (
+          <span className="text-xs text-neutral-400">
+            {note.visibility === 'private' ? '🔒 Len ja' : note.visibility === 'rooms' ? '👥 Podskupiny' : '👪 Celá rodina'}
+          </span>
+        )}
+        {visOpen && isAuthor && (
+          <div className="mt-2 rounded-2xl border border-neutral-200 p-3 dark:border-neutral-800">
+            <VisibilityPicker
+              visibility={note.visibility}
+              roomIds={note.roomIds}
+              onChange={(v, r) => {
+                if (v === 'rooms' && r.length === 0) return;
+                void notesApi
+                  .update(noteId, { visibility: v, roomIds: v === 'rooms' ? r : [] })
+                  .then((n) => {
+                    setNote(n);
+                    flash('Viditeľnosť zmenená ✓');
+                  });
+              }}
+            />
+          </div>
+        )}
       </div>
 
       {/* Fotky poznámky (ladenie 07/2026) + pridávanie príloh a polohy. */}

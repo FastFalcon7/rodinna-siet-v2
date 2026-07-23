@@ -5,6 +5,7 @@ import { ProfileCard } from '../users/ProfileCard';
 import { MembersList } from '../users/MembersList';
 import { InvitePanel } from '../users/InvitePanel';
 import { NotificationSettings } from './NotificationSettings';
+import { CalendarSubscription } from './CalendarSubscription';
 import { ThemeSettings } from './ThemeSettings';
 import { FontSizeSettings } from './FontSizeSettings';
 import { LlmSettings } from './LlmSettings';
@@ -71,6 +72,7 @@ export function More({ onOpenModule }: { onOpenModule: (name: string) => void })
       {user.role === 'admin' && <LlmSettings />}
       <NotificationSettings />
       <ProfileCard />
+      <CalendarSubscription />
       {user.role === 'admin' && <InvitePanel />}
       <MembersList />
     </>

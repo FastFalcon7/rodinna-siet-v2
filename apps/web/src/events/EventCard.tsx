@@ -7,6 +7,7 @@ import { appNavigate } from '../app/navigate';
 import type { EntityCardProps } from '../app/cards';
 import { PhotoGallery } from '../shared/PhotoGallery';
 import { SharedWith } from '../shared/SharedWith';
+import { useSwipeBack } from '../shared/useSwipeBack';
 import { EventForm } from './EventForm';
 
 /**
@@ -190,23 +191,31 @@ export function EventCard({ entityId, compact }: EntityCardProps) {
         </div>
       )}
 
-      <p className="pr-7 text-sm font-semibold text-neutral-900 dark:text-neutral-100">📅 {event.title}</p>
-      <p className="mt-0.5 flex items-center gap-2 text-xs text-neutral-500">
-        <span className="truncate">
-          {eventTimeText(event)}
-          {event.location && ` · 📍 ${event.location}`}
+      {/* Klik na názov/čas otvorí celú udalosť na úpravu (ladenie 07/2026) —
+          bez cesty cez ⋯ → Upraviť. Len autor/admin a len v plnej karte. */}
+      <button
+        type="button"
+        onClick={canEdit && !compact ? () => setEditing(true) : undefined}
+        className={`block w-full pr-7 text-left ${canEdit && !compact ? 'cursor-pointer' : 'cursor-default'}`}
+      >
+        <span className="block text-sm font-semibold text-neutral-900 dark:text-neutral-100">📅 {event.title}</span>
+        <span className="mt-0.5 flex items-center gap-2 text-xs text-neutral-500">
+          <span className="truncate">
+            {eventTimeText(event)}
+            {event.location && ` · 📍 ${event.location}`}
+          </span>
+          <SharedWith visibility={event.visibility} roomIds={event.roomIds} className="ml-auto shrink-0" />
         </span>
-        <SharedWith visibility={event.visibility} roomIds={event.roomIds} className="ml-auto shrink-0" />
-      </p>
+      </button>
       {event.bodyMd && !compact && (
         <p className="mt-1 line-clamp-2 whitespace-pre-wrap text-sm text-neutral-600 dark:text-neutral-300">
           {event.bodyMd}
         </p>
       )}
 
-      {event.media.some((m) => m.kind === 'image') && (
+      {event.media.some((m) => m.kind === 'image' || m.kind === 'video') && (
         <div className="mt-2">
-          <PhotoGallery images={event.media.filter((m) => m.kind === 'image')} compact />
+          <PhotoGallery images={event.media.filter((m) => m.kind === 'image' || m.kind === 'video')} compact />
         </div>
       )}
 
@@ -252,10 +261,13 @@ function EventEditForm({
   onDone: (updated: EventPublic) => void;
   onCancel: () => void;
 }) {
+  // Swipe od ľavého okraja doprava = zavrieť (ako detail poznámky), ladenie 07/2026.
+  const swipeBack = useSwipeBack(onCancel, { edgeOnly: true });
   return (
     <div
       className="rounded-xl border border-neutral-200 bg-white p-4 dark:border-neutral-800 dark:bg-neutral-900"
       onClick={(e) => e.stopPropagation()}
+      {...swipeBack}
     >
       <EventForm event={event} submitLabel="Uložiť" busyLabel="Ukladám…" onDone={onDone} onCancel={onCancel} />
     </div>

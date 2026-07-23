@@ -53,7 +53,8 @@ router.get('/', requireAuth, zValidator('query', AgendaQuerySchema), async (c) =
   const now = new Date();
   const todayStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
   const from = q.from ? new Date(q.from) : todayStart;
-  const to = q.to ? new Date(q.to) : new Date(Date.now() + 60 * 24 * 60 * 60 * 1000);
+  // Okno agendy (ladenie 07/2026): pol roka dopredu — obrazovka scrolluje.
+  const to = q.to ? new Date(q.to) : new Date(Date.now() + 180 * 24 * 60 * 60 * 1000);
   return c.json(await listAgenda(from, to, me.id));
 });
 

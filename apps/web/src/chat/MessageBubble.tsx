@@ -39,8 +39,8 @@ function ReplyQuote({ message }: { message: NonNullable<MessagePublic['replyTo']
 function MediaGrid({ message, mine }: { message: MessagePublic; mine: boolean }) {
   if (message.media.length === 0) return null;
   // Úvodná fotka + „+N fotiek" badge (PhotoGallery); video a súbory na plnú šírku.
-  const images = message.media.filter((m) => m.kind === 'image');
-  const rest = message.media.filter((m) => m.kind !== 'image');
+  const images = message.media.filter((m) => m.kind === 'image' || m.kind === 'video');
+  const rest = message.media.filter((m) => m.kind === 'file');
   return (
     <div className="mt-1 space-y-1">
       <PhotoGallery

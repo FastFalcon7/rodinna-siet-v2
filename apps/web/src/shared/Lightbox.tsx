@@ -86,7 +86,19 @@ export function Lightbox({ items, initialIndex, onClose, renderActions }: Lightb
             ‹
           </button>
         )}
-        <ZoomableImage key={current.id} src={current.url} />
+        {current.kind === 'video' ? (
+          // eslint-disable-next-line jsx-a11y/media-has-caption
+          <video
+            key={current.id}
+            src={current.url}
+            poster={current.posterUrl ?? undefined}
+            controls
+            playsInline
+            className="max-h-full max-w-full bg-black"
+          />
+        ) : (
+          <ZoomableImage key={current.id} src={current.url} />
+        )}
         {index < items.length - 1 && (
           <button
             type="button"
