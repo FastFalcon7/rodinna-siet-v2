@@ -11,7 +11,7 @@ import { useSwipeBack } from '../shared/useSwipeBack';
 import { useAutoGrow } from '../shared/useAutoGrow';
 import { NoteForm } from './NoteForm';
 import { SharedWith } from '../shared/SharedWith';
-import { VisibilityPicker } from '../shared/VisibilityPicker';
+import { VisibilityPicker, type ShareVisibility } from '../shared/VisibilityPicker';
 
 /**
  * Modul Zoznamy & Poznámky (M3): rodinne zdieľané zoznamy s odškrtávaním
@@ -20,9 +20,12 @@ import { VisibilityPicker } from '../shared/VisibilityPicker';
  */
 export function Notes() {
   const { subscribe } = useChat();
+  const { user } = useAuth();
   const [items, setItems] = useState<NoteSummary[] | null>(null);
   const [openId, setOpenId] = useState<string | null>(() => consumePendingNav('notes')?.entityId ?? null);
   const [error, setError] = useState<string | null>(null);
+  // ⋯ na riadku zoznamu (ladenie 07/2026): rýchle Duplikovať/Zmazať bez otvorenia.
+  const [menuFor, setMenuFor] = useState<string | null>(null);
 
   const refresh = () =>
     notesApi
@@ -56,10 +59,10 @@ export function Notes() {
 
       <ul className="space-y-2">
         {items?.map((n) => (
-          <li key={n.id}>
+          <li key={n.id} className="relative">
             <button
               onClick={() => setOpenId(n.id)}
-              className="w-full rounded-2xl border border-neutral-200 bg-white px-4 py-3 text-left transition hover:shadow-sm dark:border-neutral-800 dark:bg-neutral-900"
+              className="w-full rounded-2xl border border-neutral-200 bg-white px-4 py-3 pr-11 text-left transition hover:shadow-sm dark:border-neutral-800 dark:bg-neutral-900"
             >
               <span className="flex items-center gap-2">
                 <span className="min-w-0 flex-1 truncate text-sm font-medium">
@@ -90,6 +93,41 @@ export function Notes() {
                 <SharedWith visibility={n.visibility} roomIds={n.roomIds} className="ml-auto shrink-0" />
               </span>
             </button>
+            {/* ⋯ priamo na riadku — rýchle akcie bez otvorenia (ladenie 07/2026). */}
+            <button
+              onClick={() => setMenuFor((m) => (m === n.id ? null : n.id))}
+              aria-label="Možnosti"
+              className="absolute right-1.5 top-2 grid h-8 w-8 place-items-center rounded-full text-lg leading-none text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800"
+            >
+              ⋯
+            </button>
+            {menuFor === n.id && (
+              <>
+                <div className="fixed inset-0 z-10" onClick={() => setMenuFor(null)} />
+                <div className="absolute right-2 top-10 z-20 w-44 overflow-hidden rounded-xl border border-black/10 bg-white shadow-lg dark:border-white/10 dark:bg-neutral-800">
+                  <button
+                    onClick={() => {
+                      setMenuFor(null);
+                      void notesApi.duplicate(n.id).then(refresh);
+                    }}
+                    className="block w-full px-3 py-2 text-left text-sm hover:bg-neutral-100 dark:hover:bg-neutral-700"
+                  >
+                    Duplikovať (šablóna)
+                  </button>
+                  {(n.createdBy.id === user?.id || user?.role === 'admin') && (
+                    <button
+                      onClick={() => {
+                        setMenuFor(null);
+                        if (confirm(`Zmazať „${n.title}"?`)) void notesApi.remove(n.id).then(refresh);
+                      }}
+                      className="block w-full px-3 py-2 text-left text-sm text-red-600 hover:bg-neutral-100 dark:hover:bg-neutral-700"
+                    >
+                      Zmazať
+                    </button>
+                  )}
+                </div>
+              </>
+            )}
           </li>
         ))}
       </ul>
@@ -153,6 +191,10 @@ function NoteDetailView({ noteId, onBack }: { noteId: string; onBack: () => void
   const [menuOpen, setMenuOpen] = useState(false);
   const [titleDraft, setTitleDraft] = useState<string | null>(null);
   const [visOpen, setVisOpen] = useState(false);
+  const [visDraft, setVisDraft] = useState<{ visibility: ShareVisibility; roomIds: string[] }>({
+    visibility: 'family',
+    roomIds: [],
+  });
   const mediaFileRef = useRef<HTMLInputElement>(null);
   const bodyRef = useRef<HTMLTextAreaElement>(null);
   useAutoGrow(bodyRef, body ?? '', 60);
@@ -277,47 +319,33 @@ function NoteDetailView({ noteId, onBack }: { noteId: string; onBack: () => void
 
   return (
     <div className="px-4 py-4" {...swipeBack}>
-      <div className="mb-3 flex items-center gap-2">
-        <button onClick={onBack} aria-label="Späť na zoznamy" className="grid h-8 w-8 place-items-center rounded-full text-lg hover:bg-neutral-100 dark:hover:bg-neutral-800">
+      <div className="mb-1 flex items-center gap-2">
+        <button onClick={onBack} aria-label="Späť na zoznamy" className="grid h-8 w-8 shrink-0 place-items-center rounded-full text-lg hover:bg-neutral-100 dark:hover:bg-neutral-800">
           ←
         </button>
-        <div className="min-w-0 flex-1">
-          {/* Názov editovateľný priamo (ladenie 07/2026) — bez ⋯ → Upraviť. */}
-          <div className="flex items-center gap-1">
-            <span className="shrink-0">{note.kind === 'list' ? '✅' : '📝'}</span>
-            <input
-              value={titleDraft ?? note.title}
-              onChange={(e) => setTitleDraft(e.target.value)}
-              onBlur={saveTitle}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') e.currentTarget.blur();
-                if (e.key === 'Escape') setTitleDraft(null);
-              }}
-              maxLength={120}
-              aria-label="Názov"
-              className="min-w-0 flex-1 rounded-lg border border-transparent bg-transparent px-1 py-0.5 font-semibold outline-none hover:border-neutral-200 focus:border-accent dark:hover:border-neutral-700"
-            />
-          </div>
-          <p className="px-1 text-xs text-neutral-500">
-            {note.updatedBy ? `naposledy ${note.updatedBy.displayName} · ` : ''}
-            {relativeTime(note.updatedAt)}
-          </p>
-        </div>
+        <span className="shrink-0 text-lg">{note.kind === 'list' ? '✅' : '📝'}</span>
+        {/* Názov editovateľný priamo (ladenie 07/2026) — vlastný široký riadok. */}
+        <input
+          value={titleDraft ?? note.title}
+          onChange={(e) => setTitleDraft(e.target.value)}
+          onBlur={saveTitle}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') e.currentTarget.blur();
+            if (e.key === 'Escape') setTitleDraft(null);
+          }}
+          maxLength={120}
+          aria-label="Názov"
+          placeholder="Názov"
+          className="min-w-0 flex-1 rounded-lg border border-transparent bg-transparent px-1.5 py-1 text-base font-semibold outline-none hover:border-neutral-200 focus:border-accent dark:hover:border-neutral-700"
+        />
         <button
           onClick={() => void notesApi.update(noteId, { pinned: !note.pinned }).then(setNote)}
           title={note.pinned ? 'Odopnúť' : 'Pripnúť hore'}
-          className={`shrink-0 rounded-lg px-2 py-1.5 text-sm ${note.pinned ? '' : 'opacity-40'}`}
+          className={`shrink-0 rounded-lg px-2 py-1.5 text-lg ${note.pinned ? '' : 'opacity-40'}`}
         >
           📌
         </button>
-        <button
-          onClick={() => setSharePick(true)}
-          title="Poslať do chatu"
-          className="shrink-0 rounded-lg border border-neutral-300 px-2.5 py-1.5 text-sm transition hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-800"
-        >
-          💬 Zdieľať
-        </button>
-        {/* ⋯ menu — rovnaké ako na karte udalosti (7B): Upraviť / Duplikovať / Zmazať. */}
+        {/* ⋯ menu — Poslať do chatu / Duplikovať / Zmazať. */}
         <div className="relative shrink-0">
           <button
             onClick={() => setMenuOpen((v) => !v)}
@@ -329,7 +357,16 @@ function NoteDetailView({ noteId, onBack }: { noteId: string; onBack: () => void
           {menuOpen && (
             <>
               <div className="fixed inset-0 z-10" onClick={() => setMenuOpen(false)} />
-              <div className="absolute right-0 top-9 z-20 w-44 overflow-hidden rounded-xl border border-black/10 bg-white shadow-lg dark:border-white/10 dark:bg-neutral-800">
+              <div className="absolute right-0 top-9 z-20 w-48 overflow-hidden rounded-xl border border-black/10 bg-white shadow-lg dark:border-white/10 dark:bg-neutral-800">
+                <button
+                  onClick={() => {
+                    setMenuOpen(false);
+                    setSharePick(true);
+                  }}
+                  className="block w-full px-3 py-2 text-left text-sm hover:bg-neutral-100 dark:hover:bg-neutral-700"
+                >
+                  💬 Poslať do chatu
+                </button>
                 <button
                   onClick={() => {
                     setMenuOpen(false);
@@ -359,12 +396,19 @@ function NoteDetailView({ noteId, onBack }: { noteId: string; onBack: () => void
           )}
         </div>
       </div>
+      <p className="mb-3 px-1 pl-11 text-xs text-neutral-500">
+        {note.updatedBy ? `naposledy ${note.updatedBy.displayName} · ` : ''}
+        {relativeTime(note.updatedAt)}
+      </p>
 
       {/* Viditeľnosť priamo v detaile (ladenie 07/2026) — mení ju len autor. */}
       <div className="mb-3">
         {isAuthor ? (
           <button
-            onClick={() => setVisOpen((v) => !v)}
+            onClick={() => {
+              if (!visOpen) setVisDraft({ visibility: note.visibility, roomIds: note.roomIds });
+              setVisOpen((v) => !v);
+            }}
             className="rounded-full border border-neutral-300 px-3 py-1 text-xs text-neutral-600 transition hover:border-accent hover:text-accent dark:border-neutral-700 dark:text-neutral-300"
           >
             {note.visibility === 'private' ? '🔒 Len ja' : note.visibility === 'rooms' ? '👥 Podskupiny' : '👪 Celá rodina'}
@@ -376,20 +420,41 @@ function NoteDetailView({ noteId, onBack }: { noteId: string; onBack: () => void
           </span>
         )}
         {visOpen && isAuthor && (
-          <div className="mt-2 rounded-2xl border border-neutral-200 p-3 dark:border-neutral-800">
+          <div className="mt-2 space-y-2 rounded-2xl border border-neutral-200 p-3 dark:border-neutral-800">
+            {/* Lokálny draft: klik na „Podskupiny" najprv odkryje zoznam miestností
+                (predtým sa hneď ukladalo a prázdny výber sa zahodil → nefungovalo). */}
             <VisibilityPicker
-              visibility={note.visibility}
-              roomIds={note.roomIds}
-              onChange={(v, r) => {
-                if (v === 'rooms' && r.length === 0) return;
-                void notesApi
-                  .update(noteId, { visibility: v, roomIds: v === 'rooms' ? r : [] })
-                  .then((n) => {
-                    setNote(n);
-                    flash('Viditeľnosť zmenená ✓');
-                  });
-              }}
+              visibility={visDraft.visibility}
+              roomIds={visDraft.roomIds}
+              onChange={(v, r) => setVisDraft({ visibility: v, roomIds: r })}
             />
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => setVisOpen(false)}
+                className="rounded-lg px-3 py-1.5 text-sm text-neutral-500"
+              >
+                Zrušiť
+              </button>
+              <button
+                onClick={() => {
+                  if (visDraft.visibility === 'rooms' && visDraft.roomIds.length === 0) return;
+                  void notesApi
+                    .update(noteId, {
+                      visibility: visDraft.visibility,
+                      roomIds: visDraft.visibility === 'rooms' ? visDraft.roomIds : [],
+                    })
+                    .then((n) => {
+                      setNote(n);
+                      setVisOpen(false);
+                      flash('Viditeľnosť zmenená ✓');
+                    });
+                }}
+                disabled={visDraft.visibility === 'rooms' && visDraft.roomIds.length === 0}
+                className="rounded-lg bg-accent px-3 py-1.5 text-sm font-medium text-white disabled:opacity-40"
+              >
+                Uložiť
+              </button>
+            </div>
           </div>
         )}
       </div>

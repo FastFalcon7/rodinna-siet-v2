@@ -169,16 +169,9 @@ export function EventCard({ entityId, compact }: EntityCardProps) {
           {menuOpen && (
             <>
               <div className="fixed inset-0 z-10" onClick={() => setMenuOpen(false)} />
+              {/* Klik na kartu už otvára úpravu — v ⋯ ostáva len rýchle Zmazať
+                  (aby sa neaktuálna udalosť dala zmazať bez otvorenia). */}
               <div className="absolute right-0 top-8 z-20 w-32 overflow-hidden rounded-xl border border-black/10 bg-white shadow-lg dark:border-white/10 dark:bg-neutral-800">
-                <button
-                  onClick={() => {
-                    setMenuOpen(false);
-                    setEditing(true);
-                  }}
-                  className="block w-full px-3 py-2 text-left text-sm hover:bg-neutral-100 dark:hover:bg-neutral-700"
-                >
-                  Upraviť
-                </button>
                 <button
                   onClick={() => void del()}
                   className="block w-full px-3 py-2 text-left text-sm text-red-600 hover:bg-neutral-100 dark:hover:bg-neutral-700"
@@ -251,7 +244,11 @@ export function EventCard({ entityId, compact }: EntityCardProps) {
   );
 }
 
-/** Inline úprava udalosti (autor/admin) — zdieľaný EventForm (rovnaké polia ako tvorba). */
+/**
+ * Úprava udalosti (autor/admin) ako celoobrazovkový detail — otvorí sa klikom
+ * na udalosť, swipe od ľavého okraja doprava zavrie (ako detail poznámky).
+ * Zdieľaný EventForm má rovnaké polia ako tvorba + „Uložiť".
+ */
 function EventEditForm({
   event,
   onDone,
@@ -261,15 +258,29 @@ function EventEditForm({
   onDone: (updated: EventPublic) => void;
   onCancel: () => void;
 }) {
-  // Swipe od ľavého okraja doprava = zavrieť (ako detail poznámky), ladenie 07/2026.
-  const swipeBack = useSwipeBack(onCancel, { edgeOnly: true });
+  const swipeBack = useSwipeBack(onCancel);
   return (
     <div
-      className="rounded-xl border border-neutral-200 bg-white p-4 dark:border-neutral-800 dark:bg-neutral-900"
+      className="fixed inset-0 z-50 overflow-y-auto app-bg"
+      style={{ paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }}
       onClick={(e) => e.stopPropagation()}
       {...swipeBack}
     >
-      <EventForm event={event} submitLabel="Uložiť" busyLabel="Ukladám…" onDone={onDone} onCancel={onCancel} />
+      <div className="mx-auto max-w-2xl px-4 py-4">
+        <div className="mb-3 flex items-center gap-2">
+          <button
+            onClick={onCancel}
+            aria-label="Späť"
+            className="grid h-8 w-8 place-items-center rounded-full text-lg hover:bg-neutral-100 dark:hover:bg-neutral-800"
+          >
+            ←
+          </button>
+          <h2 className="font-semibold">Upraviť udalosť</h2>
+        </div>
+        <div className="rounded-2xl border border-neutral-200 bg-white p-4 dark:border-neutral-800 dark:bg-neutral-900">
+          <EventForm event={event} submitLabel="Uložiť" busyLabel="Ukladám…" onDone={onDone} onCancel={onCancel} />
+        </div>
+      </div>
     </div>
   );
 }
