@@ -179,6 +179,12 @@ function NoteDetailView({ noteId, onBack }: { noteId: string; onBack: () => void
   const [error, setError] = useState<string | null>(null);
   const [newItem, setNewItem] = useState('');
   const [body, setBody] = useState<string | null>(null); // lokálny draft textu poznámky
+  // Auto-save textu (ladenie 07/2026): stav pre jemný indikátor namiesto tlačidla.
+  const [saving, setSaving] = useState(false);
+  const [savedAt, setSavedAt] = useState<number | null>(null);
+  const bodyTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const savedBodyRef = useRef<string | null>(null);
+  const bodyRefLatest = useRef<string | null>(null);
   const [assignFor, setAssignFor] = useState<string | null>(null);
   const [members, setMembers] = useState<{ id: string; displayName: string }[]>([]);
   const [sharePick, setSharePick] = useState(false);
@@ -206,6 +212,8 @@ function NoteDetailView({ noteId, onBack }: { noteId: string; onBack: () => void
       .then((n) => {
         setNote(n);
         setBody((cur) => cur ?? n.bodyMd);
+        // Referencia „čo je na serveri" — auto-save podľa nej pozná zmenu.
+        savedBodyRef.current ??= n.bodyMd;
       })
       .catch((err) => setError(err instanceof ApiError ? err.message : 'Načítanie zlyhalo'));
 
@@ -217,6 +225,21 @@ function NoteDetailView({ noteId, onBack }: { noteId: string; onBack: () => void
     return off;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [noteId, subscribe]);
+
+  // Rozpísaný text drž v ref, nech ho odchod z detailu vie uložiť.
+  bodyRefLatest.current = body;
+
+  // Odchod z poznámky (späť/swipe/prepnutie modulu) — dopíš posledné zmeny.
+  useEffect(() => {
+    return () => {
+      if (bodyTimer.current) clearTimeout(bodyTimer.current);
+      const text = bodyRefLatest.current;
+      if (text !== null && text !== savedBodyRef.current) {
+        void notesApi.update(noteId, { bodyMd: text }).catch(() => {});
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [noteId]);
 
   useEffect(() => {
     void usersApi.list().then((r) => setMembers(r.users.map((u) => ({ id: u.id, displayName: u.displayName }))));
@@ -260,10 +283,32 @@ function NoteDetailView({ noteId, onBack }: { noteId: string; onBack: () => void
     await chatApi.sendMessage(roomId, { bodyMd: buildAppLink('notes', noteId), mediaIds: [] });
   };
 
-  const saveBody = async () => {
-    if (body === null) return;
-    if (body !== note.bodyMd) setNote(await notesApi.update(noteId, { bodyMd: body }));
-    flash('Uložené ✓');
+  /**
+   * Text poznámky sa ukladá SÁM (ladenie 07/2026) — rovnako ako položky
+   * zoznamu, ktoré tlačidlo „Uložiť" nikdy nemali. Ukladá sa po krátkej
+   * pauze v písaní, pri opustení poľa a pri odchode z detailu.
+   */
+  const flushBody = async (text: string) => {
+    if (text === savedBodyRef.current) return;
+    savedBodyRef.current = text;
+    setSaving(true);
+    try {
+      setNote(await notesApi.update(noteId, { bodyMd: text }));
+      setSavedAt(Date.now());
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const onBodyChange = (text: string) => {
+    setBody(text);
+    if (bodyTimer.current) clearTimeout(bodyTimer.current);
+    bodyTimer.current = setTimeout(() => void flushBody(text), 1200);
+  };
+
+  const flushNow = () => {
+    if (bodyTimer.current) clearTimeout(bodyTimer.current);
+    if (body !== null) void flushBody(body);
   };
 
   const uploadMedia = async (files: File[]) => {
@@ -294,8 +339,10 @@ function NoteDetailView({ noteId, onBack }: { noteId: string; onBack: () => void
         const { latitude, longitude } = pos.coords;
         const text = `📍 Poloha: https://maps.google.com/?q=${latitude.toFixed(6)},${longitude.toFixed(6)}`;
         if (note.kind === 'note') {
-          setBody((cur) => (cur?.trim() ? `${cur}\n${text}` : text));
-          flash('Poloha vložená — nezabudni Uložiť');
+          // Vloženie polohy rovno uloží (text sa ukladá automaticky).
+          const next = body?.trim() ? `${body}\n${text}` : text;
+          onBodyChange(next);
+          flash('Poloha vložená ✓');
         } else {
           void notesApi.addItem(noteId, text).then(setNote);
         }
@@ -600,19 +647,17 @@ function NoteDetailView({ noteId, onBack }: { noteId: string; onBack: () => void
           <textarea
             ref={bodyRef}
             value={body ?? ''}
-            onChange={(e) => setBody(e.target.value)}
+            onChange={(e) => onBodyChange(e.target.value)}
+            onBlur={flushNow}
             rows={6}
             placeholder="Píš sem…"
             className="min-h-40 w-full resize-none rounded-2xl border border-neutral-200 bg-white px-4 py-3 text-sm leading-relaxed outline-none focus:border-accent dark:border-neutral-800 dark:bg-neutral-900"
           />
           <div className="mt-2 flex items-center gap-3">
-            <button
-              onClick={() => void saveBody()}
-              disabled={body === null}
-              className="rounded-lg bg-accent px-4 py-1.5 text-sm font-medium text-white disabled:opacity-40"
-            >
-              Uložiť
-            </button>
+            {/* Bez tlačidla „Uložiť" — len jemný stav (ladenie 07/2026). */}
+            <span className="text-xs text-neutral-400">
+              {saving ? 'Ukladám…' : savedAt ? 'Uložené ✓' : 'Ukladá sa automaticky'}
+            </span>
             {note.revisionCount > 0 && (
               <button
                 onClick={() =>

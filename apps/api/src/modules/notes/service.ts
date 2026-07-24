@@ -308,11 +308,27 @@ export async function updateNote(noteId: string, userId: string, input: UpdateNo
   }
 
   // Zmena textu: predchádzajúci obsah do revízií (história verzií).
+  // Auto-save (ladenie 07/2026) ukladá po každej pauze v písaní — aby z jednej
+  // úpravy nevznikli desiatky verzií, revízie sa v 15-min okne toho istého
+  // autora zlučujú (najstaršia = stav pred začiatkom písania, čo je to, čo
+  // chce užívateľ obnoviť).
   if (input.bodyMd !== undefined && input.bodyMd !== note.bodyMd) {
     if (note.bodyMd.trim().length > 0) {
-      await db
-        .insert(noteRevisions)
-        .values({ noteId, bodyMd: note.bodyMd, savedBy: note.updatedBy ?? note.createdBy });
+      const lastAuthor = note.updatedBy ?? note.createdBy;
+      const recent = await db
+        .select({ id: noteRevisions.id, savedBy: noteRevisions.savedBy, savedAt: noteRevisions.savedAt })
+        .from(noteRevisions)
+        .where(eq(noteRevisions.noteId, noteId))
+        .orderBy(desc(noteRevisions.savedAt))
+        .limit(1);
+      const last = recent[0];
+      const mergeable =
+        last !== undefined &&
+        last.savedBy === lastAuthor &&
+        Date.now() - last.savedAt.getTime() < 15 * 60 * 1000;
+      if (!mergeable) {
+        await db.insert(noteRevisions).values({ noteId, bodyMd: note.bodyMd, savedBy: lastAuthor });
+      }
     }
   }
 
